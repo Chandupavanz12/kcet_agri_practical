@@ -255,7 +255,7 @@ export async function connectDb() {
   }
 
   // Parse connection string to extract components
-  const match = dbUrl.match(/^postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)$/);
+  const match = dbUrl.match(/^postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)(?:\?.*)?$/);
   if (!match) {
     throw new Error('Invalid DATABASE_URL format');
   }
@@ -268,7 +268,7 @@ export async function connectDb() {
     host,
     port: parseInt(port, 10),
     database,
-    ssl: false,
+    ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 60000,
     idleTimeoutMillis: 30000,
   });
