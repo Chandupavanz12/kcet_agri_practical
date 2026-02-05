@@ -1,4 +1,4 @@
-import { query } from '../config/db.js';
+import { query } from '../config/db-pg.js';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import { signToken, hashPassword, verifyPassword } from '../utils/auth.js';

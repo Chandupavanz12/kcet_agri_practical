@@ -1,4 +1,4 @@
-import { query } from '../config/db.js';
+import { query } from '../config/db-pg.js';
 import { ensureSettings } from '../seed/ensureSettings.js';
 import { makePrivateMaterialRef, makePrivateUploadRef, makePublicUploadUrl } from '../middleware/upload.js';
 import { hashPassword } from '../utils/auth.js';

@@ -1,5 +1,5 @@
 import { hashPassword } from '../utils/auth.js';
-import { query } from '../config/db.js';
+import { query } from '../config/db-pg.js';
 
 export async function ensureAdminUser() {
   const email = process.env.ADMIN_EMAIL;

@@ -1,4 +1,4 @@
-import { query } from '../config/db.js';
+import { query } from '../config/db-pg.js';
 
 export async function ensureSettings() {
   await query('INSERT IGNORE INTO settings (id) VALUES (1)');
