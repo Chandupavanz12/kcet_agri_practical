@@ -256,7 +256,10 @@ export async function connectDb() {
 
   pool = new pg.Pool({
     connectionString: dbUrl,
-    ssl: { rejectUnauthorized: false },
+    ssl: false,
+    keepAlive: true,
+    connectionTimeoutMillis: 60000,
+    idleTimeoutMillis: 30000,
   });
 
   await query('SELECT 1');
