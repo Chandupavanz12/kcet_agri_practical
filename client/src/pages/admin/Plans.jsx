@@ -3,6 +3,7 @@ import AdminCRUDPage from '../../components/AdminCRUDPage.jsx';
 
 export default function Plans() {
   const fields = [
+    { name: 'code', label: 'Code (combo|pyq|materials)', type: 'text' },
     { name: 'name', label: 'Name', type: 'text' },
     { name: 'priceRupees', label: 'Price (₹)', type: 'number' },
     { name: 'durationDays', label: 'Duration (days)', type: 'number' },
@@ -21,12 +22,13 @@ export default function Plans() {
       title="Premium Plans"
       apiEndpoint="plans"
       responseKey="plans"
-      disableCreate={true}
+      disableCreate={false}
       fields={fields}
-      initialForm={{ name: '', priceRupees: 0, durationDays: 365, status: 'active', isFree: '0' }}
+      initialForm={{ code: '', name: '', priceRupees: 0, durationDays: 365, status: 'active', isFree: '0' }}
       listTransform={(p) => ({
         id: p.id,
         title: p.name,
+        code: p.code,
         name: p.name,
         priceRupees: Number(p.pricePaise || 0) / 100,
         durationDays: p.durationDays,
@@ -34,6 +36,7 @@ export default function Plans() {
         isFree: p.isFree ? '1' : '0',
       })}
       formTransform={(f) => ({
+        code: f.code,
         name: f.name,
         pricePaise: Math.round(Number(f.priceRupees || 0) * 100),
         durationDays: Number(f.durationDays || 365),

@@ -12,7 +12,7 @@ export default function StudentNotifications() {
     try {
       setError('');
       if (opts.showLoading) setLoading(true);
-      const res = await apiFetch('/api/student/dashboard', { token });
+      const res = await apiFetch('/api/student/notifications', { token });
       if (!isAlive()) return;
       setNotifications(Array.isArray(res?.notifications) ? res.notifications : []);
     } catch (e) {

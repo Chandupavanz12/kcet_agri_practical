@@ -29,6 +29,7 @@ import {
   updateMaterial,
   deleteMaterial,
   listPlans,
+  createPlan,
   updatePlan,
   deletePlan,
   listPayments,
@@ -93,11 +94,10 @@ adminRouter.post('/upload/material-private', uploadMaterialPrivate.single('file'
 adminRouter.post('/upload/pyq-pdf', uploadPyqPdf.single('file'), uploadPyqPdfPrivate);
 adminRouter.post('/upload/pyq-public', uploadPyqPdfPublicMulter.single('file'), uploadPyqPdfPublic);
 
-adminRouter.post('/exam-centres', createExamCentre);
 adminRouter.get('/exam-centres', listExamCentres);
+adminRouter.post('/exam-centres', createExamCentre);
 adminRouter.put('/exam-centres/:id', updateExamCentre);
 adminRouter.delete('/exam-centres/:id', deleteExamCentre);
-
 adminRouter.post('/exam-centres/:centreId/years', createExamCentreYear);
 adminRouter.get('/exam-centres/:centreId/years', listExamCentreYears);
 adminRouter.put('/exam-centre-years/:id', updateExamCentreYear);
@@ -114,6 +114,7 @@ adminRouter.put('/materials/:id', updateMaterial);
 adminRouter.delete('/materials/:id', deleteMaterial);
 
 adminRouter.get('/plans', listPlans);
+adminRouter.post('/plans', createPlan);
 adminRouter.put('/plans/:id', updatePlan);
 adminRouter.delete('/plans/:id', deletePlan);
 

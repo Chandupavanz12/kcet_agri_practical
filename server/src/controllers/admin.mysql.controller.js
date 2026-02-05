@@ -1,7 +1,42 @@
-import { query } from '../config/db-pg.js';
+import {
+  Counter,
+  ExamCentre,
+  ExamCentreYear,
+  Material,
+  Menu,
+  Notification,
+  Payment,
+  Plan,
+  Pyq,
+  Result,
+  Settings,
+  Specimen,
+  Test,
+  TestQuestion,
+  User,
+  Video,
+} from '../models/index.js';
 import { ensureSettings } from '../seed/ensureSettings.js';
 import { makePrivateMaterialRef, makePrivateUploadRef, makePublicUploadUrl } from '../middleware/upload.js';
 import { hashPassword } from '../utils/auth.js';
+
+async function getNextNumericId(sequenceName, ensureAtLeast) {
+  const min = Number(ensureAtLeast || 0);
+  if (Number.isFinite(min) && min > 0) {
+    await Counter.findByIdAndUpdate(
+      sequenceName,
+      { $max: { seq: min } },
+      { upsert: true, setDefaultsOnInsert: true }
+    );
+  }
+
+  const doc = await Counter.findByIdAndUpdate(
+    sequenceName,
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true, setDefaultsOnInsert: true }
+  ).lean();
+  return Number(doc.seq);
+}
 
 function toBool(v) {
   if (typeof v === 'boolean') return v;
@@ -70,23 +105,75 @@ async function ensureExamCentreByName(name) {
   const centreName = typeof name === 'string' ? name.trim() : '';
   if (!centreName) return null;
 
-  await query(
-    "INSERT INTO exam_centres (name, status) VALUES (?, 'active') ON DUPLICATE KEY UPDATE status = 'active'",
-    [centreName]
-  );
+  let doc = await ExamCentre.findOne({ name: centreName }).lean();
 
-  const rows = await query('SELECT id FROM exam_centres WHERE name = ? LIMIT 1', [centreName]);
-  return rows.length ? Number(rows[0].id) : null;
+  if (!doc) {
+    const newCentre = new ExamCentre({
+      name: centreName,
+      status: 'active',
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    await newCentre.save();
+    return newCentre.id;
+  }
+
+  if (doc.id === undefined || doc.id === null) {
+    const maxRow = await ExamCentre.findOne({ id: { $ne: null } }).sort({ id: -1 }).select({ id: 1 }).lean();
+    const nextId = await getNextNumericId('exam_centres', Number(maxRow?.id || 0));
+    await ExamCentre.updateOne(
+      { _id: doc._id, $or: [{ id: { $exists: false } }, { id: null }] },
+      { $set: { id: nextId, updated_at: new Date() } }
+    );
+    return nextId;
+  }
+
+  if (doc.status !== 'active') {
+    await ExamCentre.updateOne(
+      { name: centreName },
+      { $set: { status: 'active', updated_at: new Date() } }
+    );
+  }
+
+  return doc?.id != null ? Number(doc.id) : null;
 }
 
 async function ensureExamCentreYearActive(centreId, year) {
   const yr = typeof year === 'string' ? year.trim() : String(year ?? '').trim();
   if (!yr) return null;
 
-  await query(
-    "INSERT INTO exam_centre_years (centre_id, year, status) VALUES (?, ?, 'active') ON DUPLICATE KEY UPDATE status = 'active'",
-    [centreId, yr]
-  );
+  const cid = Number(centreId);
+  if (!Number.isFinite(cid)) return null;
+
+  const existing = await ExamCentreYear.findOne({ centre_id: cid, year: yr }).lean();
+  if (!existing) {
+    const doc = new ExamCentreYear({
+      centre_id: cid,
+      year: yr,
+      status: 'active',
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    await doc.save();
+    return yr;
+  }
+
+  if (existing.id === undefined || existing.id === null) {
+    const maxRow = await ExamCentreYear.findOne({ id: { $ne: null } }).sort({ id: -1 }).select({ id: 1 }).lean();
+    const nextId = await getNextNumericId('exam_centre_years', Number(maxRow?.id || 0));
+    await ExamCentreYear.updateOne(
+      { _id: existing._id, $or: [{ id: { $exists: false } }, { id: null }] },
+      { $set: { id: nextId, updated_at: new Date() } }
+    );
+  }
+
+  if (existing.status !== 'active') {
+    await ExamCentreYear.updateOne(
+      { _id: existing._id },
+      { $set: { status: 'active', updated_at: new Date() } }
+    );
+  }
+
   return yr;
 }
 
@@ -162,9 +249,10 @@ export async function createExamCentre(req, res, next) {
     if (!name) return res.status(400).json({ message: 'name is required' });
     if (!['active', 'inactive'].includes(status)) return res.status(400).json({ message: 'status must be active|inactive' });
 
-    const result = await query('INSERT INTO exam_centres (name, status) VALUES (?, ?)', [name, status]);
-    const rows = await query('SELECT * FROM exam_centres WHERE id = ? LIMIT 1', [result.insertId]);
-    return res.status(201).json({ centre: rows[0] });
+    const centre = new ExamCentre({ name, status, created_at: new Date(), updated_at: new Date() });
+    await centre.save();
+    const doc = await ExamCentre.findOne({ id: centre.id }, { _id: 0, __v: 0 }).lean();
+    return res.status(201).json({ centre: doc });
   } catch (err) {
     return next(err);
   }
@@ -172,8 +260,8 @@ export async function createExamCentre(req, res, next) {
 
 export async function listExamCentres(req, res, next) {
   try {
-    const rows = await query('SELECT * FROM exam_centres ORDER BY name ASC, id ASC');
-    return res.json({ centres: rows });
+    const centres = await ExamCentre.find({}, { _id: 0, __v: 0 }).sort({ name: 1, id: 1 }).lean();
+    return res.json({ centres });
   } catch (err) {
     return next(err);
   }
@@ -183,13 +271,17 @@ export async function updateExamCentre(req, res, next) {
   try {
     const { id } = req.params;
     const fields = req.body || {};
-    const mapping = { name: 'name', status: 'status' };
-    const { set, params } = buildUpdate(fields, mapping);
-    if (set.length === 0) return res.status(400).json({ message: 'No fields to update' });
-    await query(`UPDATE exam_centres SET ${set.join(', ')} WHERE id = ?`, [...params, id]);
-    const rows = await query('SELECT * FROM exam_centres WHERE id = ? LIMIT 1', [id]);
-    if (!rows.length) return res.status(404).json({ message: 'Centre not found' });
-    return res.json({ centre: rows[0] });
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(fields, 'name')) updates.name = fields.name;
+    if (Object.prototype.hasOwnProperty.call(fields, 'status')) updates.status = fields.status;
+
+    if (Object.keys(updates).length === 0) return res.status(400).json({ message: 'No fields to update' });
+
+    updates.updated_at = new Date();
+    await ExamCentre.updateOne({ id: Number(id) }, { $set: updates });
+    const doc = await ExamCentre.findOne({ id: Number(id) }, { _id: 0, __v: 0 }).lean();
+    if (!doc) return res.status(404).json({ message: 'Centre not found' });
+    return res.json({ centre: doc });
   } catch (err) {
     return next(err);
   }
@@ -198,11 +290,13 @@ export async function updateExamCentre(req, res, next) {
 export async function deleteExamCentre(req, res, next) {
   try {
     const { id } = req.params;
-    const rows = await query('SELECT id FROM exam_centres WHERE id = ? LIMIT 1', [id]);
-    if (!rows.length) return res.status(404).json({ message: 'Centre not found' });
-    await query('DELETE FROM exam_centre_years WHERE centre_id = ?', [id]);
-    await query('UPDATE pyqs SET centre_id = NULL WHERE centre_id = ?', [id]);
-    await query('DELETE FROM exam_centres WHERE id = ?', [id]);
+
+    const existing = await ExamCentre.findOne({ id: Number(id) }, { id: 1, _id: 0 }).lean();
+    if (!existing) return res.status(404).json({ message: 'Centre not found' });
+
+    await ExamCentreYear.deleteMany({ centre_id: Number(id) });
+    await Pyq.updateMany({ centre_id: Number(id) }, { $set: { centre_id: null } });
+    await ExamCentre.deleteOne({ id: Number(id) });
     return res.json({ ok: true });
   } catch (err) {
     return next(err);
@@ -216,12 +310,20 @@ export async function createExamCentreYear(req, res, next) {
     const status = typeof req.body?.status === 'string' ? req.body.status.trim().toLowerCase() : 'active';
     if (!year) return res.status(400).json({ message: 'year is required' });
     if (!['active', 'inactive'].includes(status)) return res.status(400).json({ message: 'status must be active|inactive' });
-    const centres = await query('SELECT id FROM exam_centres WHERE id = ? LIMIT 1', [centreId]);
-    if (!centres.length) return res.status(404).json({ message: 'Centre not found' });
 
-    const result = await query('INSERT INTO exam_centre_years (centre_id, year, status) VALUES (?, ?, ?)', [centreId, year, status]);
-    const rows = await query('SELECT * FROM exam_centre_years WHERE id = ? LIMIT 1', [result.insertId]);
-    return res.status(201).json({ year: rows[0] });
+    const centre = await ExamCentre.findOne({ id: Number(centreId) }, { id: 1, _id: 0 }).lean();
+    if (!centre) return res.status(404).json({ message: 'Centre not found' });
+
+    const doc = new ExamCentreYear({
+      centre_id: Number(centreId),
+      year,
+      status,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    await doc.save();
+    const saved = await ExamCentreYear.findOne({ id: doc.id }, { _id: 0, __v: 0 }).lean();
+    return res.status(201).json({ year: saved });
   } catch (err) {
     return next(err);
   }
@@ -230,8 +332,10 @@ export async function createExamCentreYear(req, res, next) {
 export async function listExamCentreYears(req, res, next) {
   try {
     const { centreId } = req.params;
-    const rows = await query('SELECT * FROM exam_centre_years WHERE centre_id = ? ORDER BY year DESC, id DESC', [centreId]);
-    return res.json({ years: rows });
+    const years = await ExamCentreYear.find({ centre_id: Number(centreId) }, { _id: 0, __v: 0 })
+      .sort({ year: -1, id: -1 })
+      .lean();
+    return res.json({ years });
   } catch (err) {
     return next(err);
   }
@@ -241,13 +345,17 @@ export async function updateExamCentreYear(req, res, next) {
   try {
     const { id } = req.params;
     const fields = req.body || {};
-    const mapping = { year: 'year', status: 'status' };
-    const { set, params } = buildUpdate(fields, mapping);
-    if (set.length === 0) return res.status(400).json({ message: 'No fields to update' });
-    await query(`UPDATE exam_centre_years SET ${set.join(', ')} WHERE id = ?`, [...params, id]);
-    const rows = await query('SELECT * FROM exam_centre_years WHERE id = ? LIMIT 1', [id]);
-    if (!rows.length) return res.status(404).json({ message: 'Year not found' });
-    return res.json({ year: rows[0] });
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(fields, 'year')) updates.year = fields.year;
+    if (Object.prototype.hasOwnProperty.call(fields, 'status')) updates.status = fields.status;
+
+    if (Object.keys(updates).length === 0) return res.status(400).json({ message: 'No fields to update' });
+
+    updates.updated_at = new Date();
+    await ExamCentreYear.updateOne({ id: Number(id) }, { $set: updates });
+    const doc = await ExamCentreYear.findOne({ id: Number(id) }, { _id: 0, __v: 0 }).lean();
+    if (!doc) return res.status(404).json({ message: 'Year not found' });
+    return res.json({ year: doc });
   } catch (err) {
     return next(err);
   }
@@ -256,14 +364,16 @@ export async function updateExamCentreYear(req, res, next) {
 export async function deleteExamCentreYear(req, res, next) {
   try {
     const { id } = req.params;
-    const rows = await query('SELECT id, centre_id, year FROM exam_centre_years WHERE id = ? LIMIT 1', [id]);
-    if (!rows.length) return res.status(404).json({ message: 'Year not found' });
-    const y = rows[0];
-    const used = await query('SELECT COUNT(*) as cnt FROM pyqs WHERE centre_id = ? AND year = ? LIMIT 1', [y.centre_id, y.year]);
-    if (Number(used?.[0]?.cnt || 0) > 0) {
+
+    const y = await ExamCentreYear.findOne({ id: Number(id) }, { id: 1, centre_id: 1, year: 1, _id: 0 }).lean();
+    if (!y) return res.status(404).json({ message: 'Year not found' });
+
+    const cnt = await Pyq.countDocuments({ centre_id: Number(y.centre_id), year: String(y.year) });
+    if (Number(cnt || 0) > 0) {
       return res.status(400).json({ message: 'Cannot delete year with existing PYQs' });
     }
-    await query('DELETE FROM exam_centre_years WHERE id = ?', [id]);
+
+    await ExamCentreYear.deleteOne({ id: Number(id) });
     return res.json({ ok: true });
   } catch (err) {
     return next(err);
@@ -272,10 +382,20 @@ export async function deleteExamCentreYear(req, res, next) {
 
 export async function listStudents(req, res, next) {
   try {
-    const students = await query(
-      'SELECT id, name, email, created_at as createdAt FROM users WHERE role = ? ORDER BY created_at DESC',
-      ['student']
-    );
+    const rows = await User.find(
+      { role: 'student' },
+      { _id: 0, id: 1, name: 1, email: 1, created_at: 1 }
+    )
+      .sort({ created_at: -1, id: -1 })
+      .lean();
+
+    const students = (rows || []).map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      createdAt: u.created_at,
+    }));
+
     return res.json({ students });
   } catch (err) {
     return next(err);
@@ -290,20 +410,34 @@ export async function createStudent(req, res, next) {
       return res.status(400).json({ message: 'name, email, password are required' });
     }
 
-    const existing = await query('SELECT id FROM users WHERE email = ? LIMIT 1', [(email || '').toLowerCase()]);
-    if (existing.length > 0) {
+    const normalizedEmail = String(email || '').toLowerCase();
+    const existing = await User.findOne({ email: normalizedEmail }, { id: 1, _id: 0 }).lean();
+    if (existing) {
       return res.status(409).json({ message: 'Email already exists' });
     }
 
     const passwordHash = await hashPassword(password);
-    const result = await query('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)', [
-      name,
-      email.toLowerCase(),
-      passwordHash,
-      'student',
-    ]);
 
-    return res.status(201).json({ user: { id: result.insertId, name, email: email.toLowerCase(), role: 'student' } });
+    try {
+      const user = new User({
+        name,
+        email: normalizedEmail,
+        password_hash: passwordHash,
+        role: 'student',
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+      await user.save();
+
+      return res.status(201).json({
+        user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      });
+    } catch (e) {
+      if (e && (e.code === 11000 || e.code === 11001)) {
+        return res.status(409).json({ message: 'Email already exists' });
+      }
+      throw e;
+    }
   } catch (err) {
     return next(err);
   }
@@ -314,32 +448,44 @@ export async function updateStudent(req, res, next) {
     const { id } = req.params;
     const { name, email, password } = req.body;
 
-    const rows = await query('SELECT * FROM users WHERE id = ? AND role = ? LIMIT 1', [id, 'student']);
-    const student = rows[0];
+    const student = await User.findOne({ id: Number(id), role: 'student' }, { _id: 0, __v: 0 }).lean();
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    if (email && email.toLowerCase() !== student.email) {
-      const existing = await query('SELECT id FROM users WHERE email = ? LIMIT 1', [email.toLowerCase()]);
-      if (existing.length > 0) {
+    const normalizedEmail = email ? String(email).toLowerCase() : null;
+    if (normalizedEmail && normalizedEmail !== student.email) {
+      const existing = await User.findOne({ email: normalizedEmail }, { id: 1, _id: 0 }).lean();
+      if (existing) {
         return res.status(409).json({ message: 'Email already exists' });
       }
     }
 
     const updates = {};
     if (name) updates.name = name;
-    if (email) updates.email = email.toLowerCase();
+    if (normalizedEmail) updates.email = normalizedEmail;
     if (password) updates.password_hash = await hashPassword(password);
 
-    const { set, params } = buildUpdate(updates, { name: 'name', email: 'email', password_hash: 'password_hash' });
-    if (set.length === 0) {
+    if (Object.keys(updates).length === 0) {
       return res.json({ user: { id: student.id, name: student.name, email: student.email, role: student.role } });
     }
 
-    await query(`UPDATE users SET ${set.join(', ')} WHERE id = ?`, [...params, id]);
-    const updatedRows = await query('SELECT id, name, email, role FROM users WHERE id = ? LIMIT 1', [id]);
-    return res.json({ user: updatedRows[0] });
+    updates.updated_at = new Date();
+    try {
+      await User.updateOne({ id: Number(id), role: 'student' }, { $set: updates });
+    } catch (e) {
+      if (e && (e.code === 11000 || e.code === 11001)) {
+        return res.status(409).json({ message: 'Email already exists' });
+      }
+      throw e;
+    }
+
+    const updated = await User.findOne(
+      { id: Number(id) },
+      { _id: 0, id: 1, name: 1, email: 1, role: 1 }
+    ).lean();
+
+    return res.json({ user: updated });
   } catch (err) {
     return next(err);
   }
@@ -349,13 +495,13 @@ export async function deleteStudent(req, res, next) {
   try {
     const { id } = req.params;
 
-    const rows = await query('SELECT id FROM users WHERE id = ? AND role = ? LIMIT 1', [id, 'student']);
-    if (rows.length === 0) {
+    const existing = await User.findOne({ id: Number(id), role: 'student' }, { id: 1, _id: 0 }).lean();
+    if (!existing) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    await query('DELETE FROM results WHERE user_id = ?', [id]);
-    await query('DELETE FROM users WHERE id = ?', [id]);
+    await Result.deleteMany({ user_id: Number(id) });
+    await User.deleteOne({ id: Number(id) });
 
     return res.json({ ok: true });
   } catch (err) {
@@ -378,19 +524,23 @@ export async function createVideo(req, res, next) {
     if (!normalizeStatus(status, ['active', 'inactive'])) errors.status = 'status must be active|inactive';
     if (Object.keys(errors).length) return badRequest(res, 'Validation failed', errors);
 
-    const result = await query(
-      'INSERT INTO videos (title, video_url, subject, status) VALUES (?, ?, ?, ?)',
-      [title, videoUrl, subject, status]
-    );
-    const rows = await query('SELECT * FROM videos WHERE id = ? LIMIT 1', [result.insertId]);
-    const v = rows[0];
+    const v = new Video({
+      title,
+      video_url: videoUrl,
+      subject,
+      status,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    await v.save();
+
     return res.status(201).json({
       video: { 
-        id: v.id, 
-        title: v.title, 
-        videoUrl: v.video_url, 
-        subject: v.subject, 
-        status: v.status 
+        id: v.id,
+        title: v.title,
+        videoUrl: v.video_url,
+        subject: v.subject,
+        status: v.status,
       },
     });
   } catch (err) {
@@ -400,8 +550,10 @@ export async function createVideo(req, res, next) {
 
 export async function listVideos(req, res, next) {
   try {
-    const rows = await query('SELECT * FROM videos ORDER BY created_at DESC');
-    const videos = rows.map((v) => ({
+    const rows = await Video.find({}, { _id: 0, __v: 0 })
+      .sort({ created_at: -1, id: -1 })
+      .lean();
+    const videos = (rows || []).map((v) => ({
       id: v.id,
       title: v.title,
       videoUrl: v.video_url,
@@ -425,35 +577,39 @@ export async function updateVideo(req, res, next) {
       body.status = st;
     }
 
-    const mapping = { title: 'title', videoUrl: 'video_url', subject: 'subject', status: 'status' };
-    const { set, params } = buildUpdate(body, mapping);
-    if (set.length === 0) {
-      const rows = await query('SELECT * FROM videos WHERE id = ? LIMIT 1', [id]);
-      const v = rows[0];
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(body, 'title')) updates.title = body.title;
+    if (Object.prototype.hasOwnProperty.call(body, 'videoUrl')) updates.video_url = body.videoUrl;
+    if (Object.prototype.hasOwnProperty.call(body, 'subject')) updates.subject = body.subject;
+    if (Object.prototype.hasOwnProperty.call(body, 'status')) updates.status = body.status;
+
+    if (Object.keys(updates).length === 0) {
+      const v = await Video.findOne({ id: Number(id) }, { _id: 0, __v: 0 }).lean();
       if (!v) return res.status(404).json({ message: 'Video not found' });
-      return res.json({ 
-        video: { 
-          id: v.id, 
-          title: v.title, 
-          videoUrl: v.video_url, 
-          subject: v.subject, 
-          status: v.status 
-        } 
+      return res.json({
+        video: {
+          id: v.id,
+          title: v.title,
+          videoUrl: v.video_url,
+          subject: v.subject,
+          status: v.status,
+        },
       });
     }
 
-    await query(`UPDATE videos SET ${set.join(', ')} WHERE id = ?`, [...params, id]);
-    const rows = await query('SELECT * FROM videos WHERE id = ? LIMIT 1', [id]);
-    const v = rows[0];
+    updates.updated_at = new Date();
+    await Video.updateOne({ id: Number(id) }, { $set: updates });
+
+    const v = await Video.findOne({ id: Number(id) }, { _id: 0, __v: 0 }).lean();
     if (!v) return res.status(404).json({ message: 'Video not found' });
-    return res.json({ 
-      video: { 
-        id: v.id, 
-        title: v.title, 
-        videoUrl: v.video_url, 
-        subject: v.subject, 
-        status: v.status 
-      } 
+    return res.json({
+      video: {
+        id: v.id,
+        title: v.title,
+        videoUrl: v.video_url,
+        subject: v.subject,
+        status: v.status,
+      },
     });
   } catch (err) {
     return next(err);
@@ -462,18 +618,18 @@ export async function updateVideo(req, res, next) {
 
 export async function getDashboard(req, res, next) {
   try {
-    const [students, tests, videos, materials] = await Promise.all([
-      query('SELECT COUNT(*) as count FROM users WHERE role = ?', ['student']).catch(() => [{ count: 0 }]),
-      query('SELECT COUNT(*) as count FROM tests WHERE is_active = 1').catch(() => [{ count: 0 }]),
-      query('SELECT COUNT(*) as count FROM videos WHERE status = ?', ['active']).catch(() => [{ count: 0 }]),
-      query('SELECT COUNT(*) as count FROM materials').catch(() => [{ count: 0 }]),
+    const [studentsCount, testsCount, videosCount, materialsCount] = await Promise.all([
+      User.countDocuments({ role: 'student' }).catch(() => 0),
+      Test.countDocuments({ is_active: true }).catch(() => 0),
+      Video.countDocuments({ status: 'active' }).catch(() => 0),
+      Material.countDocuments({}).catch(() => 0),
     ]);
 
     return res.json({
-      students: students[0] || { count: 0 },
-      tests: tests[0] || { count: 0 },
-      videos: videos[0] || { count: 0 },
-      materials: materials[0] || { count: 0 },
+      students: { count: Number(studentsCount || 0) },
+      tests: { count: Number(testsCount || 0) },
+      videos: { count: Number(videosCount || 0) },
+      materials: { count: Number(materialsCount || 0) },
     });
   } catch (err) {
     console.error('[getDashboard] Error:', err);
@@ -487,9 +643,11 @@ export async function getDashboard(req, res, next) {
 export async function deleteVideo(req, res, next) {
   try {
     const { id } = req.params;
-    const rows = await query('SELECT id FROM videos WHERE id = ? LIMIT 1', [id]);
-    if (rows.length === 0) return res.status(404).json({ message: 'Video not found' });
-    await query('DELETE FROM videos WHERE id = ?', [id]);
+
+    const existing = await Video.findOne({ id: Number(id) }, { id: 1, _id: 0 }).lean();
+    if (!existing) return res.status(404).json({ message: 'Video not found' });
+
+    await Video.deleteOne({ id: Number(id) });
     return res.json({ ok: true });
   } catch (err) {
     return next(err);
@@ -512,12 +670,17 @@ export async function createMaterial(req, res, next) {
     if (!['free', 'paid'].includes(accessType)) errors.accessType = 'accessType must be free|paid';
     if (Object.keys(errors).length) return res.status(400).json({ message: 'Validation failed', errors });
 
-    const result = await query(
-      'INSERT INTO materials (title, pdf_url, subject, type, access_type) VALUES (?, ?, ?, ?, ?)',
-      [title, pdfUrl, subject, type, accessType]
-    );
-    const rows = await query('SELECT * FROM materials WHERE id = ? LIMIT 1', [result.insertId]);
-    const m = rows[0];
+    const m = new Material({
+      title,
+      pdf_url: pdfUrl,
+      subject,
+      type,
+      access_type: accessType,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    await m.save();
+
     return res.status(201).json({
       material: { id: m.id, title: m.title, pdfUrl: m.pdf_url, subject: m.subject, type: m.type, accessType: m.access_type },
     });
@@ -529,11 +692,22 @@ export async function createMaterial(req, res, next) {
 export async function listMaterials(req, res, next) {
   try {
     const { type } = req.query;
-    const rows = type
-      ? await query('SELECT * FROM materials WHERE type = ? ORDER BY created_at DESC', [type])
-      : await query('SELECT * FROM materials ORDER BY created_at DESC');
 
-    const materials = rows.map((m) => ({ id: m.id, title: m.title, pdfUrl: m.pdf_url, subject: m.subject, type: m.type, accessType: m.access_type }));
+    const filter = {};
+    if (type) filter.type = String(type);
+
+    const rows = await Material.find(filter, { _id: 0, __v: 0 })
+      .sort({ created_at: -1, id: -1 })
+      .lean();
+
+    const materials = (rows || []).map((m) => ({
+      id: m.id,
+      title: m.title,
+      pdfUrl: m.pdf_url,
+      subject: m.subject,
+      type: m.type,
+      accessType: m.access_type,
+    }));
     return res.json({ materials });
   } catch (err) {
     return next(err);
@@ -543,16 +717,28 @@ export async function listMaterials(req, res, next) {
 export async function updateMaterial(req, res, next) {
   try {
     const { id } = req.params;
-    const mapping = { title: 'title', pdfUrl: 'pdf_url', subject: 'subject', type: 'type', accessType: 'access_type' };
-    const { set, params } = buildUpdate(req.body || {}, mapping);
-    if (set.length > 0) {
-      await query(`UPDATE materials SET ${set.join(', ')} WHERE id = ?`, [...params, id]);
+
+    const body = req.body || {};
+    const updates = {};
+
+    if (Object.prototype.hasOwnProperty.call(body, 'title')) updates.title = body.title;
+    if (Object.prototype.hasOwnProperty.call(body, 'pdfUrl')) updates.pdf_url = body.pdfUrl;
+    if (Object.prototype.hasOwnProperty.call(body, 'pdf_url')) updates.pdf_url = body.pdf_url;
+    if (Object.prototype.hasOwnProperty.call(body, 'subject')) updates.subject = body.subject;
+    if (Object.prototype.hasOwnProperty.call(body, 'type')) updates.type = body.type;
+    if (Object.prototype.hasOwnProperty.call(body, 'accessType')) updates.access_type = body.accessType;
+    if (Object.prototype.hasOwnProperty.call(body, 'access_type')) updates.access_type = body.access_type;
+
+    if (Object.keys(updates).length > 0) {
+      updates.updated_at = new Date();
+      await Material.updateOne({ id: Number(id) }, { $set: updates });
     }
 
-    const rows = await query('SELECT * FROM materials WHERE id = ? LIMIT 1', [id]);
-    const m = rows[0];
+    const m = await Material.findOne({ id: Number(id) }, { _id: 0, __v: 0 }).lean();
     if (!m) return res.status(404).json({ message: 'Material not found' });
-    return res.json({ material: { id: m.id, title: m.title, pdfUrl: m.pdf_url, subject: m.subject, type: m.type, accessType: m.access_type } });
+    return res.json({
+      material: { id: m.id, title: m.title, pdfUrl: m.pdf_url, subject: m.subject, type: m.type, accessType: m.access_type },
+    });
   } catch (err) {
     return next(err);
   }
@@ -561,10 +747,55 @@ export async function updateMaterial(req, res, next) {
 export async function deleteMaterial(req, res, next) {
   try {
     const { id } = req.params;
-    const rows = await query('SELECT id FROM materials WHERE id = ? LIMIT 1', [id]);
-    if (rows.length === 0) return res.status(404).json({ message: 'Material not found' });
-    await query('DELETE FROM materials WHERE id = ?', [id]);
+
+    const existing = await Material.findOne({ id: Number(id) }, { id: 1, _id: 0 }).lean();
+    if (!existing) return res.status(404).json({ message: 'Material not found' });
+
+    await Material.deleteOne({ id: Number(id) });
     return res.json({ ok: true });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function createPlan(req, res, next) {
+  try {
+    const body = req.body || {};
+
+    const code = typeof body.code === 'string' ? body.code.trim().toLowerCase() : '';
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const status = typeof body.status === 'string' ? body.status.trim().toLowerCase() : 'active';
+    const pricePaise = Object.prototype.hasOwnProperty.call(body, 'pricePaise') ? Number(body.pricePaise) : Number(body.price_paise);
+    const durationDays = Object.prototype.hasOwnProperty.call(body, 'durationDays') ? Number(body.durationDays) : Number(body.duration_days);
+    const isFree = Object.prototype.hasOwnProperty.call(body, 'isFree') ? toBool(body.isFree) : toBool(body.is_free);
+
+    if (!code) return res.status(400).json({ message: 'code is required' });
+    if (!name) return res.status(400).json({ message: 'name is required' });
+    if (!['active', 'inactive'].includes(status)) return res.status(400).json({ message: 'status must be active|inactive' });
+    if (!Number.isFinite(pricePaise) || pricePaise < 0) return res.status(400).json({ message: 'pricePaise must be a non-negative number' });
+    if (!Number.isFinite(durationDays) || durationDays <= 0) return res.status(400).json({ message: 'durationDays must be a positive number' });
+
+    const doc = new Plan({
+      code,
+      name,
+      price_paise: Number(pricePaise || 0),
+      duration_days: Number(durationDays || 365),
+      status,
+      is_free: Boolean(isFree),
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+
+    try {
+      await doc.save();
+    } catch (e) {
+      if (e && (e.code === 11000 || e.code === 11001)) {
+        return res.status(409).json({ message: 'code already exists' });
+      }
+      throw e;
+    }
+
+    return res.status(201).json({ id: doc.id });
   } catch (err) {
     return next(err);
   }
@@ -572,8 +803,14 @@ export async function deleteMaterial(req, res, next) {
 
 export async function listPlans(req, res, next) {
   try {
-    const rows = await query('SELECT id, code, name, price_paise, duration_days, status, is_free FROM plans ORDER BY id ASC');
-    const plans = rows.map((p) => ({
+    const rows = await Plan.find(
+      {},
+      { _id: 0, id: 1, code: 1, name: 1, price_paise: 1, duration_days: 1, status: 1, is_free: 1 }
+    )
+      .sort({ id: 1 })
+      .lean();
+
+    const plans = (rows || []).map((p) => ({
       id: p.id,
       code: p.code,
       name: p.name,
@@ -591,6 +828,7 @@ export async function listPlans(req, res, next) {
 function normalizePlanUpdateFields(body) {
   const b = body || {};
   const out = {};
+  if (Object.prototype.hasOwnProperty.call(b, 'code')) out.code = String(b.code || '').trim().toLowerCase();
   if (Object.prototype.hasOwnProperty.call(b, 'name')) out.name = String(b.name || '').trim();
   if (Object.prototype.hasOwnProperty.call(b, 'pricePaise')) out.price_paise = Number(b.pricePaise || 0);
   if (Object.prototype.hasOwnProperty.call(b, 'price_paise')) out.price_paise = Number(b.price_paise || 0);
@@ -615,16 +853,20 @@ export async function updatePlan(req, res, next) {
     const { id } = req.params;
     const fields = normalizePlanUpdateFields(req.body);
 
-    const mapping = {
-      name: 'name',
-      price_paise: 'price_paise',
-      duration_days: 'duration_days',
-      status: 'status',
-      is_free: 'is_free',
-    };
-    const { set, params } = buildUpdate(fields, mapping);
-    if (set.length === 0) return res.status(400).json({ message: 'No fields to update' });
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(fields, 'code')) updates.code = fields.code;
+    if (Object.prototype.hasOwnProperty.call(fields, 'name')) updates.name = fields.name;
+    if (Object.prototype.hasOwnProperty.call(fields, 'price_paise')) updates.price_paise = fields.price_paise;
+    if (Object.prototype.hasOwnProperty.call(fields, 'duration_days')) updates.duration_days = fields.duration_days;
+    if (Object.prototype.hasOwnProperty.call(fields, 'status')) updates.status = fields.status;
+    if (Object.prototype.hasOwnProperty.call(fields, 'is_free')) updates.is_free = Boolean(fields.is_free);
+    if (Object.keys(updates).length === 0) return res.status(400).json({ message: 'No fields to update' });
 
+    if (Object.prototype.hasOwnProperty.call(fields, 'code')) {
+      const code = String(fields.code || '').trim().toLowerCase();
+      if (!code) return res.status(400).json({ message: 'code is required' });
+      updates.code = code;
+    }
     if (Object.prototype.hasOwnProperty.call(fields, 'status') && !['active', 'inactive'].includes(fields.status)) {
       return res.status(400).json({ message: 'status must be active|inactive' });
     }
@@ -635,9 +877,13 @@ export async function updatePlan(req, res, next) {
       return res.status(400).json({ message: 'durationDays must be a positive number' });
     }
 
-    await query(`UPDATE plans SET ${set.join(', ')} WHERE id = ?`, [...params, id]);
-    const rows = await query('SELECT id, code, name, price_paise, duration_days, status, is_free FROM plans WHERE id = ? LIMIT 1', [id]);
-    const p = rows[0];
+    updates.updated_at = new Date();
+    await Plan.updateOne({ id: Number(id) }, { $set: updates });
+
+    const p = await Plan.findOne(
+      { id: Number(id) },
+      { _id: 0, id: 1, code: 1, name: 1, price_paise: 1, duration_days: 1, status: 1, is_free: 1 }
+    ).lean();
     if (!p) return res.status(404).json({ message: 'Plan not found' });
     return res.json({
       plan: {
@@ -658,9 +904,11 @@ export async function updatePlan(req, res, next) {
 export async function deletePlan(req, res, next) {
   try {
     const { id } = req.params;
-    const rows = await query('SELECT id FROM plans WHERE id = ? LIMIT 1', [id]);
-    if (!rows.length) return res.status(404).json({ message: 'Plan not found' });
-    await query("UPDATE plans SET status = 'inactive', updated_at = NOW() WHERE id = ?", [id]);
+
+    const existing = await Plan.findOne({ id: Number(id) }, { id: 1, _id: 0 }).lean();
+    if (!existing) return res.status(404).json({ message: 'Plan not found' });
+
+    await Plan.updateOne({ id: Number(id) }, { $set: { status: 'inactive', updated_at: new Date() } });
     return res.json({ ok: true });
   } catch (err) {
     return next(err);
@@ -669,30 +917,40 @@ export async function deletePlan(req, res, next) {
 
 export async function listPayments(req, res, next) {
   try {
-    const rows = await query(
-      `SELECT p.id, p.user_id, u.name as user_name, u.email as user_email, pl.code as plan_code, pl.name as plan_name,
-              p.amount_paise, p.razorpay_order_id, p.razorpay_payment_id, p.status, p.created_at, p.paid_at
-       FROM payments p
-       JOIN users u ON u.id = p.user_id
-       JOIN plans pl ON pl.id = p.plan_id
-       ORDER BY p.created_at DESC
-       LIMIT 200`
-    );
+    const rows = await Payment.find({}, { _id: 0, __v: 0 })
+      .sort({ created_at: -1, id: -1 })
+      .limit(200)
+      .lean();
 
-    const payments = rows.map((r) => ({
-      id: r.id,
-      userId: r.user_id,
-      userName: r.user_name,
-      userEmail: r.user_email,
-      planCode: r.plan_code,
-      planName: r.plan_name,
-      amountPaise: Number(r.amount_paise || 0),
-      orderId: r.razorpay_order_id,
-      paymentId: r.razorpay_payment_id,
-      status: r.status,
-      createdAt: r.created_at,
-      paidAt: r.paid_at,
-    }));
+    const userIds = [...new Set((rows || []).map((r) => Number(r.user_id)).filter((x) => Number.isFinite(x)))];
+    const planIds = [...new Set((rows || []).map((r) => Number(r.plan_id)).filter((x) => Number.isFinite(x)))];
+
+    const [users, plans] = await Promise.all([
+      User.find({ id: { $in: userIds } }, { _id: 0, id: 1, name: 1, email: 1 }).lean(),
+      Plan.find({ id: { $in: planIds } }, { _id: 0, id: 1, code: 1, name: 1 }).lean(),
+    ]);
+
+    const userById = new Map((users || []).map((u) => [Number(u.id), u]));
+    const planById = new Map((plans || []).map((p) => [Number(p.id), p]));
+
+    const payments = (rows || []).map((r) => {
+      const u = userById.get(Number(r.user_id));
+      const p = planById.get(Number(r.plan_id));
+      return {
+        id: r.id,
+        userId: r.user_id,
+        userName: u?.name ?? null,
+        userEmail: u?.email ?? null,
+        planCode: p?.code ?? null,
+        planName: p?.name ?? null,
+        amountPaise: Number(r.amount_paise || 0),
+        orderId: r.razorpay_order_id,
+        paymentId: r.razorpay_payment_id,
+        status: r.status,
+        createdAt: r.created_at,
+        paidAt: r.paid_at,
+      };
+    });
 
     return res.json({ payments });
   } catch (err) {
@@ -703,13 +961,15 @@ export async function listPayments(req, res, next) {
 export async function createNotification(req, res, next) {
   try {
     const { title, message, status = 'active' } = req.body;
-    const result = await query('INSERT INTO notifications (title, message, status) VALUES (?, ?, ?)', [
+
+    const n = new Notification({
       title,
       message,
       status,
-    ]);
-    const rows = await query('SELECT * FROM notifications WHERE id = ? LIMIT 1', [result.insertId]);
-    const n = rows[0];
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    await n.save();
     return res.status(201).json({ notification: { id: n.id, title: n.title, message: n.message, status: n.status } });
   } catch (err) {
     return next(err);
@@ -718,8 +978,10 @@ export async function createNotification(req, res, next) {
 
 export async function listNotifications(req, res, next) {
   try {
-    const rows = await query('SELECT * FROM notifications ORDER BY created_at DESC');
-    const notifications = rows.map((n) => ({ id: n.id, title: n.title, message: n.message, status: n.status }));
+    const rows = await Notification.find({}, { _id: 0, __v: 0 })
+      .sort({ created_at: -1, id: -1 })
+      .lean();
+    const notifications = (rows || []).map((n) => ({ id: n.id, title: n.title, message: n.message, status: n.status }));
     return res.json({ notifications });
   } catch (err) {
     return next(err);
@@ -729,14 +991,19 @@ export async function listNotifications(req, res, next) {
 export async function updateNotification(req, res, next) {
   try {
     const { id } = req.params;
-    const mapping = { title: 'title', message: 'message', status: 'status' };
-    const { set, params } = buildUpdate(req.body || {}, mapping);
-    if (set.length > 0) {
-      await query(`UPDATE notifications SET ${set.join(', ')} WHERE id = ?`, [...params, id]);
+
+    const body = req.body || {};
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(body, 'title')) updates.title = body.title;
+    if (Object.prototype.hasOwnProperty.call(body, 'message')) updates.message = body.message;
+    if (Object.prototype.hasOwnProperty.call(body, 'status')) updates.status = body.status;
+
+    if (Object.keys(updates).length > 0) {
+      updates.updated_at = new Date();
+      await Notification.updateOne({ id: Number(id) }, { $set: updates });
     }
 
-    const rows = await query('SELECT * FROM notifications WHERE id = ? LIMIT 1', [id]);
-    const n = rows[0];
+    const n = await Notification.findOne({ id: Number(id) }, { _id: 0, __v: 0 }).lean();
     if (!n) return res.status(404).json({ message: 'Notification not found' });
     return res.json({ notification: { id: n.id, title: n.title, message: n.message, status: n.status } });
   } catch (err) {
@@ -747,9 +1014,11 @@ export async function updateNotification(req, res, next) {
 export async function deleteNotification(req, res, next) {
   try {
     const { id } = req.params;
-    const rows = await query('SELECT id FROM notifications WHERE id = ? LIMIT 1', [id]);
-    if (rows.length === 0) return res.status(404).json({ message: 'Notification not found' });
-    await query('DELETE FROM notifications WHERE id = ?', [id]);
+
+    const existing = await Notification.findOne({ id: Number(id) }, { id: 1, _id: 0 }).lean();
+    if (!existing) return res.status(404).json({ message: 'Notification not found' });
+
+    await Notification.deleteOne({ id: Number(id) });
     return res.json({ ok: true });
   } catch (err) {
     return next(err);
@@ -777,13 +1046,17 @@ export async function createSpecimen(req, res, next) {
     if (!normalizeStatus(status, ['active', 'inactive'])) errors.status = 'status must be active|inactive';
     if (Object.keys(errors).length) return badRequest(res, 'Validation failed', errors);
 
-    const result = await query(
-      'INSERT INTO specimens (image_url, options_json, correct, status, question_text) VALUES (?, ?, ?, ?, ?)',
-      [imageUrl, JSON.stringify(options), correct, status, questionText]
-    );
+    const s = new Specimen({
+      image_url: imageUrl,
+      options_json: JSON.stringify(options),
+      correct,
+      status,
+      question_text: questionText,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    await s.save();
 
-    const rows = await query('SELECT * FROM specimens WHERE id = ? LIMIT 1', [result.insertId]);
-    const s = rows[0];
     return res.status(201).json({
       specimen: {
         id: s.id,
@@ -801,8 +1074,11 @@ export async function createSpecimen(req, res, next) {
 
 export async function listSpecimens(req, res, next) {
   try {
-    const rows = await query('SELECT * FROM specimens ORDER BY created_at DESC');
-    const specimens = rows.map((s) => ({
+    const rows = await Specimen.find({}, { _id: 0, __v: 0 })
+      .sort({ created_at: -1, id: -1 })
+      .lean();
+
+    const specimens = (rows || []).map((s) => ({
       id: s.id,
       imageUrl: s.image_url,
       options: JSON.parse(s.options_json),
@@ -865,14 +1141,19 @@ export async function updateSpecimen(req, res, next) {
       body.questionText = asNonEmptyString(body.questionText) || null;
     }
 
-    const mapping2 = { ...mapping, questionText: 'question_text' };
-    const { set, params } = buildUpdate(body, mapping2);
-    if (set.length > 0) {
-      await query(`UPDATE specimens SET ${set.join(', ')} WHERE id = ?`, [...params, id]);
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(body, 'imageUrl')) updates.image_url = body.imageUrl;
+    if (Object.prototype.hasOwnProperty.call(body, 'optionsJson')) updates.options_json = body.optionsJson;
+    if (Object.prototype.hasOwnProperty.call(body, 'correct')) updates.correct = Number(body.correct);
+    if (Object.prototype.hasOwnProperty.call(body, 'status')) updates.status = body.status;
+    if (Object.prototype.hasOwnProperty.call(body, 'questionText')) updates.question_text = body.questionText;
+
+    if (Object.keys(updates).length > 0) {
+      updates.updated_at = new Date();
+      await Specimen.updateOne({ id: Number(id) }, { $set: updates });
     }
 
-    const rows = await query('SELECT * FROM specimens WHERE id = ? LIMIT 1', [id]);
-    const s = rows[0];
+    const s = await Specimen.findOne({ id: Number(id) }, { _id: 0, __v: 0 }).lean();
     if (!s) return res.status(404).json({ message: 'Specimen not found' });
     return res.json({ specimen: { id: s.id, imageUrl: s.image_url, options: JSON.parse(s.options_json), correct: s.correct, status: s.status, questionText: s.question_text ?? null } });
   } catch (err) {
@@ -955,23 +1236,36 @@ export async function createTestWithQuestions(req, res, next) {
       return badRequest(res, 'Validation failed', { questions: questionErrors.map((q) => ({ index: q.idx, ...q.qErrors })) });
     }
 
-    // Create test
-    const testResult = await query(
-      'INSERT INTO tests (title, is_active, question_count, per_question_seconds, marks_correct) VALUES (?, ?, ?, ?, ?)',
-      [title, isActive ? 1 : 0, questionCount, perQuestionSeconds, marksCorrect]
-    );
-    const testId = testResult.insertId;
+    const t = new Test({
+      title,
+      is_active: Boolean(isActive),
+      question_count: Number(questionCount),
+      per_question_seconds: Number(perQuestionSeconds),
+      marks_correct: Number(marksCorrect),
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    await t.save();
 
-    // Insert questions into test_questions table
-    for (const q of normalizedQuestions) {
-      await query(
-        'INSERT INTO test_questions (test_id, question_text, image_url, option_a, option_b, option_c, option_d, correct_option, question_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [testId, q.questionText, q.imageUrl, q.optionA, q.optionB, q.optionC, q.optionD, q.correctOption, q.questionOrder]
-      );
+    const testId = t.id;
+    const qDocs = normalizedQuestions.map((q) => ({
+      test_id: Number(testId),
+      question_text: q.questionText,
+      image_url: q.imageUrl,
+      option_a: q.optionA,
+      option_b: q.optionB,
+      option_c: q.optionC,
+      option_d: q.optionD,
+      correct_option: q.correctOption,
+      question_order: Number(q.questionOrder),
+      created_at: new Date(),
+    }));
+
+    for (const q of qDocs) {
+      const doc = new TestQuestion(q);
+      await doc.save();
     }
 
-    const rows = await query('SELECT * FROM tests WHERE id = ? LIMIT 1', [testId]);
-    const t = rows[0];
     return res.status(201).json({
       test: {
         id: t.id,
@@ -991,9 +1285,11 @@ export async function createTestWithQuestions(req, res, next) {
 export async function deleteSpecimen(req, res, next) {
   try {
     const { id } = req.params;
-    const rows = await query('SELECT id FROM specimens WHERE id = ? LIMIT 1', [id]);
-    if (rows.length === 0) return res.status(404).json({ message: 'Specimen not found' });
-    await query('DELETE FROM specimens WHERE id = ?', [id]);
+
+    const existing = await Specimen.findOne({ id: Number(id) }, { id: 1, _id: 0 }).lean();
+    if (!existing) return res.status(404).json({ message: 'Specimen not found' });
+
+    await Specimen.deleteOne({ id: Number(id) });
     return res.json({ ok: true });
   } catch (err) {
     return next(err);
@@ -1003,13 +1299,18 @@ export async function deleteSpecimen(req, res, next) {
 export async function createTest(req, res, next) {
   try {
     const { title, isActive = true, questionCount = 50, perQuestionSeconds = 30, marksCorrect = 4 } = req.body;
-    const result = await query(
-      'INSERT INTO tests (title, is_active, question_count, per_question_seconds, marks_correct) VALUES (?, ?, ?, ?, ?)',
-      [title, isActive ? 1 : 0, questionCount, perQuestionSeconds, marksCorrect]
-    );
 
-    const rows = await query('SELECT * FROM tests WHERE id = ? LIMIT 1', [result.insertId]);
-    const t = rows[0];
+    const t = new Test({
+      title,
+      is_active: Boolean(isActive),
+      question_count: Number(questionCount),
+      per_question_seconds: Number(perQuestionSeconds),
+      marks_correct: Number(marksCorrect),
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    await t.save();
+
     return res.status(201).json({
       test: {
         id: t.id,
@@ -1027,8 +1328,11 @@ export async function createTest(req, res, next) {
 
 export async function listTests(req, res, next) {
   try {
-    const rows = await query('SELECT * FROM tests ORDER BY created_at DESC');
-    const tests = rows.map((t) => ({
+    const rows = await Test.find({}, { _id: 0, __v: 0 })
+      .sort({ created_at: -1, id: -1 })
+      .lean();
+
+    const tests = (rows || []).map((t) => ({
       id: t.id,
       title: t.title,
       isActive: toBool(t.is_active),
@@ -1046,25 +1350,20 @@ export async function updateTest(req, res, next) {
   try {
     const { id } = req.params;
     const body = { ...(req.body || {}) };
-    if (Object.prototype.hasOwnProperty.call(body, 'isActive')) {
-      body.isActive = body.isActive ? 1 : 0;
+
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(body, 'title')) updates.title = body.title;
+    if (Object.prototype.hasOwnProperty.call(body, 'isActive')) updates.is_active = Boolean(body.isActive);
+    if (Object.prototype.hasOwnProperty.call(body, 'questionCount')) updates.question_count = Number(body.questionCount);
+    if (Object.prototype.hasOwnProperty.call(body, 'perQuestionSeconds')) updates.per_question_seconds = Number(body.perQuestionSeconds);
+    if (Object.prototype.hasOwnProperty.call(body, 'marksCorrect')) updates.marks_correct = Number(body.marksCorrect);
+
+    if (Object.keys(updates).length > 0) {
+      updates.updated_at = new Date();
+      await Test.updateOne({ id: Number(id) }, { $set: updates });
     }
 
-    const mapping = {
-      title: 'title',
-      isActive: 'is_active',
-      questionCount: 'question_count',
-      perQuestionSeconds: 'per_question_seconds',
-      marksCorrect: 'marks_correct',
-    };
-
-    const { set, params } = buildUpdate(body, mapping);
-    if (set.length > 0) {
-      await query(`UPDATE tests SET ${set.join(', ')} WHERE id = ?`, [...params, id]);
-    }
-
-    const rows = await query('SELECT * FROM tests WHERE id = ? LIMIT 1', [id]);
-    const t = rows[0];
+    const t = await Test.findOne({ id: Number(id) }, { _id: 0, __v: 0 }).lean();
     if (!t) return res.status(404).json({ message: 'Test not found' });
 
     return res.json({
@@ -1085,11 +1384,13 @@ export async function updateTest(req, res, next) {
 export async function deleteTest(req, res, next) {
   try {
     const { id } = req.params;
-    const rows = await query('SELECT id FROM tests WHERE id = ? LIMIT 1', [id]);
-    if (rows.length === 0) return res.status(404).json({ message: 'Test not found' });
 
-    await query('DELETE FROM results WHERE test_id = ?', [id]);
-    await query('DELETE FROM tests WHERE id = ?', [id]);
+    const existing = await Test.findOne({ id: Number(id) }, { id: 1, _id: 0 }).lean();
+    if (!existing) return res.status(404).json({ message: 'Test not found' });
+
+    await Result.deleteMany({ test_id: Number(id) });
+    await TestQuestion.deleteMany({ test_id: Number(id) });
+    await Test.deleteOne({ id: Number(id) });
 
     return res.json({ ok: true });
   } catch (err) {
@@ -1121,17 +1422,17 @@ export async function updateSettings(req, res, next) {
     const updates = {};
     for (const [k, col] of Object.entries(mapping)) {
       if (Object.prototype.hasOwnProperty.call(req.body || {}, k)) {
-        updates[k] = toBool(req.body[k]) ? 1 : 0;
+        updates[col] = toBool(req.body[k]);
       }
     }
 
-    const { set, params } = buildUpdate(updates, mapping);
-    if (set.length > 0) {
-      await query(`UPDATE settings SET ${set.join(', ')} WHERE id = 1`, params);
+    if (Object.keys(updates).length > 0) {
+      updates.updated_at = new Date();
+      await Settings.updateOne({ id: 1 }, { $set: updates });
     }
 
-    const rows = await query('SELECT * FROM settings WHERE id = 1');
-    return res.json({ settings: mapSettingsRow(rows[0]) });
+    const row = await Settings.findOne({ id: 1 }, { _id: 0, __v: 0 }).lean();
+    return res.json({ settings: mapSettingsRow(row) });
   } catch (err) {
     return next(err);
   }
@@ -1154,35 +1455,67 @@ export async function listResults(req, res, next) {
     const { testId, limit = 200 } = req.query;
     const lim = Math.min(Number(limit) || 200, 500);
 
-    const rows = testId
-      ? await query(
-          `SELECT r.*, u.name as student_name, u.email as student_email, t.title as test_title
-           FROM results r
-           JOIN (
-             SELECT user_id, MIN(id) AS first_id
-             FROM results
-             WHERE test_id = ?
-             GROUP BY user_id
-           ) first_attempt ON first_attempt.first_id = r.id
-           JOIN users u ON u.id = r.user_id
-           JOIN tests t ON t.id = r.test_id
-           WHERE r.test_id = ?
-           ORDER BY r.score DESC, r.time_taken_sec ASC, r.date ASC
-           LIMIT ${lim}`,
-          [testId, testId]
-        )
-      : await query(
-          `SELECT r.*, u.name as student_name, u.email as student_email, t.title as test_title
-           FROM results r
-           JOIN users u ON u.id = r.user_id
-           JOIN tests t ON t.id = r.test_id
-           ORDER BY r.date DESC
-           LIMIT ${lim}`
-        );
+    if (testId) {
+      const tid = Number(testId);
+      if (!Number.isFinite(tid)) return res.status(400).json({ message: 'testId must be a number' });
 
-    const out = testId
-      ? rows.map((r, idx) => ({ ...r, rank: idx + 1 }))
-      : rows;
+      const firstAttempts = await Result.aggregate([
+        { $match: { test_id: tid } },
+        { $sort: { id: 1 } },
+        { $group: { _id: '$user_id', first: { $first: '$$ROOT' } } },
+        { $replaceRoot: { newRoot: '$first' } },
+        { $sort: { score: -1, time_taken_sec: 1, date: 1, id: 1 } },
+        { $limit: lim },
+        { $project: { _id: 0, __v: 0 } },
+      ]);
+
+      const userIds = [...new Set((firstAttempts || []).map((r) => Number(r.user_id)).filter((x) => Number.isFinite(x)))];
+      const [users, test] = await Promise.all([
+        User.find({ id: { $in: userIds } }, { _id: 0, id: 1, name: 1, email: 1 }).lean(),
+        Test.findOne({ id: tid }, { _id: 0, id: 1, title: 1 }).lean(),
+      ]);
+
+      const userById = new Map((users || []).map((u) => [Number(u.id), u]));
+      const out = (firstAttempts || []).map((r, idx) => {
+        const u = userById.get(Number(r.user_id));
+        return {
+          ...r,
+          student_name: u?.name ?? null,
+          student_email: u?.email ?? null,
+          test_title: test?.title ?? null,
+          rank: idx + 1,
+        };
+      });
+
+      return res.json({ results: out });
+    }
+
+    const rows = await Result.find({}, { _id: 0, __v: 0 })
+      .sort({ date: -1, id: -1 })
+      .limit(lim)
+      .lean();
+
+    const userIds = [...new Set((rows || []).map((r) => Number(r.user_id)).filter((x) => Number.isFinite(x)))];
+    const testIds = [...new Set((rows || []).map((r) => Number(r.test_id)).filter((x) => Number.isFinite(x)))];
+
+    const [users, tests] = await Promise.all([
+      User.find({ id: { $in: userIds } }, { _id: 0, id: 1, name: 1, email: 1 }).lean(),
+      Test.find({ id: { $in: testIds } }, { _id: 0, id: 1, title: 1 }).lean(),
+    ]);
+
+    const userById = new Map((users || []).map((u) => [Number(u.id), u]));
+    const testById = new Map((tests || []).map((t) => [Number(t.id), t]));
+
+    const out = (rows || []).map((r) => {
+      const u = userById.get(Number(r.user_id));
+      const t = testById.get(Number(r.test_id));
+      return {
+        ...r,
+        student_name: u?.name ?? null,
+        student_email: u?.email ?? null,
+        test_title: t?.title ?? null,
+      };
+    });
 
     return res.json({ results: out });
   } catch (err) {
@@ -1190,37 +1523,75 @@ export async function listResults(req, res, next) {
   }
 }
 
-export async function exportResultsCsv(req, res, next) {
+export async function exportResultsCsv(req, res) {
   try {
     const { testId } = req.query;
 
-    const rows = testId
-      ? await query(
-          `SELECT r.date, u.name as student_name, u.email as student_email, t.title as test_title,
-                  r.score, r.accuracy, r.time_taken_sec
-           FROM results r
-           JOIN (
-             SELECT user_id, MIN(id) AS first_id
-             FROM results
-             WHERE test_id = ?
-             GROUP BY user_id
-           ) first_attempt ON first_attempt.first_id = r.id
-           JOIN users u ON u.id = r.user_id
-           JOIN tests t ON t.id = r.test_id
-           WHERE r.test_id = ?
-           ORDER BY r.score DESC, r.time_taken_sec ASC, r.date ASC
-           LIMIT 5000`,
-          [testId, testId]
-        )
-      : await query(
-          `SELECT r.date, u.name as student_name, u.email as student_email, t.title as test_title,
-                  r.score, r.accuracy, r.time_taken_sec
-           FROM results r
-           JOIN users u ON u.id = r.user_id
-           JOIN tests t ON t.id = r.test_id
-           ORDER BY r.date DESC
-           LIMIT 5000`
-        );
+    let rows = [];
+    if (testId) {
+      const tid = Number(testId);
+      if (!Number.isFinite(tid)) return res.status(400).json({ message: 'testId must be a number' });
+
+      const firstAttempts = await Result.aggregate([
+        { $match: { test_id: tid } },
+        { $sort: { id: 1 } },
+        { $group: { _id: '$user_id', first: { $first: '$$ROOT' } } },
+        { $replaceRoot: { newRoot: '$first' } },
+        { $sort: { score: -1, time_taken_sec: 1, date: 1, id: 1 } },
+        { $limit: 5000 },
+        { $project: { _id: 0, date: 1, user_id: 1, test_id: 1, score: 1, accuracy: 1, time_taken_sec: 1 } },
+      ]);
+
+      const userIds = [...new Set((firstAttempts || []).map((r) => Number(r.user_id)).filter((x) => Number.isFinite(x)))];
+      const [users, test] = await Promise.all([
+        User.find({ id: { $in: userIds } }, { _id: 0, id: 1, name: 1, email: 1 }).lean(),
+        Test.findOne({ id: tid }, { _id: 0, id: 1, title: 1 }).lean(),
+      ]);
+
+      const userById = new Map((users || []).map((u) => [Number(u.id), u]));
+      rows = (firstAttempts || []).map((r) => {
+        const u = userById.get(Number(r.user_id));
+        return {
+          date: r.date,
+          student_name: u?.name ?? null,
+          student_email: u?.email ?? null,
+          test_title: test?.title ?? null,
+          score: r.score,
+          accuracy: r.accuracy,
+          time_taken_sec: r.time_taken_sec,
+        };
+      });
+    } else {
+      const results = await Result.find({}, { _id: 0, date: 1, user_id: 1, test_id: 1, score: 1, accuracy: 1, time_taken_sec: 1 })
+        .sort({ date: -1, id: -1 })
+        .limit(5000)
+        .lean();
+
+      const userIds = [...new Set((results || []).map((r) => Number(r.user_id)).filter((x) => Number.isFinite(x)))];
+      const testIds = [...new Set((results || []).map((r) => Number(r.test_id)).filter((x) => Number.isFinite(x)))];
+
+      const [users, tests] = await Promise.all([
+        User.find({ id: { $in: userIds } }, { _id: 0, id: 1, name: 1, email: 1 }).lean(),
+        Test.find({ id: { $in: testIds } }, { _id: 0, id: 1, title: 1 }).lean(),
+      ]);
+
+      const userById = new Map((users || []).map((u) => [Number(u.id), u]));
+      const testById = new Map((tests || []).map((t) => [Number(t.id), t]));
+
+      rows = (results || []).map((r) => {
+        const u = userById.get(Number(r.user_id));
+        const t = testById.get(Number(r.test_id));
+        return {
+          date: r.date,
+          student_name: u?.name ?? null,
+          student_email: u?.email ?? null,
+          test_title: t?.title ?? null,
+          score: r.score,
+          accuracy: r.accuracy,
+          time_taken_sec: r.time_taken_sec,
+        };
+      });
+    }
 
     const csvRows = testId
       ? [
@@ -1259,11 +1630,13 @@ export async function exportResultsCsv(req, res, next) {
   }
 }
 
-// PYQ CRUD
 export async function createPyq(req, res) {
   try {
     const { title, pdf_url, solution_url, subject, year, centre_id, centre_name, status, access_type } = req.body;
-    if (!title || !pdf_url) {
+
+    const trimmedTitle = typeof title === 'string' ? title.trim() : '';
+    const trimmedPdfUrl = typeof pdf_url === 'string' ? pdf_url.trim() : '';
+    if (!trimmedTitle || !trimmedPdfUrl) {
       return res.status(400).json({ message: 'title and pdf_url are required' });
     }
     const st = status ? String(status).trim().toLowerCase() : 'active';
@@ -1276,13 +1649,15 @@ export async function createPyq(req, res) {
     const centreName = typeof centre_name === 'string' ? centre_name.trim() : '';
     if (centreName) {
       centreId = await ensureExamCentreByName(centreName);
-      if (!centreId) return res.status(400).json({ message: 'Invalid centre_name' });
+      if (!centreId) {
+        return res.status(400).json({ message: 'Invalid centre_name' });
+      }
     } else {
       centreId = centre_id === undefined || centre_id === null || centre_id === '' ? null : Number(centre_id);
       if (centreId !== null && !Number.isFinite(centreId)) return res.status(400).json({ message: 'centre_id must be a number' });
       if (centreId !== null) {
-        const centres = await query('SELECT id FROM exam_centres WHERE id = ? LIMIT 1', [centreId]);
-        if (!centres.length) return res.status(400).json({ message: 'Invalid centre_id' });
+        const centre = await ExamCentre.findOne({ id: Number(centreId) }, { id: 1, _id: 0 }).lean();
+        if (!centre) return res.status(400).json({ message: 'Invalid centre_id' });
       }
     }
 
@@ -1295,11 +1670,20 @@ export async function createPyq(req, res) {
     yr = await ensureExamCentreYearActive(centreId, yr);
     if (!yr) return res.status(400).json({ message: 'Invalid year' });
 
-    const result = await query(
-      `INSERT INTO pyqs (title, pdf_url, solution_url, subject, year, centre_id, access_type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [title, pdf_url, solution_url || null, subject || 'General', yr || null, centreId, accessType, st]
-    );
-    return res.json({ id: result.insertId });
+    const doc = new Pyq({
+      title: trimmedTitle,
+      pdf_url: trimmedPdfUrl,
+      solution_url: solution_url || null,
+      subject: subject || 'General',
+      year: yr || null,
+      centre_id: Number(centreId),
+      access_type: accessType,
+      status: st,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    await doc.save();
+    return res.json({ id: doc.id });
   } catch (err) {
     console.error('[createPyq]', err);
     return res.status(500).json({ message: 'Failed to create PYQ' });
@@ -1308,13 +1692,20 @@ export async function createPyq(req, res) {
 
 export async function listPyqs(req, res) {
   try {
-    const rows = await query(
-      `SELECT p.*, c.name as centre_name
-       FROM pyqs p
-       LEFT JOIN exam_centres c ON c.id = p.centre_id
-       ORDER BY p.created_at DESC`
-    );
-    return res.json(rows);
+    const rows = await Pyq.find({}, { _id: 0, __v: 0 })
+      .sort({ created_at: -1, id: -1 })
+      .lean();
+
+    const centreIds = [...new Set((rows || []).map((p) => Number(p.centre_id)).filter((x) => Number.isFinite(x)))];
+    const centres = await ExamCentre.find({ id: { $in: centreIds } }, { _id: 0, id: 1, name: 1 }).lean();
+    const centreById = new Map((centres || []).map((c) => [Number(c.id), c]));
+
+    const out = (rows || []).map((p) => ({
+      ...p,
+      centre_name: centreById.get(Number(p.centre_id))?.name ?? null,
+    }));
+
+    return res.json(out);
   } catch (err) {
     console.error('[listPyqs]', err);
     return res.status(500).json({ message: 'Failed to fetch PYQs' });
@@ -1326,9 +1717,8 @@ export async function updatePyq(req, res) {
     const { id } = req.params;
     const { title, pdf_url, solution_url, subject, year, status, centre_id, centre_name, access_type } = req.body;
 
-    const existingRows = await query('SELECT id, centre_id, year FROM pyqs WHERE id = ? LIMIT 1', [id]);
-    if (!existingRows.length) return res.status(404).json({ message: 'PYQ not found' });
-    const existing = existingRows[0];
+    const existing = await Pyq.findOne({ id: Number(id) }, { _id: 0, id: 1, centre_id: 1, year: 1 }).lean();
+    if (!existing) return res.status(404).json({ message: 'PYQ not found' });
 
     let nextCentreId = existing.centre_id === null || existing.centre_id === undefined ? null : Number(existing.centre_id);
     let nextYear = existing.year === null || existing.year === undefined ? null : String(existing.year).trim();
@@ -1350,8 +1740,8 @@ export async function updatePyq(req, res) {
       } else {
         const parsed = Number(centre_id);
         if (!Number.isFinite(parsed)) return res.status(400).json({ message: 'centre_id must be a number' });
-        const centres = await query('SELECT id FROM exam_centres WHERE id = ? LIMIT 1', [parsed]);
-        if (!centres.length) return res.status(400).json({ message: 'Invalid centre_id' });
+        const centre = await ExamCentre.findOne({ id: Number(parsed) }, { id: 1, _id: 0 }).lean();
+        if (!centre) return res.status(400).json({ message: 'Invalid centre_id' });
         nextCentreId = parsed;
       }
     }
@@ -1365,33 +1755,28 @@ export async function updatePyq(req, res) {
       await ensureExamCentreYearActive(nextCentreId, nextYear);
     }
 
-    const updates = [];
-    const params = [];
-    if (title !== undefined) { updates.push('title = ?'); params.push(title); }
-    if (pdf_url !== undefined) { updates.push('pdf_url = ?'); params.push(pdf_url); }
-    if (solution_url !== undefined) { updates.push('solution_url = ?'); params.push(solution_url); }
-    if (subject !== undefined) { updates.push('subject = ?'); params.push(subject); }
-    if (year !== undefined) { updates.push('year = ?'); params.push(nextYear); }
+    const updates = {};
+    if (title !== undefined) updates.title = title;
+    if (pdf_url !== undefined) updates.pdf_url = pdf_url;
+    if (solution_url !== undefined) updates.solution_url = solution_url;
+    if (subject !== undefined) updates.subject = subject;
+    if (year !== undefined) updates.year = nextYear;
 
-    if (centre_name !== undefined) {
-      updates.push('centre_id = ?');
-      params.push(nextCentreId);
-    } else if (centre_id !== undefined) {
-      updates.push('centre_id = ?');
-      params.push(nextCentreId);
+    if (centre_name !== undefined || centre_id !== undefined) {
+      updates.centre_id = nextCentreId;
     }
 
     if (access_type !== undefined) {
       const at = access_type === null ? null : String(access_type).trim().toLowerCase();
       if (!at || !['free', 'paid'].includes(at)) return res.status(400).json({ message: 'access_type must be free|paid' });
-      updates.push('access_type = ?');
-      params.push(at);
+      updates.access_type = at;
     }
 
-    if (status !== undefined) { updates.push('status = ?'); params.push(status); }
-    if (updates.length === 0) return res.status(400).json({ message: 'No fields to update' });
-    params.push(id);
-    await query(`UPDATE pyqs SET ${updates.join(', ')} WHERE id = ?`, params);
+    if (status !== undefined) updates.status = status;
+    if (Object.keys(updates).length === 0) return res.status(400).json({ message: 'No fields to update' });
+
+    updates.updated_at = new Date();
+    await Pyq.updateOne({ id: Number(id) }, { $set: updates });
     return res.json({ updated: true });
   } catch (err) {
     console.error('[updatePyq]', err);
@@ -1402,7 +1787,7 @@ export async function updatePyq(req, res) {
 export async function deletePyq(req, res) {
   try {
     const { id } = req.params;
-    await query(`DELETE FROM pyqs WHERE id = ?`, [id]);
+    await Pyq.deleteOne({ id: Number(id) });
     return res.json({ deleted: true });
   } catch (err) {
     console.error('[deletePyq]', err);
@@ -1413,23 +1798,18 @@ export async function deletePyq(req, res) {
 export async function getMenus(req, res) {
   try {
     const { type, status } = req.query;
-    let sql = `SELECT * FROM menus WHERE 1=1`;
-    const params = [];
-
+    const filter = {};
     if (status) {
       const st = normalizeStatus(status, ['active', 'inactive']);
       if (!st) return badRequest(res, 'Validation failed', { status: 'status must be active|inactive' });
-      sql += ` AND status = ?`;
-      params.push(st);
+      filter.status = st;
     }
 
     if (type) {
-      sql += ` AND (type = ? OR type = 'both')`;
-      params.push(type);
+      filter.type = { $in: [String(type), 'both'] };
     }
 
-    sql += ` ORDER BY menu_order ASC, id ASC`;
-    const rows = await query(sql, params);
+    const rows = await Menu.find(filter, { _id: 0, __v: 0 }).sort({ menu_order: 1, id: 1 }).lean();
     return res.json({ menus: rows });
   } catch (err) {
     console.error('[getMenus]', err);
@@ -1453,13 +1833,21 @@ export async function createMenu(req, res) {
       return badRequest(res, 'Validation failed', { type: 'type must be student|admin|both' });
     }
 
-    const result = await query(
-      'INSERT INTO menus (name, route, icon, type, status, menu_order, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, route || null, icon, type, status, menuOrder, body.parent_id ?? null]
-    );
+    const doc = new Menu({
+      name,
+      route: route || null,
+      icon,
+      type,
+      status,
+      menu_order: menuOrder,
+      parent_id: body.parent_id ?? null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    await doc.save();
 
-    const rows = await query('SELECT * FROM menus WHERE id = ? LIMIT 1', [result.insertId]);
-    return res.status(201).json({ menu: rows[0] });
+    const saved = await Menu.findOne({ id: doc.id }, { _id: 0, __v: 0 }).lean();
+    return res.status(201).json({ menu: saved });
   } catch (err) {
     console.error('[createMenu]', err);
     return res.status(500).json({ message: 'Failed to create menu' });
@@ -1471,36 +1859,22 @@ export async function updateMenu(req, res) {
     const { id } = req.params;
     const body = req.body || {};
 
-    const allowed = {
-      name: 'name',
-      route: 'route',
-      icon: 'icon',
-      type: 'type',
-      status: 'status',
-      menu_order: 'menu_order',
-      parent_id: 'parent_id',
-    };
-
-    const updates = [];
-    const params = [];
+    const updates = {};
 
     if (Object.prototype.hasOwnProperty.call(body, 'name')) {
       const name = asNonEmptyString(body.name);
       if (!name) return badRequest(res, 'Validation failed', { name: 'name is required' });
-      updates.push(`${allowed.name} = ?`);
-      params.push(name);
+      updates.name = name;
     }
 
     if (Object.prototype.hasOwnProperty.call(body, 'route')) {
       const route = typeof body.route === 'string' ? body.route.trim() : null;
-      updates.push(`${allowed.route} = ?`);
-      params.push(route || null);
+      updates.route = route || null;
     }
 
     if (Object.prototype.hasOwnProperty.call(body, 'icon')) {
       const icon = asNonEmptyString(body.icon) || '📄';
-      updates.push(`${allowed.icon} = ?`);
-      params.push(icon);
+      updates.icon = icon;
     }
 
     if (Object.prototype.hasOwnProperty.call(body, 'type')) {
@@ -1508,36 +1882,32 @@ export async function updateMenu(req, res) {
       if (!type || !['student', 'admin', 'both'].includes(type)) {
         return badRequest(res, 'Validation failed', { type: 'type must be student|admin|both' });
       }
-      updates.push(`${allowed.type} = ?`);
-      params.push(type);
+      updates.type = type;
     }
 
     if (Object.prototype.hasOwnProperty.call(body, 'status')) {
       const status = normalizeStatus(body.status, ['active', 'inactive']);
       if (!status) return badRequest(res, 'Validation failed', { status: 'status must be active|inactive' });
-      updates.push(`${allowed.status} = ?`);
-      params.push(status);
+      updates.status = status;
     }
 
     if (Object.prototype.hasOwnProperty.call(body, 'menu_order')) {
-      updates.push(`${allowed.menu_order} = ?`);
-      params.push(Number(body.menu_order) || 0);
+      updates.menu_order = Number(body.menu_order) || 0;
     }
 
     if (Object.prototype.hasOwnProperty.call(body, 'parent_id')) {
-      updates.push(`${allowed.parent_id} = ?`);
-      params.push(body.parent_id ?? null);
+      updates.parent_id = body.parent_id ?? null;
     }
 
-    if (updates.length === 0) return badRequest(res, 'No fields to update');
+    if (Object.keys(updates).length === 0) return badRequest(res, 'No fields to update');
 
-    params.push(id);
-    await query(`UPDATE menus SET ${updates.join(', ')} WHERE id = ?`, params);
+    updates.updated_at = new Date();
+    await Menu.updateOne({ id: Number(id) }, { $set: updates });
 
-    const rows = await query('SELECT * FROM menus WHERE id = ? LIMIT 1', [id]);
-    if (!rows.length) return res.status(404).json({ message: 'Menu not found' });
+    const row = await Menu.findOne({ id: Number(id) }, { _id: 0, __v: 0 }).lean();
+    if (!row) return res.status(404).json({ message: 'Menu not found' });
 
-    return res.json({ menu: rows[0] });
+    return res.json({ menu: row });
   } catch (err) {
     console.error('[updateMenu]', err);
     return res.status(500).json({ message: 'Failed to update menu' });
@@ -1547,7 +1917,7 @@ export async function updateMenu(req, res) {
 export async function deleteMenu(req, res) {
   try {
     const { id } = req.params;
-    await query('DELETE FROM menus WHERE id = ?', [id]);
+    await Menu.deleteOne({ id: Number(id) });
     return res.json({ deleted: true });
   } catch (err) {
     console.error('[deleteMenu]', err);
@@ -1564,7 +1934,7 @@ export async function reorderMenus(req, res) {
 
     for (const item of orders) {
       if (!item || !item.id) return badRequest(res, 'Validation failed', { orders: 'each item must have id' });
-      await query('UPDATE menus SET menu_order = ? WHERE id = ?', [Number(item.menu_order) || 0, item.id]);
+      await Menu.updateOne({ id: Number(item.id) }, { $set: { menu_order: Number(item.menu_order) || 0, updated_at: new Date() } });
     }
 
     return res.json({ reordered: true });
@@ -1577,23 +1947,36 @@ export async function reorderMenus(req, res) {
 // Analytics dashboard
 export async function getAnalytics(req, res) {
   try {
-    const [studentsCount] = await query(`SELECT COUNT(*) as cnt FROM users WHERE role = 'student'`);
-    const [testsCount] = await query(`SELECT COUNT(*) as cnt FROM tests WHERE is_active = 1`);
-    const [specimensCount] = await query(`SELECT COUNT(*) as cnt FROM specimens WHERE status = 'active'`);
-    const [videosCount] = await query(`SELECT COUNT(*) as cnt FROM videos WHERE status = 'active'`);
-    const [materialsCount] = await query(`SELECT COUNT(*) as cnt FROM materials`);
-    const [pyqsCount] = await query(`SELECT COUNT(*) as cnt FROM pyqs`);
-    const [resultsCount] = await query(`SELECT COUNT(*) as cnt FROM results`);
-    const avgAccuracy = await query(`SELECT AVG(accuracy) as avg FROM results`);
+
+    const [
+      studentsCount,
+      testsCount,
+      specimensCount,
+      videosCount,
+      materialsCount,
+      pyqsCount,
+      resultsCount,
+      avgAccuracyAgg,
+    ] = await Promise.all([
+      User.countDocuments({ role: 'student' }),
+      Test.countDocuments({ is_active: true }),
+      Specimen.countDocuments({ status: 'active' }),
+      Video.countDocuments({ status: 'active' }),
+      Material.countDocuments({}),
+      Pyq.countDocuments({}),
+      Result.countDocuments({}),
+      Result.aggregate([{ $group: { _id: null, avg: { $avg: '$accuracy' } } }]).catch(() => []),
+    ]);
+
     return res.json({
-      studentsCount: studentsCount.cnt,
-      testsCount: testsCount.cnt,
-      specimensCount: specimensCount.cnt,
-      videosCount: videosCount.cnt,
-      materialsCount: materialsCount.cnt,
-      pyqsCount: pyqsCount.cnt,
-      resultsCount: resultsCount.cnt,
-      avgAccuracy: avgAccuracy[0]?.avg || 0,
+      studentsCount: Number(studentsCount || 0),
+      testsCount: Number(testsCount || 0),
+      specimensCount: Number(specimensCount || 0),
+      videosCount: Number(videosCount || 0),
+      materialsCount: Number(materialsCount || 0),
+      pyqsCount: Number(pyqsCount || 0),
+      resultsCount: Number(resultsCount || 0),
+      avgAccuracy: Number(avgAccuracyAgg?.[0]?.avg || 0),
     });
   } catch (err) {
     console.error('[getAnalytics]', err);

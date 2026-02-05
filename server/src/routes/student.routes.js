@@ -30,6 +30,8 @@ import {
   createPaymentOrderStudent,
   verifyPaymentStudent,
   listMaterialsStudent,
+  listVideosStudent,
+  listNotificationsStudent,
 } from '../controllers/student.mysql.controller.js';
 
 export const studentRouter = Router();
@@ -44,6 +46,8 @@ studentRouter.use(requireAuth, requireRole('student', 'admin'));
 
 studentRouter.get('/dashboard', getDashboard);
 studentRouter.get('/menus', getMenus);
+studentRouter.get('/videos', listVideosStudent);
+studentRouter.get('/notifications', listNotificationsStudent);
 studentRouter.get('/tests', listActiveTests);
 studentRouter.get('/tests/:testId/start', startTest);
 studentRouter.post('/tests/:testId/submit', submitTest);

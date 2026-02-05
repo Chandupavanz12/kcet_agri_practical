@@ -1,10 +1,30 @@
-import { query } from '../config/db-pg.js';
 import { ensureSettings } from '../seed/ensureSettings.js';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import https from 'https';
 import nodemailer from 'nodemailer';
+import { hashPassword } from '../utils/auth.js';
+import {
+  ExamCentre,
+  ExamCentreYear,
+  LoginOtp,
+  Material,
+  MaterialCompletion,
+  Notification,
+  PasswordReset,
+  Payment,
+  Plan,
+  Pyq,
+  Result,
+  Test,
+  TestQuestion,
+  User,
+  UserAccess,
+  UserNotification,
+  Menu,
+  Video,
+} from '../models/index.js';
 
 function shuffle(arr) {
   const a = [...arr];
@@ -12,7 +32,44 @@ function shuffle(arr) {
     const j = Math.floor(Math.random() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
+
   return a;
+}
+
+const _ttlCache = new Map();
+
+function getCached(key, ttlMs) {
+  const hit = _ttlCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.ts > ttlMs) {
+    _ttlCache.delete(key);
+    return null;
+  }
+  return hit.value;
+}
+
+function setCached(key, value) {
+  _ttlCache.set(key, { ts: Date.now(), value });
+  return value;
+}
+
+async function getOrSetCached(key, ttlMs, fn) {
+  const cached = getCached(key, ttlMs);
+  if (cached) return cached;
+  const inFlightKey = `${key}.__inflight`;
+  const inFlight = _ttlCache.get(inFlightKey);
+  if (inFlight && inFlight.value) return inFlight.value;
+  const p = (async () => {
+    try {
+      const v = await fn();
+      setCached(key, v);
+      return v;
+    } finally {
+      _ttlCache.delete(inFlightKey);
+    }
+  })();
+  _ttlCache.set(inFlightKey, { ts: Date.now(), value: p });
+  return p;
 }
 
 function toBool(v) {
@@ -45,14 +102,18 @@ function isFuture(d) {
 }
 
 async function getPlanByCode(code) {
-  const rows = await query('SELECT id, code, status, is_free FROM plans WHERE code = ? LIMIT 1', [code]);
-  return rows[0] || null;
+  const row = await Plan.findOne({ code: String(code || '').trim().toLowerCase() })
+    .select({ id: 1, code: 1, status: 1, is_free: 1 })
+    .lean();
+  return row || null;
 }
 
 async function ensureUserAccessRow(userId) {
-  await query('INSERT IGNORE INTO user_access (user_id) VALUES (?)', [userId]);
-  const rows = await query('SELECT * FROM user_access WHERE user_id = ? LIMIT 1', [userId]);
-  return rows[0] || null;
+  const existing = await UserAccess.findOne({ user_id: Number(userId) }).lean();
+  if (existing) return existing;
+
+  const doc = await new UserAccess({ user_id: Number(userId) }).save();
+  return doc.toObject();
 }
 
 function computeActiveAccess(row) {
@@ -90,12 +151,17 @@ async function canAccessPlan(userId, role, planCode) {
 }
 
 async function getPlanDetailsByCode(code) {
-  const rows = await query('SELECT id, code, name, price_paise, duration_days, status, is_free FROM plans WHERE code = ? LIMIT 1', [code]);
-  return rows[0] || null;
+  const row = await Plan.findOne({ code: String(code || '').trim().toLowerCase() })
+    .select({ id: 1, code: 1, name: 1, price_paise: 1, duration_days: 1, status: 1, is_free: 1 })
+    .lean();
+  return row || null;
 }
 
 async function listActivePlans() {
-  const rows = await query('SELECT id, code, name, price_paise, duration_days, status, is_free FROM plans WHERE status = ? ORDER BY id ASC', ['active']);
+  const rows = await Plan.find({ status: 'active' })
+    .sort({ id: 1 })
+    .select({ id: 1, code: 1, name: 1, price_paise: 1, duration_days: 1, status: 1, is_free: 1 })
+    .lean();
   return rows;
 }
 
@@ -104,22 +170,31 @@ async function grantAccessForPlan(userId, planCode, durationDays) {
   const expiry = new Date(Date.now() + Number(durationDays || 365) * 24 * 60 * 60 * 1000);
 
   if (planCode === 'combo') {
-    await query('UPDATE user_access SET combo_access = 1, expiry = ?, updated_at = NOW() WHERE user_id = ?', [expiry, userId]);
+    await UserAccess.updateOne(
+      { user_id: Number(userId) },
+      { $set: { combo_access: true, expiry, updated_at: new Date() } }
+    );
     return expiry;
   }
   if (planCode === 'pyq') {
-    await query('UPDATE user_access SET pyq_access = 1, pyq_expiry = ?, updated_at = NOW() WHERE user_id = ?', [expiry, userId]);
+    await UserAccess.updateOne(
+      { user_id: Number(userId) },
+      { $set: { pyq_access: true, pyq_expiry: expiry, updated_at: new Date() } }
+    );
     return expiry;
   }
   if (planCode === 'materials') {
-    await query('UPDATE user_access SET material_access = 1, material_expiry = ?, updated_at = NOW() WHERE user_id = ?', [expiry, userId]);
+    await UserAccess.updateOne(
+      { user_id: Number(userId) },
+      { $set: { material_access: true, material_expiry: expiry, updated_at: new Date() } }
+    );
     return expiry;
   }
   return null;
 }
 
 async function createUserNotification(userId, title, message) {
-  await query('INSERT INTO user_notifications (user_id, title, message, status) VALUES (?, ?, ?, ?)', [userId, title, message, 'unread']);
+  await new UserNotification({ user_id: Number(userId), title, message, status: 'unread' }).save();
 }
 
 async function razorpayCreateOrder({ amountPaise, receipt, notes }) {
@@ -229,14 +304,24 @@ export async function razorpayWebhook(req, res, next) {
       return res.json({ ok: true, ignored: true });
     }
 
-    const payRows = await query(
-      'SELECT p.*, pl.code as plan_code, pl.name as plan_name, pl.duration_days FROM payments p JOIN plans pl ON p.plan_id = pl.id WHERE p.razorpay_order_id = ? LIMIT 1',
-      [String(orderId)]
-    );
-    const payment = payRows[0];
-    if (!payment) {
+    const paymentDoc = await Payment.findOne({ razorpay_order_id: String(orderId) }).lean();
+    if (!paymentDoc) {
       return res.json({ ok: true, missing: true });
     }
+
+    const planDoc = await Plan.findOne({ id: Number(paymentDoc.plan_id) })
+      .select({ code: 1, name: 1, duration_days: 1 })
+      .lean();
+    if (!planDoc) {
+      return res.json({ ok: true, missing: true });
+    }
+
+    const payment = {
+      ...paymentDoc,
+      plan_code: planDoc.code,
+      plan_name: planDoc.name,
+      duration_days: planDoc.duration_days,
+    };
 
     if (payment.status === 'paid' || payment.status === 'free') {
       return res.json({ ok: true, alreadyProcessed: true });
@@ -246,9 +331,17 @@ export async function razorpayWebhook(req, res, next) {
       return res.json({ ok: true, ignored: true });
     }
 
-    await query(
-      'UPDATE payments SET status = ?, razorpay_payment_id = COALESCE(razorpay_payment_id, ?), paid_at = NOW() WHERE id = ? AND status = ?',
-      ['paid', paymentId ? String(paymentId) : null, payment.id, 'created']
+    const nextPaymentId = payment.razorpay_payment_id || (paymentId ? String(paymentId) : null);
+    await Payment.updateOne(
+      { id: Number(payment.id), status: 'created' },
+      {
+        $set: {
+          status: 'paid',
+          razorpay_payment_id: nextPaymentId,
+          paid_at: new Date(),
+          updated_at: new Date(),
+        },
+      }
     );
 
     const expiry = await grantAccessForPlan(Number(payment.user_id), String(payment.plan_code), Number(payment.duration_days || 365));
@@ -327,10 +420,14 @@ export async function createPaymentOrderStudent(req, res, next) {
       const expiry = await grantAccessForPlan(userId, planCode, durationDays);
       await createUserNotification(userId, 'Premium activated', `Your ${plan.name} is active.`);
       const orderId = `free_${userId}_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
-      await query(
-        'INSERT INTO payments (user_id, plan_id, amount_paise, razorpay_order_id, status, paid_at) VALUES (?, ?, ?, ?, ?, NOW())',
-        [userId, plan.id, 0, orderId, 'free']
-      );
+      await new Payment({
+        user_id: userId,
+        plan_id: Number(plan.id),
+        amount_paise: 0,
+        razorpay_order_id: orderId,
+        status: 'free',
+        paid_at: new Date(),
+      }).save();
       return res.json({ free: true, plan: { code: plan.code, name: plan.name }, expiry });
     }
 
@@ -341,10 +438,13 @@ export async function createPaymentOrderStudent(req, res, next) {
       notes: { userId: String(userId), planCode: plan.code },
     });
 
-    await query(
-      'INSERT INTO payments (user_id, plan_id, amount_paise, razorpay_order_id, status) VALUES (?, ?, ?, ?, ?)',
-      [userId, plan.id, Number(plan.price_paise), String(order.id), 'created']
-    );
+    await new Payment({
+      user_id: userId,
+      plan_id: Number(plan.id),
+      amount_paise: Number(plan.price_paise),
+      razorpay_order_id: String(order.id),
+      status: 'created',
+    }).save();
 
     return res.json({
       orderId: String(order.id),
@@ -371,11 +471,18 @@ export async function verifyPaymentStudent(req, res, next) {
       return res.status(400).json({ message: 'razorpay_order_id, razorpay_payment_id, razorpay_signature are required' });
     }
 
-    const payRows = await query(
-      'SELECT p.*, pl.code as plan_code, pl.name as plan_name, pl.duration_days FROM payments p JOIN plans pl ON p.plan_id = pl.id WHERE p.razorpay_order_id = ? LIMIT 1',
-      [orderId]
-    );
-    const payment = payRows[0];
+    const paymentDoc = await Payment.findOne({ razorpay_order_id: orderId }).lean();
+    const planDoc = paymentDoc
+      ? await Plan.findOne({ id: Number(paymentDoc.plan_id) }).select({ code: 1, name: 1, duration_days: 1 }).lean()
+      : null;
+    const payment = paymentDoc && planDoc
+      ? {
+          ...paymentDoc,
+          plan_code: planDoc.code,
+          plan_name: planDoc.name,
+          duration_days: planDoc.duration_days,
+        }
+      : null;
     if (!payment) return res.status(404).json({ message: 'Payment not found' });
     if (Number(payment.user_id) !== userId) return res.status(403).json({ message: 'Forbidden' });
 
@@ -387,9 +494,17 @@ export async function verifyPaymentStudent(req, res, next) {
       return res.json({ ok: true, alreadyProcessed: true });
     }
 
-    await query(
-      'UPDATE payments SET status = ?, razorpay_payment_id = ?, razorpay_signature = ?, paid_at = NOW() WHERE id = ? AND status = ?',
-      ['paid', paymentId, signature, payment.id, 'created']
+    await Payment.updateOne(
+      { id: Number(payment.id), status: 'created' },
+      {
+        $set: {
+          status: 'paid',
+          razorpay_payment_id: paymentId,
+          razorpay_signature: signature,
+          paid_at: new Date(),
+          updated_at: new Date(),
+        },
+      }
     );
 
     const expiry = await grantAccessForPlan(userId, String(payment.plan_code), Number(payment.duration_days || 365));
@@ -412,24 +527,27 @@ export async function listMaterialsStudent(req, res, next) {
     const allowedAccess = new Set(['free', 'paid']);
     const allowedType = new Set(['pdf', 'pyq']);
 
-    const where = [];
-    const params = [];
-    if (allowedType.has(type)) {
-      where.push('type = ?');
-      params.push(type);
-    }
-    if (allowedAccess.has(access)) {
-      where.push('access_type = ?');
-      params.push(access);
-    }
+    const filter = {};
+    if (allowedType.has(type)) filter.type = type;
+    if (allowedAccess.has(access)) filter.access_type = access;
 
-    const sql = `SELECT id, title, pdf_url, subject, type, access_type, created_at FROM materials ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC, id DESC`;
-    const rows = await query(sql, params);
+    const dbFilter = { ...filter, status: 'active' };
+    const cacheKey = `materials:list:v1:${dbFilter.type || 'all'}:${dbFilter.access_type || 'all'}`;
+    const rows = await getOrSetCached(cacheKey, 8000, () =>
+      Material.find(dbFilter)
+        .sort({ created_at: -1, id: -1 })
+        .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1, created_at: 1 })
+        .lean()
+    );
 
-    const materialsUnlocked = await canAccessPlan(userId, role, 'materials');
+    const [materialsUnlocked, pyqUnlocked] = await Promise.all([
+      canAccessPlan(userId, role, 'materials'),
+      canAccessPlan(userId, role, 'pyq'),
+    ]);
     const materials = rows.map((m) => {
       const accessType = String(m.access_type || 'free').toLowerCase();
-      const locked = accessType === 'paid' && !materialsUnlocked;
+      const planUnlocked = String(m.type || '').toLowerCase() === 'pyq' ? pyqUnlocked : materialsUnlocked;
+      const locked = accessType === 'paid' && !planUnlocked;
       const fileEndpoint = `/api/student/materials/${m.id}/file`;
       const pdfUrl = accessType === 'paid' ? fileEndpoint : (m.pdf_url || fileEndpoint);
       return {
@@ -489,10 +607,30 @@ function contentTypeForPath(filePath) {
 
 export async function getMenus(req, res, next) {
   try {
-    const rows = await query(
-      "SELECT * FROM menus WHERE status = 'active' AND (type = 'student' OR type = 'both') ORDER BY menu_order ASC, id ASC"
-    );
+    const rows = await Menu.find({ status: 'active', type: { $in: ['student', 'both'] } })
+      .sort({ menu_order: 1, id: 1 })
+      .lean();
     return res.json({ menus: rows });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function listVideosStudent(req, res, next) {
+  try {
+    const rows = await Video.find({ status: 'active' }).sort({ created_at: -1, id: -1 }).limit(60).lean();
+    const videos = rows.map((v) => ({ id: v.id, title: v.title, videoUrl: v.video_url, subject: v.subject, status: v.status }));
+    return res.json({ videos });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function listNotificationsStudent(req, res, next) {
+  try {
+    const rows = await Notification.find({ status: 'active' }).sort({ created_at: -1, id: -1 }).limit(50).lean();
+    const notifications = rows.map((n) => ({ id: n.id, title: n.title, message: n.message, status: n.status }));
+    return res.json({ notifications });
   } catch (err) {
     return next(err);
   }
@@ -500,22 +638,63 @@ export async function getMenus(req, res, next) {
 
 export async function getDashboard(req, res, next) {
   try {
-    const settingsRow = await ensureSettings();
+    const settingsRow = await getOrSetCached('settings:v1', 5000, () => ensureSettings());
     const settings = mapSettingsRow(settingsRow);
 
     const [videos, pdfs, pyqs, notifications, tests] = await Promise.all([
-      settings.videosEnabled ? query('SELECT * FROM videos WHERE status = ? ORDER BY created_at DESC LIMIT 12', ['active']) : [],
-      settings.pdfsEnabled ? query('SELECT * FROM materials WHERE type = ? ORDER BY created_at DESC LIMIT 12', ['pdf']) : [],
-      settings.pyqsEnabled ? query('SELECT * FROM materials WHERE type = ? ORDER BY created_at DESC LIMIT 12', ['pyq']) : [],
-      settings.notificationsEnabled
-        ? query('SELECT * FROM notifications WHERE status = ? ORDER BY created_at DESC LIMIT 10', ['active'])
+      settings.videosEnabled
+        ? getOrSetCached('dashboard:videos:v1', 8000, () =>
+            Video.find({ status: 'active' })
+              .sort({ created_at: -1, id: -1 })
+              .limit(12)
+              .select({ id: 1, title: 1, video_url: 1, subject: 1, status: 1 })
+              .lean()
+          )
         : [],
-      settings.testsEnabled ? query('SELECT t.*, COUNT(tq.id) as question_count FROM tests t LEFT JOIN test_questions tq ON t.id = tq.test_id WHERE t.is_active = 1 GROUP BY t.id HAVING question_count > 0 ORDER BY t.created_at DESC') : [],
+      settings.pdfsEnabled
+        ? getOrSetCached('dashboard:pdfs:v1', 8000, () =>
+            Material.find({ type: 'pdf', status: 'active' })
+              .sort({ created_at: -1, id: -1 })
+              .limit(12)
+              .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1 })
+              .lean()
+          )
+        : [],
+      settings.pyqsEnabled
+        ? getOrSetCached('dashboard:pyqs:v1', 8000, () =>
+            Material.find({ type: 'pyq', status: 'active' })
+              .sort({ created_at: -1, id: -1 })
+              .limit(12)
+              .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1 })
+              .lean()
+          )
+        : [],
+      settings.notificationsEnabled
+        ? getOrSetCached('dashboard:notifications:v1', 5000, () =>
+            Notification.find({ status: 'active' })
+              .sort({ created_at: -1, id: -1 })
+              .limit(10)
+              .select({ id: 1, title: 1, message: 1, status: 1 })
+              .lean()
+          )
+        : [],
+      settings.testsEnabled
+        ? getOrSetCached('dashboard:tests:v1', 8000, () =>
+            Test.find({ is_active: true, question_count: { $gt: 0 } })
+              .sort({ created_at: -1, id: -1 })
+              .limit(20)
+              .select({ id: 1, title: 1, question_count: 1, per_question_seconds: 1, marks_correct: 1, is_active: 1 })
+              .lean()
+          )
+        : [],
     ]);
 
     const userId = Number(req.user?.sub);
     const role = String(req.user?.role || 'student');
-    const materialsUnlocked = Number.isFinite(userId) ? await canAccessPlan(userId, role, 'materials') : false;
+    const [materialsUnlocked, pyqUnlocked] = await Promise.all([
+      Number.isFinite(userId) ? canAccessPlan(userId, role, 'materials') : false,
+      Number.isFinite(userId) ? canAccessPlan(userId, role, 'pyq') : false,
+    ]);
     const accessRow = Number.isFinite(userId) ? await ensureUserAccessRow(userId) : null;
     const activeAccess = computeActiveAccess(accessRow);
 
@@ -539,13 +718,7 @@ export async function getDashboard(req, res, next) {
         pyqExpiry: activeAccess.pyqExpiry,
         materialExpiry: activeAccess.materialExpiry,
       },
-      videos: videos.map((v) => ({ 
-        id: v.id, 
-        title: v.title, 
-        videoUrl: v.video_url, 
-        subject: v.subject, 
-        status: v.status 
-      })),
+      videos: videos.map((v) => ({ id: v.id, title: v.title, videoUrl: v.video_url, subject: v.subject, status: v.status })),
       pdfs: pdfs.map((m) => {
         const accessType = String(m.access_type || 'free').toLowerCase();
         const locked = accessType === 'paid' && !materialsUnlocked;
@@ -562,7 +735,7 @@ export async function getDashboard(req, res, next) {
       }),
       pyqs: pyqs.map((m) => {
         const accessType = String(m.access_type || 'free').toLowerCase();
-        const locked = accessType === 'paid' && !materialsUnlocked;
+        const locked = accessType === 'paid' && !pyqUnlocked;
         const pdfUrl = accessType === 'paid' ? `/api/student/materials/${m.id}/file` : m.pdf_url;
         return {
           id: m.id,
@@ -591,12 +764,19 @@ export async function getDashboard(req, res, next) {
 
 export async function listActiveTests(req, res, next) {
   try {
-    const settingsRow = await ensureSettings();
+    const settingsRow = await getOrSetCached('settings:v1', 5000, () => ensureSettings());
     if (!toBool(settingsRow.tests_enabled)) {
       return res.json({ tests: [] });
     }
 
-    const rows = await query('SELECT * FROM tests WHERE is_active = 1 ORDER BY created_at DESC');
+    const rows = await getOrSetCached(
+      'tests:active:v1',
+      8000,
+      () => Test.find({ is_active: true, question_count: { $gt: 0 } })
+        .sort({ created_at: -1, id: -1 })
+        .select({ id: 1, title: 1, is_active: 1, question_count: 1, per_question_seconds: 1, marks_correct: 1 })
+        .lean()
+    );
     const tests = rows.map((t) => ({
       id: t.id,
       title: t.title,
@@ -623,18 +803,16 @@ export async function startTest(req, res, next) {
       return res.status(403).json({ message: 'Tests are disabled' });
     }
 
-    const testRows = await query('SELECT * FROM tests WHERE id = ? LIMIT 1', [testId]);
-    const test = testRows[0];
+    const test = await Test.findOne({ id: Number(testId) }).lean();
     console.log('[startTest] Test found:', test ? 'YES' : 'NO');
     if (!test || !toBool(test.is_active)) {
       return res.status(404).json({ message: 'Test not found' });
     }
 
     // Fetch questions from test_questions table
-    const questionRows = await query(
-      'SELECT * FROM test_questions WHERE test_id = ? ORDER BY question_order ASC',
-      [Number(testId)]
-    );
+    const questionRows = await TestQuestion.find({ test_id: Number(testId) })
+      .sort({ question_order: 1, id: 1 })
+      .lean();
     console.log('[startTest] Questions found:', questionRows.length);
 
     if (!Array.isArray(questionRows) || questionRows.length === 0) {
@@ -685,8 +863,7 @@ export async function submitTest(req, res, next) {
       return res.status(403).json({ message: 'Tests are disabled' });
     }
 
-    const testRows = await query('SELECT * FROM tests WHERE id = ? LIMIT 1', [testId]);
-    const test = testRows[0];
+    const test = await Test.findOne({ id: Number(testId) }).lean();
     if (!test) {
       return res.status(404).json({ message: 'Test not found' });
     }
@@ -701,11 +878,9 @@ export async function submitTest(req, res, next) {
     const ids = responses.map((r) => Number(r.questionId)).filter((n) => Number.isFinite(n));
     const uniqueIds = [...new Set(ids)];
 
-    let questionRows = [];
-    if (uniqueIds.length > 0) {
-      const placeholders = uniqueIds.map(() => '?').join(',');
-      questionRows = await query(`SELECT id, correct_option FROM test_questions WHERE id IN (${placeholders})`, uniqueIds);
-    }
+    const questionRows = uniqueIds.length
+      ? await TestQuestion.find({ id: { $in: uniqueIds } }).select({ id: 1, correct_option: 1 }).lean()
+      : [];
 
     const correctMap = new Map(questionRows.map((q) => [Number(q.id), q.correct_option]));
 
@@ -741,21 +916,29 @@ export async function submitTest(req, res, next) {
 
     console.log('[submitTest] Results:', { correctCount, wrongCount, totalQuestions, score, accuracy });
 
-    const insertRes = await query(
-      'INSERT INTO results (user_id, test_id, score, correct_count, wrong_count, total_questions, accuracy, time_taken_sec, responses_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [userId, Number(testId), score, correctCount, wrongCount, totalQuestions, accuracy, timeTakenSec, JSON.stringify(normalizedResponses)]
-    );
+    const inserted = await new Result({
+      user_id: userId,
+      test_id: Number(testId),
+      score,
+      correct_count: correctCount,
+      wrong_count: wrongCount,
+      total_questions: totalQuestions,
+      accuracy,
+      time_taken_sec: timeTakenSec,
+      responses_json: JSON.stringify(normalizedResponses),
+      date: new Date(),
+    }).save();
 
-    const betterRows = await query(
-      'SELECT COUNT(*) as cnt FROM results WHERE test_id = ? AND (score > ? OR (score = ? AND time_taken_sec < ?))',
-      [Number(testId), score, score, timeTakenSec]
-    );
+    const betterCount = await Result.countDocuments({
+      test_id: Number(testId),
+      $or: [{ score: { $gt: score } }, { score, time_taken_sec: { $lt: timeTakenSec } }],
+    });
 
-    const rank = Number(betterRows[0]?.cnt || 0) + 1;
+    const rank = Number(betterCount || 0) + 1;
 
     return res.status(201).json({
       result: {
-        id: insertRes.insertId,
+        id: inserted.id,
         score,
         outOf: totalQuestions * marksCorrect,
         accuracy,
@@ -776,20 +959,29 @@ export async function myResults(req, res, next) {
   try {
     const userId = Number(req.user.sub);
 
-    const rows = await query(
-      `SELECT r.*, t.title as test_title
-       FROM results r
-       JOIN tests t ON t.id = r.test_id
-       WHERE r.user_id = ?
-       ORDER BY r.date DESC
-       LIMIT 50`,
-      [userId]
-    );
+    const rows = await Result.find({ user_id: userId })
+      .sort({ date: -1, id: -1 })
+      .limit(50)
+      .select({
+        id: 1,
+        test_id: 1,
+        score: 1,
+        correct_count: 1,
+        wrong_count: 1,
+        total_questions: 1,
+        accuracy: 1,
+        time_taken_sec: 1,
+        date: 1,
+      })
+      .lean();
+    const testIds = [...new Set(rows.map((r) => Number(r.test_id)).filter((x) => Number.isFinite(x)))];
+    const tests = testIds.length ? await Test.find({ id: { $in: testIds } }).select({ id: 1, title: 1 }).lean() : [];
+    const testTitleById = new Map(tests.map((t) => [Number(t.id), t.title]));
 
     const results = rows.map((r) => ({
       id: r.id,
       testId: r.test_id,
-      testTitle: r.test_title,
+      testTitle: testTitleById.get(Number(r.test_id)) || '',
       score: r.score,
       correctCount: r.correct_count,
       wrongCount: r.wrong_count,
@@ -810,49 +1002,44 @@ export async function resultDetails(req, res, next) {
     const userId = Number(req.user.sub);
     const { id } = req.params;
 
-    const rows = await query(
-      `SELECT r.*, t.title as test_title, t.question_count, t.marks_correct
-       FROM results r
-       JOIN tests t ON t.id = r.test_id
-       WHERE r.id = ? AND r.user_id = ?
-       LIMIT 1`,
-      [id, userId]
-    );
+    const r = await Result.findOne({ id: Number(id), user_id: userId }).lean();
+    if (!r) return res.status(404).json({ message: 'Result not found' });
 
-    const r = rows[0];
-    if (!r) {
-      return res.status(404).json({ message: 'Result not found' });
-    }
-
+    const t = await Test.findOne({ id: Number(r.test_id) }).select({ id: 1, title: 1 }).lean();
     const responses = JSON.parse(r.responses_json || '[]');
-    
-    // Get question details for all questions in the test
-    const questionIds = responses.map(resp => resp.questionId).filter(id => id);
-    let questions = [];
-    
-    if (questionIds.length > 0) {
-      const placeholders = questionIds.map(() => '?').join(',');
-      const questionRows = await query(
-        `SELECT id, question_text, image_url, option_a, option_b, option_c, option_d, correct_option, question_order
-         FROM test_questions 
-         WHERE id IN (${placeholders}) 
-         ORDER BY question_order ASC`,
-        questionIds
-      );
-      
-      questions = questionRows;
-    }
 
-    // Merge responses with question details
-    const detailedResponses = responses.map(resp => {
-      const question = questions.find(q => q.id === resp.questionId);
+    const questionIds = responses
+      .map((resp) => resp.questionId)
+      .filter((qid) => Number.isFinite(Number(qid)))
+      .map((qid) => Number(qid));
+
+    const questionRows = questionIds.length
+      ? await TestQuestion.find({ id: { $in: questionIds } })
+          .select({
+            id: 1,
+            question_text: 1,
+            image_url: 1,
+            option_a: 1,
+            option_b: 1,
+            option_c: 1,
+            option_d: 1,
+            correct_option: 1,
+            question_order: 1,
+          })
+          .sort({ question_order: 1, id: 1 })
+          .lean()
+      : [];
+
+    const questionById = new Map(questionRows.map((q) => [Number(q.id), q]));
+    const detailedResponses = responses.map((resp) => {
+      const question = questionById.get(Number(resp.questionId));
       return {
         ...resp,
         questionText: question?.question_text || '',
         imageUrl: question?.image_url || '',
         options: question ? [question.option_a, question.option_b, question.option_c, question.option_d] : [],
         correctOption: question?.correct_option || '',
-        questionOrder: question?.question_order || 0
+        questionOrder: question?.question_order || 0,
       };
     });
 
@@ -860,7 +1047,7 @@ export async function resultDetails(req, res, next) {
       result: {
         id: r.id,
         testId: r.test_id,
-        testTitle: r.test_title,
+        testTitle: t?.title || '',
         score: r.score,
         correctCount: r.correct_count,
         wrongCount: r.wrong_count,
@@ -880,14 +1067,13 @@ export async function myProgress(req, res, next) {
   try {
     const userId = Number(req.user.sub);
 
-    const rows = await query(
-      'SELECT date, score, accuracy FROM results WHERE user_id = ? ORDER BY date DESC LIMIT 10',
-      [userId]
-    );
+    const rows = await Result.find({ user_id: userId })
+      .sort({ date: -1, id: -1 })
+      .limit(10)
+      .select({ date: 1, score: 1, accuracy: 1 })
+      .lean();
 
-    const points = [...rows]
-      .reverse()
-      .map((r) => ({ date: r.date, score: r.score, accuracy: Number(r.accuracy) }));
+    const points = [...rows].reverse().map((r) => ({ date: r.date, score: r.score, accuracy: Number(r.accuracy) }));
 
     return res.json({ points });
   } catch (err) {
@@ -900,10 +1086,14 @@ export async function completeMaterial(req, res, next) {
     const userId = Number(req.user.sub);
     const { materialId } = req.body;
     if (!materialId) return res.status(400).json({ message: 'materialId is required' });
-    await query(
-      `INSERT IGNORE INTO material_completions (user_id, material_id) VALUES (?, ?)`,
-      [userId, Number(materialId)]
+
+    const mid = Number(materialId);
+    await MaterialCompletion.updateOne(
+      { user_id: userId, material_id: mid },
+      { $setOnInsert: { user_id: userId, material_id: mid } },
+      { upsert: true, setDefaultsOnInsert: true }
     );
+
     return res.json({ completed: true });
   } catch (err) {
     return next(err);
@@ -913,11 +1103,9 @@ export async function completeMaterial(req, res, next) {
 export async function getMaterialCompletions(req, res, next) {
   try {
     const userId = Number(req.user.sub);
-    const rows = await query(
-      `SELECT material_id FROM material_completions WHERE user_id = ?`,
-      [userId]
-    );
-    return res.json({ completedIds: rows.map(r => r.material_id) });
+
+    const rows = await MaterialCompletion.find({ user_id: userId }).select({ material_id: 1 }).lean();
+    return res.json({ completedIds: rows.map((r) => r.material_id) });
   } catch (err) {
     return next(err);
   }
@@ -926,9 +1114,10 @@ export async function getMaterialCompletions(req, res, next) {
 export async function getProfile(req, res, next) {
   try {
     const userId = Number(req.user.sub);
-    const rows = await query(`SELECT id, name, email, role FROM users WHERE id = ?`, [userId]);
-    if (!rows.length) return res.status(404).json({ message: 'User not found' });
-    return res.json({ user: rows[0] });
+
+    const user = await User.findOne({ id: userId }).select({ id: 1, name: 1, email: 1, role: 1 }).lean();
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    return res.json({ user });
   } catch (err) {
     return next(err);
   }
@@ -939,7 +1128,8 @@ export async function updateProfile(req, res, next) {
     const userId = Number(req.user.sub);
     const { name } = req.body;
     if (!name) return res.status(400).json({ message: 'name is required' });
-    await query(`UPDATE users SET name = ? WHERE id = ?`, [name, userId]);
+
+    await User.updateOne({ id: userId }, { $set: { name: String(name), updated_at: new Date() } });
     return res.json({ updated: true });
   } catch (err) {
     return next(err);
@@ -951,9 +1141,9 @@ export async function requestPasswordReset(req, res, next) {
     const userId = Number(req.user.sub);
     if (!Number.isFinite(userId)) return res.status(401).json({ message: 'Unauthorized' });
 
-    const users = await query(`SELECT id, email FROM users WHERE id = ? LIMIT 1`, [userId]);
-    if (!users.length) return res.status(404).json({ message: 'User not found' });
-    const email = String(users[0].email || '').trim();
+    const userDoc = await User.findOne({ id: userId }).select({ id: 1, email: 1 }).lean();
+    if (!userDoc) return res.status(404).json({ message: 'User not found' });
+    const email = String(userDoc.email || '').trim();
     if (!email) return res.status(400).json({ message: 'Email not found for this account' });
 
     const otp = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
@@ -961,22 +1151,22 @@ export async function requestPasswordReset(req, res, next) {
     const tokenHash = crypto.createHash('sha256').update(`${otp}.${secret}.${userId}`).digest('hex');
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    await query(`UPDATE password_resets SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL`, [userId]);
-    await query(`INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)`, [userId, tokenHash, expiresAt]);
+    await PasswordReset.updateMany({ user_id: userId, used_at: null }, { $set: { used_at: new Date() } });
+    await new PasswordReset({ user_id: userId, token: tokenHash, expires_at: expiresAt }).save();
 
     const host = process.env.SMTP_HOST;
     const port = Number(process.env.SMTP_PORT || 587);
-    const user = process.env.SMTP_USER;
+    const smtpUser = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
     const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
     const from = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com';
 
-    if (host && user && pass) {
+    if (host && smtpUser && pass) {
       const transporter = nodemailer.createTransport({
         host,
         port,
         secure,
-        auth: { user, pass },
+        auth: { user: smtpUser, pass },
       });
 
       await transporter.sendMail({
@@ -1014,18 +1204,17 @@ export async function resetPassword(req, res, next) {
     const secret = process.env.PASSWORD_RESET_OTP_SECRET || process.env.JWT_SECRET || 'dev-secret';
     const tokenHash = crypto.createHash('sha256').update(`${otpValue}.${secret}.${userId}`).digest('hex');
 
-    const rows = await query(
-      `SELECT id, expires_at, used_at FROM password_resets WHERE user_id = ? AND token = ? LIMIT 1`,
-      [userId, tokenHash]
-    );
-    if (!rows.length) return res.status(400).json({ message: 'Invalid OTP' });
-    const { id, expires_at, used_at } = rows[0];
-    if (used_at) return res.status(400).json({ message: 'OTP already used' });
-    if (new Date() > new Date(expires_at)) return res.status(400).json({ message: 'OTP expired' });
+    const pr = await PasswordReset.findOne({ user_id: userId, token: tokenHash })
+      .select({ id: 1, expires_at: 1, used_at: 1 })
+      .lean();
+
+    if (!pr) return res.status(400).json({ message: 'Invalid OTP' });
+    if (pr.used_at) return res.status(400).json({ message: 'OTP already used' });
+    if (new Date() > new Date(pr.expires_at)) return res.status(400).json({ message: 'OTP expired' });
 
     const passwordHash = await (await import('../utils/auth.js')).hashPassword(newPassword);
-    await query(`UPDATE users SET password_hash = ? WHERE id = ?`, [passwordHash, userId]);
-    await query(`UPDATE password_resets SET used_at = NOW() WHERE id = ?`, [id]);
+    await User.updateOne({ id: userId }, { $set: { password_hash: passwordHash, updated_at: new Date() } });
+    await PasswordReset.updateOne({ id: Number(pr.id) }, { $set: { used_at: new Date() } });
     return res.json({ reset: true });
   } catch (err) {
     return next(err);
@@ -1038,7 +1227,14 @@ export async function listPyqsStudent(req, res, next) {
     const role = String(req.user?.role || 'student');
     const pyqUnlocked = Number.isFinite(userId) ? await canAccessPlan(userId, role, 'pyq') : false;
 
-    const rows = await query(`SELECT id, title, subject, year, access_type FROM pyqs WHERE status = 'active' ORDER BY year DESC, created_at DESC`);
+    const rows = await getOrSetCached(
+      'pyqs:all:v1',
+      8000,
+      () => Pyq.find({ status: 'active' })
+        .sort({ year: -1, created_at: -1, id: -1 })
+        .select({ id: 1, title: 1, subject: 1, year: 1, access_type: 1 })
+        .lean()
+    );
     const pyqs = rows.map((p) => {
       const accessType = String(p.access_type || 'paid').toLowerCase();
       const locked = accessType === 'paid' && !pyqUnlocked;
@@ -1059,7 +1255,10 @@ export async function listPyqsStudent(req, res, next) {
 
 export async function listExamCentresStudent(req, res, next) {
   try {
-    const rows = await query("SELECT id, name FROM exam_centres WHERE status = 'active' ORDER BY name ASC, id ASC");
+    const rows = await ExamCentre.find({ status: 'active', id: { $ne: null } })
+      .sort({ name: 1, id: 1 })
+      .select({ id: 1, name: 1 })
+      .lean();
     return res.json({ centres: rows });
   } catch (err) {
     return next(err);
@@ -1069,10 +1268,12 @@ export async function listExamCentresStudent(req, res, next) {
 export async function listExamCentreYearsStudent(req, res, next) {
   try {
     const { centreId } = req.params;
-    const rows = await query(
-      "SELECT id, year FROM exam_centre_years WHERE centre_id = ? AND status = 'active' ORDER BY year DESC, id DESC",
-      [centreId]
-    );
+    const cid = Number(centreId);
+    if (!Number.isFinite(cid)) return res.status(400).json({ message: 'centreId is required' });
+    const rows = await ExamCentreYear.find({ centre_id: cid, status: 'active' })
+      .sort({ year: -1, id: -1 })
+      .select({ id: 1, year: 1 })
+      .lean();
     return res.json({ years: rows });
   } catch (err) {
     return next(err);
@@ -1090,9 +1291,14 @@ export async function listPyqsByCentreYear(req, res, next) {
     const role = String(req.user?.role || 'student');
     const pyqUnlocked = Number.isFinite(userId) ? await canAccessPlan(userId, role, 'pyq') : false;
 
-    const rows = await query(
-      "SELECT id, title, subject, year, access_type FROM pyqs WHERE status = 'active' AND centre_id = ? AND year = ? ORDER BY created_at DESC",
-      [centreId, year]
+    const cacheKey = `pyqs:centreYear:v1:${centreId}:${year}`;
+    const rows = await getOrSetCached(
+      cacheKey,
+      8000,
+      () => Pyq.find({ status: 'active', centre_id: centreId, year })
+        .sort({ created_at: -1, id: -1 })
+        .select({ id: 1, title: 1, subject: 1, year: 1, access_type: 1 })
+        .lean()
     );
     const pyqs = rows.map((p) => {
       const accessType = String(p.access_type || 'paid').toLowerCase();
@@ -1115,8 +1321,9 @@ export async function listPyqsByCentreYear(req, res, next) {
 export async function streamPyqPdf(req, res, next) {
   try {
     const { id } = req.params;
-    const rows = await query('SELECT id, title, pdf_url, status, access_type FROM pyqs WHERE id = ? LIMIT 1', [id]);
-    const p = rows[0];
+    const p = await Pyq.findOne({ id: Number(id) })
+      .select({ id: 1, title: 1, pdf_url: 1, status: 1, access_type: 1 })
+      .lean();
     if (!p || p.status !== 'active') return res.status(404).json({ message: 'PYQ not found' });
 
     const accessType = String(p.access_type || 'paid').toLowerCase();
@@ -1153,8 +1360,7 @@ export async function streamPyqPdf(req, res, next) {
 export async function streamMaterialFile(req, res, next) {
   try {
     const { id } = req.params;
-    const rows = await query('SELECT id, title, pdf_url, access_type FROM materials WHERE id = ? LIMIT 1', [id]);
-    const m = rows[0];
+    const m = await Material.findOne({ id: Number(id) }).select({ id: 1, title: 1, pdf_url: 1, access_type: 1, type: 1 }).lean();
     if (!m) return res.status(404).json({ message: 'Material not found' });
 
     const accessType = String(m.access_type || 'free').toLowerCase();
@@ -1164,11 +1370,15 @@ export async function streamMaterialFile(req, res, next) {
     const userId = Number(req.user?.sub);
     const role = String(req.user?.role || 'student');
     if (accessType === 'paid') {
-      const ok = Number.isFinite(userId) ? await canAccessPlan(userId, role, 'materials') : false;
+      const planCode = String(m.type || '').toLowerCase() === 'pyq' ? 'pyq' : 'materials';
+      const ok = Number.isFinite(userId) ? await canAccessPlan(userId, role, planCode) : false;
       if (!ok) return res.status(403).json({ message: 'Premium access required' });
     }
 
-    const allowedBases = accessType === 'paid' ? ['materials'] : ['materials', 'uploads'];
+    const isPyqMaterial = String(m.type || '').toLowerCase() === 'pyq';
+    const allowedBases = accessType === 'paid'
+      ? (isPyqMaterial ? ['pyqs', 'materials'] : ['materials'])
+      : ['materials', 'uploads'];
     const { resolved, allowed } = resolveAndValidateFile(ref, allowedBases);
     if (!allowed) return res.status(400).json({ message: 'Invalid file reference' });
     if (!fs.existsSync(resolved)) return res.status(404).json({ message: 'File not found' });

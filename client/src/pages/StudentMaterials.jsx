@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { apiFetch } from '../lib/api.js';
 
 export default function StudentMaterials() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [pdfs, setPdfs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -22,9 +24,9 @@ export default function StudentMaterials() {
     (async () => {
       try {
         setLoading(true);
-        const res = await apiFetch('/api/student/dashboard', { token });
+        const res = await apiFetch('/api/student/materials?type=pdf', { token });
         if (!alive) return;
-        setPdfs(Array.isArray(res?.pdfs) ? res.pdfs : []);
+        setPdfs(Array.isArray(res?.materials) ? res.materials : []);
       } catch (e) {
         if (!alive) return;
         setError(e?.message || 'Failed to load materials');
@@ -98,17 +100,28 @@ export default function StudentMaterials() {
                 <div key={m.id} className="card overflow-hidden">
                   <div className="h-1 bg-gradient-to-r from-accent-400 to-secondary-500" />
                   <div className="card-body">
-                    <div className="text-sm font-semibold text-slate-900">{m.title}</div>
-                    <div className="mt-1 text-xs text-slate-600">{m.subject}</div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">{m.title}</div>
+                        <div className="mt-1 text-xs text-slate-600">{m.subject}</div>
+                      </div>
+                      {m.locked ? <span className="badge">Locked</span> : <span className="badge badge-success">Unlocked</span>}
+                    </div>
                     <div className="mt-4">
-                      <a
-                        href={toFileUrl(m.pdfUrl)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-primary text-xs"
-                      >
-                        View
-                      </a>
+                      {m.locked ? (
+                        <button type="button" className="btn-primary text-xs" onClick={() => navigate('/student/premium')}>
+                          Unlock
+                        </button>
+                      ) : (
+                        <a
+                          href={toFileUrl(m.pdfUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-primary text-xs"
+                        >
+                          View
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>

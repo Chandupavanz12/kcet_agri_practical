@@ -1,7 +1,7 @@
-import { query } from '../config/db-pg.js';
+import { Settings } from '../models/index.js';
 
 export async function ensureSettings() {
-  await query('INSERT IGNORE INTO settings (id) VALUES (1)');
-  const rows = await query('SELECT * FROM settings WHERE id = 1');
-  return rows[0];
+  await Settings.updateOne({ id: 1 }, { $setOnInsert: { id: 1 } }, { upsert: true });
+  const row = await Settings.findOne({ id: 1 }).lean();
+  return row;
 }

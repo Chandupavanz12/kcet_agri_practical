@@ -43,6 +43,30 @@ export default function PremiumAccess() {
     []
   );
 
+  const planBenefits = useMemo(
+    () => ({
+      pyq: [
+        'Unlock all PYQs (all centres and years)',
+        'Instant access inside the app',
+        'Works on mobile and desktop',
+        'Valid for the full plan duration',
+      ],
+      materials: [
+        'Unlock premium study PDFs and notes',
+        'New premium uploads get unlocked automatically',
+        'View materials inside the app',
+        'Valid for the full plan duration',
+      ],
+      combo: [
+        'Unlock ALL premium content (PYQs + Materials)',
+        'Best value plan for serious preparation',
+        'One purchase covers everything',
+        'Valid for the full plan duration',
+      ],
+    }),
+    []
+  );
+
   const refresh = async () => {
     const [p, s] = await Promise.all([
       apiFetch('/api/student/premium/plans', { token }),
@@ -190,6 +214,7 @@ export default function PremiumAccess() {
           const code = String(p.code || '').toLowerCase();
           const unlocked = Boolean(status?.[code]?.unlocked);
           const expiry = status?.[code]?.expiry;
+          const bullets = Array.isArray(planBenefits?.[code]) ? planBenefits[code] : [];
 
           return (
             <div key={p.id} className="card overflow-hidden">
@@ -208,6 +233,20 @@ export default function PremiumAccess() {
                   {p.isFree ? 'Free' : formatINR(p.pricePaise)}
                 </div>
 
+                {bullets.length ? (
+                  <div className="mt-4">
+                    <div className="text-xs font-semibold text-slate-800">Benefits</div>
+                    <div className="mt-2 grid gap-1 text-xs text-slate-700">
+                      {bullets.slice(0, 4).map((t) => (
+                        <div key={t} className="flex gap-2">
+                          <span className="text-primary-600">•</span>
+                          <span>{t}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="mt-4">
                   {unlocked ? (
                     <button type="button" disabled className="btn-ghost text-xs">Already active</button>
@@ -216,10 +255,6 @@ export default function PremiumAccess() {
                       {busy ? 'Please wait...' : p.isFree ? 'Activate' : 'Buy now'}
                     </button>
                   )}
-                </div>
-
-                <div className="mt-3 text-[11px] text-slate-500">
-                  View-only access. Download may be restricted.
                 </div>
               </div>
             </div>

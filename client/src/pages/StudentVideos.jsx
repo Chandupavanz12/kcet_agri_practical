@@ -14,7 +14,7 @@ export default function StudentVideos() {
     (async () => {
       try {
         setLoading(true);
-        const res = await apiFetch('/api/student/dashboard', { token });
+        const res = await apiFetch('/api/student/videos', { token });
         if (!alive) return;
         setVideos(Array.isArray(res?.videos) ? res.videos : []);
       } catch (e) {

@@ -70,7 +70,7 @@ export default function NotificationTicker({ token, initialNotifications = [], a
 
     const tick = async () => {
       try {
-        const res = await apiFetch('/api/student/dashboard', { token });
+        const res = await apiFetch('/api/student/notifications', { token });
         const next = Array.isArray(res?.notifications) ? res.notifications : [];
         const nextKey = next.map((n) => `${n.id}:${n.title}`).join('|');
         if (nextKey && nextKey !== lastKeyRef.current) {

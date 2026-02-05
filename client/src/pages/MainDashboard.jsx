@@ -51,9 +51,10 @@ export default function MainDashboard() {
     try {
       // For students, get recent test results and new materials
       if (user.role === 'student') {
-        const [resultsRes, materialsRes] = await Promise.all([
+        const [resultsRes, materialsRes, videosRes] = await Promise.all([
           apiFetch('/api/student/results?limit=5', { token }),
-          apiFetch('/api/student/dashboard', { token }) // This will give us latest materials
+          apiFetch('/api/student/materials?type=pdf', { token }),
+          apiFetch('/api/student/videos', { token }),
         ]);
         
         const activities = [];
@@ -73,8 +74,8 @@ export default function MainDashboard() {
         }
         
         // Add new materials
-        if (materialsRes.pdfs) {
-          materialsRes.pdfs.slice(0, 2).forEach(pdf => {
+        if (materialsRes.materials) {
+          materialsRes.materials.slice(0, 2).forEach(pdf => {
             activities.push({
               type: 'new_material',
               title: `New study material: ${pdf.title}`,
@@ -87,8 +88,8 @@ export default function MainDashboard() {
         }
         
         // Add new videos
-        if (materialsRes.videos) {
-          materialsRes.videos.slice(0, 2).forEach(video => {
+        if (videosRes.videos) {
+          videosRes.videos.slice(0, 2).forEach(video => {
             activities.push({
               type: 'new_video',
               title: `New video: ${video.title}`,

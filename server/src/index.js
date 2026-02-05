@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { createApp } from './app.js';
-import { connectDb } from './config/db-pg.js';
+import { connectDb } from './config/db.js';
 import { ensureAdminUser } from './seed/ensureAdmin.js';
 import { ensureSettings } from './seed/ensureSettings.js';
 
