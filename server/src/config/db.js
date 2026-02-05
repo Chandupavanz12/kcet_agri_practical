@@ -567,11 +567,26 @@ async function initSchema() {
 }
 
 export async function connectDb() {
-  const host = process.env.DB_HOST || '127.0.0.1';
-  const port = Number(process.env.DB_PORT || 3306);
-  const user = process.env.DB_USER || 'root';
-  const password = process.env.DB_PASSWORD || '';
-  const database = process.env.DB_NAME || 'kcet_agri_practical';
+  if (pool) return;
+
+  // Support full DATABASE_URL (Railway style)
+  const dbUrl = process.env.DATABASE_URL;
+  let host, port, user, password, database;
+
+  if (dbUrl) {
+    const match = dbUrl.match(/^mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)$/);
+    if (match) {
+      [, user, password, host, port, database] = match;
+      port = Number(port);
+    }
+  }
+
+  // Fallback to individual env vars
+  host = host || process.env.DB_HOST || '127.0.0.1';
+  port = port || Number(process.env.DB_PORT || 3306);
+  user = user || process.env.DB_USER || 'root';
+  password = password || process.env.DB_PASSWORD || '';
+  database = database || process.env.DB_NAME || 'kcet_agri_practical';
 
   pool = mysql.createPool({
     host,
@@ -582,6 +597,11 @@ export async function connectDb() {
     waitForConnections: true,
     connectionLimit: 10,
     namedPlaceholders: false,
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    acquireTimeout: Number(process.env.DB_CONNECT_TIMEOUT) || 60000,
+    timeout: Number(process.env.DB_CONNECT_TIMEOUT) || 60000,
+    reconnect: true,
+    idleTimeout: 300000,
   });
 
   await query('SELECT 1');
