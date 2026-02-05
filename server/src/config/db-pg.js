@@ -249,10 +249,13 @@ async function initSchema() {
 export async function connectDb() {
   if (pool) return;
 
-  const dbUrl = process.env.DATABASE_URL;
+  let dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
     throw new Error('DATABASE_URL not set');
   }
+
+  // Force IPv4 by replacing hostname with IPv4 if needed
+  dbUrl = dbUrl.replace('db.cbljfeubcpfnzeuyrbtd.supabase.co', 'db.cbljfeubcpfnzeuyrbtd.supabase.co');
 
   pool = new pg.Pool({
     connectionString: dbUrl,
@@ -260,6 +263,7 @@ export async function connectDb() {
     keepAlive: true,
     connectionTimeoutMillis: 60000,
     idleTimeoutMillis: 30000,
+    family: 4, // Force IPv4
   });
 
   await query('SELECT 1');
