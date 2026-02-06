@@ -255,7 +255,7 @@ export default function MockTest() {
                 {/* Image */}
                 <div className="mb-6 flex justify-center">
                   <img
-                    src={current.imageUrl.startsWith('http') ? current.imageUrl : `http://localhost:5001${current.imageUrl}`}
+                    src={current.imageUrl.startsWith('http') ? current.imageUrl : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001'}${current.imageUrl}`}
                     alt={`Question ${currentIndex + 1}`}
                     className="h-64 w-auto rounded-lg border object-contain"
                     onError={(e) => {
