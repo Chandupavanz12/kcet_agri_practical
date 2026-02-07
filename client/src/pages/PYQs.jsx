@@ -10,6 +10,8 @@ export default function PYQs() {
   const [years, setYears] = useState([]);
   const [pyqs, setPyqs] = useState([]);
 
+  const isMobile = typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false;
+
   const [selectedCentreId, setSelectedCentreId] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedPyq, setSelectedPyq] = useState(null);
@@ -228,11 +230,25 @@ export default function PYQs() {
                 {loadingPdf ? (
                   <div className="p-4 text-sm text-slate-600">Loading PDF...</div>
                 ) : (
-                  <iframe
-                    title="PYQ PDF Viewer"
-                    src={`${pdfBlobUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                    className="h-[80vh] w-full bg-white"
-                  />
+                  isMobile ? (
+                    <div className="p-4">
+                      <a
+                        href={pdfBlobUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-primary text-xs"
+                      >
+                        Open PDF
+                      </a>
+                      <div className="mt-2 text-xs text-slate-600">If the PDF doesn't open inside the page on mobile, use this button.</div>
+                    </div>
+                  ) : (
+                    <iframe
+                      title="PYQ PDF Viewer"
+                      src={`${pdfBlobUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                      className="h-[80vh] w-full bg-white"
+                    />
+                  )
                 )}
               </div>
             </div>

@@ -64,27 +64,37 @@ export async function requestPasswordResetByEmail(req, res, next) {
     await PasswordReset.updateMany({ user_id: user.id, used_at: null }, { $set: { used_at: new Date() } });
     await new PasswordReset({ user_id: user.id, token: tokenHash, expires_at: expiresAt, used_at: null }).save();
 
-    const host = process.env.SMTP_HOST;
-    const port = Number(process.env.SMTP_PORT || 587);
-    const smtpUser = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
+    const host = String(process.env.SMTP_HOST || '').trim();
+    const port = Number(String(process.env.SMTP_PORT || 587).trim());
+    const smtpUser = String(process.env.SMTP_USER || '').trim();
+    const pass = String(process.env.SMTP_PASS || '').trim();
     const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
-    const from = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com';
+    const from = String(process.env.SMTP_FROM || '').trim() || smtpUser || 'no-reply@example.com';
 
-    if (host && smtpUser && pass) {
+    if (host && smtpUser && pass && Number.isFinite(port)) {
       const transporter = nodemailer.createTransport({
         host,
         port,
         secure,
         auth: { user: smtpUser, pass },
+        connectionTimeout: 12_000,
+        greetingTimeout: 12_000,
+        socketTimeout: 20_000,
       });
 
-      await transporter.sendMail({
-        from,
-        to: user.email,
-        subject: 'Password Reset OTP',
-        text: `Your password reset OTP is ${otp}. This OTP is valid for 10 minutes. If you did not request this, you can ignore this email.`,
-      });
+      try {
+        await transporter.sendMail({
+          from,
+          to: user.email,
+          subject: 'Password Reset OTP',
+          text: `Your password reset OTP is ${otp}. This OTP is valid for 10 minutes. If you did not request this, you can ignore this email.`,
+        });
+      } catch (e) {
+        if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
+          return res.status(500).json({ message: 'Email service connection timeout' });
+        }
+        return res.status(500).json({ message: e?.message || 'Email send failed' });
+      }
     } else {
       if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
         return res.status(500).json({ message: 'Email service not configured' });
@@ -157,27 +167,37 @@ export async function requestLoginOtpByEmail(req, res, next) {
     await LoginOtp.updateMany({ user_id: user.id, used_at: null }, { $set: { used_at: new Date() } });
     await new LoginOtp({ user_id: user.id, token: tokenHash, expires_at: expiresAt, used_at: null }).save();
 
-    const host = process.env.SMTP_HOST;
-    const port = Number(process.env.SMTP_PORT || 587);
-    const smtpUser = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
+    const host = String(process.env.SMTP_HOST || '').trim();
+    const port = Number(String(process.env.SMTP_PORT || 587).trim());
+    const smtpUser = String(process.env.SMTP_USER || '').trim();
+    const pass = String(process.env.SMTP_PASS || '').trim();
     const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
-    const from = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com';
+    const from = String(process.env.SMTP_FROM || '').trim() || smtpUser || 'no-reply@example.com';
 
-    if (host && smtpUser && pass) {
+    if (host && smtpUser && pass && Number.isFinite(port)) {
       const transporter = nodemailer.createTransport({
         host,
         port,
         secure,
         auth: { user: smtpUser, pass },
+        connectionTimeout: 12_000,
+        greetingTimeout: 12_000,
+        socketTimeout: 20_000,
       });
 
-      await transporter.sendMail({
-        from,
-        to: user.email,
-        subject: 'Login OTP',
-        text: `Your login OTP is ${otp}. This OTP is valid for 10 minutes. If you did not request this, you can ignore this email.`,
-      });
+      try {
+        await transporter.sendMail({
+          from,
+          to: user.email,
+          subject: 'Login OTP',
+          text: `Your login OTP is ${otp}. This OTP is valid for 10 minutes. If you did not request this, you can ignore this email.`,
+        });
+      } catch (e) {
+        if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
+          return res.status(500).json({ message: 'Email service connection timeout' });
+        }
+        return res.status(500).json({ message: e?.message || 'Email send failed' });
+      }
     } else {
       if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
         return res.status(500).json({ message: 'Email service not configured' });
