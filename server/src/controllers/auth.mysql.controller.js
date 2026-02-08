@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import https from 'https';
 import nodemailer from 'nodemailer';
 import { signToken, hashPassword, verifyPassword } from '../utils/auth.js';
 import { LoginOtp, PasswordReset, User } from '../models/index.js';
@@ -10,6 +11,111 @@ function mapUserRow(row) {
 function isValidEmail(email) {
   const e = String(email || '').trim();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+}
+
+async function sendViaBrevoHttp({ apiKey, fromEmail, fromName, toEmail, subject, text }) {
+  const payload = JSON.stringify({
+    sender: {
+      email: fromEmail,
+      name: fromName || fromEmail,
+    },
+    to: [{ email: toEmail }],
+    subject,
+    textContent: text,
+  });
+
+  const options = {
+    method: 'POST',
+    hostname: 'api.brevo.com',
+    path: '/v3/smtp/email',
+    headers: {
+      accept: 'application/json',
+      'api-key': apiKey,
+      'content-type': 'application/json',
+      'content-length': Buffer.byteLength(payload),
+    },
+    timeout: 12000,
+  };
+
+  await new Promise((resolve, reject) => {
+    const req = https.request(options, (resp) => {
+      let body = '';
+      resp.setEncoding('utf8');
+      resp.on('data', (chunk) => {
+        body += chunk;
+      });
+      resp.on('end', () => {
+        if (resp.statusCode && resp.statusCode >= 200 && resp.statusCode < 300) {
+          resolve(true);
+          return;
+        }
+        let parsed;
+        try {
+          parsed = body ? JSON.parse(body) : null;
+        } catch {
+          parsed = { message: body };
+        }
+        reject(new Error(parsed?.message || parsed?.error || 'Brevo email send failed'));
+      });
+    });
+    req.on('timeout', () => {
+      req.destroy(new Error('Brevo email request timeout'));
+    });
+    req.on('error', (e) => reject(e));
+    req.write(payload);
+    req.end();
+  });
+}
+
+async function sendMail({ toEmail, subject, text }) {
+  const brevoApiKey = String(process.env.BREVO_API_KEY || '').trim();
+  const fromRaw = String(process.env.SMTP_FROM || process.env.SMTP_USER || '').trim();
+  const fallbackFrom = fromRaw || 'no-reply@example.com';
+  const fromMatch = fallbackFrom.match(/^(.*)<([^>]+)>\s*$/);
+  const fromName = fromMatch ? String(fromMatch[1] || '').trim() : '';
+  const fromEmail = fromMatch ? String(fromMatch[2] || '').trim() : fallbackFrom;
+
+  if (brevoApiKey) {
+    await sendViaBrevoHttp({
+      apiKey: brevoApiKey,
+      fromEmail,
+      fromName,
+      toEmail,
+      subject,
+      text,
+    });
+    return;
+  }
+
+  const host = String(process.env.SMTP_HOST || '').trim();
+  const port = Number(String(process.env.SMTP_PORT || 587).trim());
+  const smtpUser = String(process.env.SMTP_USER || '').trim();
+  const pass = String(process.env.SMTP_PASS || '').trim();
+  const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
+  const from = fromRaw || smtpUser || 'no-reply@example.com';
+
+  if (!host || !smtpUser || !pass || !Number.isFinite(port)) {
+    const err = new Error('Email service not configured');
+    err.code = 'EMAIL_NOT_CONFIGURED';
+    throw err;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user: smtpUser, pass },
+    connectionTimeout: 12_000,
+    greetingTimeout: 12_000,
+    socketTimeout: 20_000,
+  });
+
+  await transporter.sendMail({
+    from,
+    to: toEmail,
+    subject,
+    text,
+  });
 }
 
 export async function studentRegister(req, res, next) {
@@ -64,43 +170,26 @@ export async function requestPasswordResetByEmail(req, res, next) {
     await PasswordReset.updateMany({ user_id: user.id, used_at: null }, { $set: { used_at: new Date() } });
     await new PasswordReset({ user_id: user.id, token: tokenHash, expires_at: expiresAt, used_at: null }).save();
 
-    const host = String(process.env.SMTP_HOST || '').trim();
-    const port = Number(String(process.env.SMTP_PORT || 587).trim());
-    const smtpUser = String(process.env.SMTP_USER || '').trim();
-    const pass = String(process.env.SMTP_PASS || '').trim();
-    const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
-    const from = String(process.env.SMTP_FROM || '').trim() || smtpUser || 'no-reply@example.com';
-
-    if (host && smtpUser && pass && Number.isFinite(port)) {
-      const transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure,
-        auth: { user: smtpUser, pass },
-        connectionTimeout: 12_000,
-        greetingTimeout: 12_000,
-        socketTimeout: 20_000,
+    try {
+      await sendMail({
+        toEmail: user.email,
+        subject: 'Password Reset OTP',
+        text: `Your password reset OTP is ${otp}. This OTP is valid for 10 minutes. If you did not request this, you can ignore this email.`,
       });
-
-      try {
-        await transporter.sendMail({
-          from,
-          to: user.email,
-          subject: 'Password Reset OTP',
-          text: `Your password reset OTP is ${otp}. This OTP is valid for 10 minutes. If you did not request this, you can ignore this email.`,
-        });
-      } catch (e) {
-        if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
-          return res.status(500).json({ message: 'Email service connection timeout' });
-        }
-        return res.status(500).json({ message: e?.message || 'Email send failed' });
+    } catch (e) {
+      const prod = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+      const hasBrevo = Boolean(String(process.env.BREVO_API_KEY || '').trim());
+      const msg = String(e?.message || '').toLowerCase();
+      if (prod && (msg.includes('timeout') || msg.includes('timed out') || String(e?.code || '').toLowerCase().includes('timeout'))) {
+        return res.status(500).json({ message: 'Email service connection timeout' });
       }
-    } else {
-      if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
+      if (prod) {
+        if (hasBrevo) {
+          return res.status(500).json({ message: `Email send failed: ${String(e?.message || 'Brevo error')}` });
+        }
         return res.status(500).json({ message: 'Email service not configured' });
       }
-      // Dev convenience only
-      return res.json({ message: 'OTP generated (SMTP not configured).', otp });
+      return res.json({ message: e?.message || 'Email send failed', otp });
     }
 
     return res.json({ message: 'If an account exists, an OTP has been sent to the registered email.' });
@@ -167,43 +256,26 @@ export async function requestLoginOtpByEmail(req, res, next) {
     await LoginOtp.updateMany({ user_id: user.id, used_at: null }, { $set: { used_at: new Date() } });
     await new LoginOtp({ user_id: user.id, token: tokenHash, expires_at: expiresAt, used_at: null }).save();
 
-    const host = String(process.env.SMTP_HOST || '').trim();
-    const port = Number(String(process.env.SMTP_PORT || 587).trim());
-    const smtpUser = String(process.env.SMTP_USER || '').trim();
-    const pass = String(process.env.SMTP_PASS || '').trim();
-    const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
-    const from = String(process.env.SMTP_FROM || '').trim() || smtpUser || 'no-reply@example.com';
-
-    if (host && smtpUser && pass && Number.isFinite(port)) {
-      const transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure,
-        auth: { user: smtpUser, pass },
-        connectionTimeout: 12_000,
-        greetingTimeout: 12_000,
-        socketTimeout: 20_000,
+    try {
+      await sendMail({
+        toEmail: user.email,
+        subject: 'Login OTP',
+        text: `Your login OTP is ${otp}. This OTP is valid for 10 minutes. If you did not request this, you can ignore this email.`,
       });
-
-      try {
-        await transporter.sendMail({
-          from,
-          to: user.email,
-          subject: 'Login OTP',
-          text: `Your login OTP is ${otp}. This OTP is valid for 10 minutes. If you did not request this, you can ignore this email.`,
-        });
-      } catch (e) {
-        if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
-          return res.status(500).json({ message: 'Email service connection timeout' });
-        }
-        return res.status(500).json({ message: e?.message || 'Email send failed' });
+    } catch (e) {
+      const prod = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+      const hasBrevo = Boolean(String(process.env.BREVO_API_KEY || '').trim());
+      const msg = String(e?.message || '').toLowerCase();
+      if (prod && (msg.includes('timeout') || msg.includes('timed out') || String(e?.code || '').toLowerCase().includes('timeout'))) {
+        return res.status(500).json({ message: 'Email service connection timeout' });
       }
-    } else {
-      if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
+      if (prod) {
+        if (hasBrevo) {
+          return res.status(500).json({ message: `Email send failed: ${String(e?.message || 'Brevo error')}` });
+        }
         return res.status(500).json({ message: 'Email service not configured' });
       }
-      // Dev convenience only
-      return res.json({ message: 'OTP generated (SMTP not configured).', otp });
+      return res.json({ message: e?.message || 'Email send failed', otp });
     }
 
     return res.json({ message: 'If an account exists, an OTP has been sent to the registered email.' });
