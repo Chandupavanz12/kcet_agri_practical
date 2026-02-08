@@ -20,6 +20,36 @@ export default function StudentMaterialsFree() {
     [apiBaseUrl]
   );
 
+  const openProtectedFile = async (fileUrl) => {
+    const absoluteUrl = toFileUrl(fileUrl);
+    if (!absoluteUrl) return;
+    if (!token) {
+      setError('Please login again');
+      return;
+    }
+
+    try {
+      setError('');
+      const res = await fetch(absoluteUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Failed to open file (${res.status})`);
+      }
+
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (e) {
+      setError(e?.message || 'Failed to open file');
+    }
+  };
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -91,9 +121,9 @@ export default function StudentMaterialsFree() {
                     <div className="text-sm font-semibold text-slate-900">{m.title}</div>
                     <div className="mt-1 text-xs text-slate-600">{m.subject}</div>
                     <div className="mt-4">
-                      <a href={toFileUrl(m.pdfUrl)} target="_blank" rel="noopener noreferrer" className="btn-primary text-xs">
+                      <button type="button" className="btn-primary text-xs" onClick={() => openProtectedFile(m.pdfUrl)}>
                         View
-                      </a>
+                      </button>
                     </div>
                   </div>
                 </div>

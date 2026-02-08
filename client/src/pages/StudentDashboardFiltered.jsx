@@ -17,6 +17,36 @@ export default function StudentDashboardFiltered() {
     if (/^https?:\/\//i.test(url)) return url;
     return `${apiBaseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
   };
+
+  const openProtectedFile = async (fileUrl) => {
+    const absoluteUrl = toFileUrl(fileUrl);
+    if (!absoluteUrl) return;
+    if (!token) {
+      setError('Please login again');
+      return;
+    }
+
+    try {
+      setError('');
+      const res = await fetch(absoluteUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Failed to open file (${res.status})`);
+      }
+
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (e) {
+      setError(e?.message || 'Failed to open file');
+    }
+  };
   const activeTab = searchParams.get('tab') || 'dashboard';
 
   useEffect(() => {
@@ -285,14 +315,9 @@ export default function StudentDashboardFiltered() {
                     <div className="text-sm font-medium">{m.title}</div>
                     <div className="text-xs text-slate-500">{m.subject}</div>
                   </div>
-                  <a
-                    href={toFileUrl(m.pdfUrl)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-primary text-xs"
-                  >
+                  <button type="button" className="btn-primary text-xs" onClick={() => openProtectedFile(m.pdfUrl)}>
                     View
-                  </a>
+                  </button>
                 </div>
               ))}
             </div>
