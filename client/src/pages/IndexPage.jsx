@@ -21,9 +21,15 @@ export default function IndexPage() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const endpoint = user?.role === 'admin' ? '/api/admin/dashboard' : '/api/student/dashboard';
-      const res = await apiFetch(endpoint, { token });
-      setData(res);
+      if (user?.role === 'admin') {
+        const res = await apiFetch('/api/admin/dashboard', { token });
+        setData(res);
+        return;
+      }
+
+      // Student: only fetch notifications quickly for the landing page.
+      const n = await apiFetch('/api/student/notifications', { token });
+      setData({ notifications: Array.isArray(n?.notifications) ? n.notifications : [] });
     } catch (err) {
       setError(err?.message || 'Failed to load dashboard');
     } finally {
@@ -193,11 +199,23 @@ export default function IndexPage() {
                   </div>
                   <div className="card-body">
                     <div className="space-y-3">
-                      {data.notifications.slice(0, 5).map((notification) => (
+                      {(() => {
+                        const seen = new Set();
+                        const out = [];
+                        for (const n of data.notifications) {
+                          const msg = String(n?.message || '').trim();
+                          if (!msg) continue;
+                          const key = msg.toLowerCase();
+                          if (seen.has(key)) continue;
+                          seen.add(key);
+                          out.push({ id: n.id, message: msg });
+                          if (out.length >= 4) break;
+                        }
+                        return out;
+                      })().map((notification) => (
                         <div key={notification.id} className="flex items-start gap-3 p-3 bg-secondary-50 rounded-2xl border border-secondary-100">
                           <div className="text-xl">📢</div>
                           <div className="flex-1">
-                            <div className="font-medium text-slate-900">{notification.title}</div>
                             <div className="text-sm text-slate-700">{notification.message}</div>
                           </div>
                         </div>

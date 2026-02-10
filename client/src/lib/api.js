@@ -12,6 +12,7 @@ function cacheTtlMs(path) {
   if (String(path || '').startsWith('/api/student/dashboard')) return 15000;
   if (String(path || '').startsWith('/api/student/notifications')) return 10000;
   if (String(path || '').startsWith('/api/student/videos')) return 10000;
+  if (String(path || '').startsWith('/api/admin/dashboard')) return 15000;
   return 5000;
 }
 

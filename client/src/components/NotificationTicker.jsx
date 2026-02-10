@@ -9,17 +9,14 @@ function classifyNotification(n) {
   if (/(mock|test)/i.test(text)) return { kind: 'mock_test', icon: '🔔' };
   if (/(video)/i.test(text)) return { kind: 'video', icon: '🎥' };
   if (/(announce|announcement|notice|update)/i.test(text)) return { kind: 'announcement', icon: '📢' };
-  return null;
+  return { kind: 'announcement', icon: '🔔' };
 }
 
 function formatLine(n) {
   const c = classifyNotification(n);
-  if (!c) return null;
-  const title = String(n?.title || '').trim();
   const msg = String(n?.message || '').trim();
-  const text = title ? (msg ? `${title}: ${msg}` : title) : msg;
-  if (!text) return null;
-  return `${c.icon} ${text}`;
+  if (!msg) return null;
+  return msg;
 }
 
 function joinLines(lines) {
@@ -87,8 +84,10 @@ export default function NotificationTicker({ token, initialNotifications = [], a
     return () => clearInterval(t);
   }, [token, autoRefresh]);
 
-  const row1Text = joinLines(importantLines.row1) || '🔔 Announcements will appear here';
-  const row2Text = joinLines(importantLines.row2) || '🎥 New content updates will appear here';
+  const row1Text = joinLines(importantLines.row1);
+  const row2Text = joinLines(importantLines.row2);
+
+  if (!row1Text && !row2Text) return null;
 
   return (
     <div className="card overflow-hidden">
@@ -102,14 +101,16 @@ export default function NotificationTicker({ token, initialNotifications = [], a
               </div>
             </div>
           </div>
-          <div className="relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white">
-            <div className="ticker-track-slow whitespace-nowrap px-4 py-2 text-sm font-medium text-slate-800">
-              <div className="inline-flex">
-                <span className="pr-10">{row2Text}</span>
-                <span className="pr-10" aria-hidden="true">{row2Text}</span>
+          {row2Text ? (
+            <div className="relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white">
+              <div className="ticker-track-slow whitespace-nowrap px-4 py-2 text-sm font-medium text-slate-800">
+                <div className="inline-flex">
+                  <span className="pr-10">{row2Text}</span>
+                  <span className="pr-10" aria-hidden="true">{row2Text}</span>
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
         </div>
       </div>
     </div>

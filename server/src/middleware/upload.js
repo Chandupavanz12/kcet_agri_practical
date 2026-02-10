@@ -8,12 +8,14 @@ function ensureDir(dir) {
   }
 }
 
-const imagesDir = path.join(process.cwd(), 'uploads', 'images');
-const pdfsDir = path.join(process.cwd(), 'uploads', 'pdfs');
-const materialsDir = path.join(process.cwd(), 'uploads', 'materials');
-const publicPyqsDir = path.join(process.cwd(), 'uploads', 'pyqs');
-const pyqsDir = path.join(process.cwd(), 'private_uploads', 'pyqs');
-const privateMaterialsDir = path.join(process.cwd(), 'private_uploads', 'materials');
+const uploadRoot = path.resolve(process.env.UPLOAD_ROOT || process.cwd());
+
+const imagesDir = path.join(uploadRoot, 'uploads', 'images');
+const pdfsDir = path.join(uploadRoot, 'uploads', 'pdfs');
+const materialsDir = path.join(uploadRoot, 'uploads', 'materials');
+const publicPyqsDir = path.join(uploadRoot, 'uploads', 'pyqs');
+const pyqsDir = path.join(uploadRoot, 'private_uploads', 'pyqs');
+const privateMaterialsDir = path.join(uploadRoot, 'private_uploads', 'materials');
 
 ensureDir(imagesDir);
 ensureDir(pdfsDir);

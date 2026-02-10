@@ -109,11 +109,24 @@ async function getPlanByCode(code) {
 }
 
 async function ensureUserAccessRow(userId) {
-  const existing = await UserAccess.findOne({ user_id: Number(userId) }).lean();
-  if (existing) return existing;
+  const uid = Number(userId);
+  if (!Number.isFinite(uid)) return null;
 
-  const doc = await new UserAccess({ user_id: Number(userId) }).save();
-  return doc.toObject();
+  try {
+    const doc = await UserAccess.findOneAndUpdate(
+      { user_id: uid },
+      { $setOnInsert: { user_id: uid, created_at: new Date(), updated_at: new Date() } },
+      { new: true, upsert: true }
+    ).lean();
+    return doc || null;
+  } catch (e) {
+    // In case of race condition duplicate key, read the row that likely got created.
+    if (e && (e.code === 11000 || String(e.message || '').includes('E11000'))) {
+      const existing = await UserAccess.findOne({ user_id: uid }).lean();
+      return existing || null;
+    }
+    throw e;
+  }
 }
 
 function computeActiveAccess(row) {
@@ -545,19 +558,19 @@ export async function listMaterialsStudent(req, res, next) {
       canAccessPlan(userId, role, 'pyq'),
     ]);
     const materials = rows.map((m) => {
-      const accessType = String(m.access_type || 'free').toLowerCase();
+      const accessType = String(m.access_type || 'paid').toLowerCase();
       const planUnlocked = String(m.type || '').toLowerCase() === 'pyq' ? pyqUnlocked : materialsUnlocked;
       const locked = accessType === 'paid' && !planUnlocked;
       const fileEndpoint = `/api/student/materials/${m.id}/file`;
-      const pdfUrl = accessType === 'paid' ? fileEndpoint : (m.pdf_url || fileEndpoint);
+      const pdfUrl = fileEndpoint;
       return {
         id: m.id,
         title: m.title,
+        pdfUrl,
         subject: m.subject,
         type: m.type,
         accessType,
         locked,
-        pdfUrl,
       };
     });
 
@@ -568,20 +581,21 @@ export async function listMaterialsStudent(req, res, next) {
 }
 
 function resolveAndValidateFile(ref, allowedBases) {
-  const privateBaseMaterials = path.resolve(process.cwd(), 'private_uploads', 'materials');
-  const privateBasePyqs = path.resolve(process.cwd(), 'private_uploads', 'pyqs');
-  const uploadsBase = path.resolve(process.cwd(), 'uploads');
+  const uploadRoot = path.resolve(process.env.UPLOAD_ROOT || process.cwd());
+  const privateBaseMaterials = path.resolve(uploadRoot, 'private_uploads', 'materials');
+  const privateBasePyqs = path.resolve(uploadRoot, 'private_uploads', 'pyqs');
+  const uploadsBase = path.resolve(uploadRoot, 'uploads');
 
   let abs;
   const r = String(ref || '').trim();
   if (r.startsWith('/uploads/')) {
-    abs = path.resolve(process.cwd(), r.slice(1));
+    abs = path.resolve(uploadRoot, r.slice(1));
   } else if (r.startsWith('uploads/')) {
-    abs = path.resolve(process.cwd(), r);
+    abs = path.resolve(uploadRoot, r);
   } else if (r.startsWith('private_uploads/')) {
-    abs = path.resolve(process.cwd(), r);
+    abs = path.resolve(uploadRoot, r);
   } else {
-    abs = path.resolve(process.cwd(), r);
+    abs = path.resolve(uploadRoot, r);
   }
 
   const resolved = path.resolve(abs);
@@ -618,7 +632,7 @@ export async function getMenus(req, res, next) {
 
 export async function listVideosStudent(req, res, next) {
   try {
-    const rows = await Video.find({ status: 'active' }).sort({ created_at: -1, id: -1 }).limit(60).lean();
+    const rows = await Video.find({ status: 'active' }).sort({ created_at: -1, id: -1 }).limit(20).lean();
     const videos = rows.map((v) => ({ id: v.id, title: v.title, videoUrl: v.video_url, subject: v.subject, status: v.status }));
     return res.json({ videos });
   } catch (err) {
@@ -628,7 +642,7 @@ export async function listVideosStudent(req, res, next) {
 
 export async function listNotificationsStudent(req, res, next) {
   try {
-    const rows = await Notification.find({ status: 'active' }).sort({ created_at: -1, id: -1 }).limit(50).lean();
+    const rows = await Notification.find({ status: 'active' }).sort({ created_at: -1, id: -1 }).limit(10).lean();
     const notifications = rows.map((n) => ({ id: n.id, title: n.title, message: n.message, status: n.status }));
     return res.json({ notifications });
   } catch (err) {
@@ -722,7 +736,7 @@ export async function getDashboard(req, res, next) {
       pdfs: pdfs.map((m) => {
         const accessType = String(m.access_type || 'free').toLowerCase();
         const locked = accessType === 'paid' && !materialsUnlocked;
-        const pdfUrl = accessType === 'paid' ? `/api/student/materials/${m.id}/file` : m.pdf_url;
+        const pdfUrl = `/api/student/materials/${m.id}/file`;
         return {
           id: m.id,
           title: m.title,
@@ -736,7 +750,7 @@ export async function getDashboard(req, res, next) {
       pyqs: pyqs.map((m) => {
         const accessType = String(m.access_type || 'free').toLowerCase();
         const locked = accessType === 'paid' && !pyqUnlocked;
-        const pdfUrl = accessType === 'paid' ? `/api/student/materials/${m.id}/file` : m.pdf_url;
+        const pdfUrl = `/api/student/materials/${m.id}/file`;
         return {
           id: m.id,
           title: m.title,

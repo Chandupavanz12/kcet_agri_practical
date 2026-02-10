@@ -54,9 +54,53 @@ export default function StudentDashboardFiltered() {
     (async () => {
       try {
         setLoading(true);
-        const res = await apiFetch('/api/student/dashboard', { token });
+        const [
+          plansRes,
+          statusRes,
+          videosRes,
+          notificationsRes,
+          testsRes,
+          pdfsRes,
+        ] = await Promise.all([
+          apiFetch('/api/student/premium/plans', { token }),
+          apiFetch('/api/student/premium/status', { token }),
+          apiFetch('/api/student/videos', { token }),
+          apiFetch('/api/student/notifications', { token }),
+          apiFetch('/api/student/tests', { token }),
+          apiFetch('/api/student/materials?type=pdf', { token }),
+        ]);
+
         if (!alive) return;
-        setData(res);
+
+        const premiumPlans = Array.isArray(plansRes?.plans) ? plansRes.plans : [];
+        const premiumStatus = statusRes?.access
+          ? {
+              comboActive: Boolean(statusRes.access?.combo?.unlocked),
+              pyqActive: Boolean(statusRes.access?.pyq?.unlocked),
+              materialActive: Boolean(statusRes.access?.materials?.unlocked),
+              comboExpiry: statusRes.access?.combo?.expiry || null,
+              pyqExpiry: statusRes.access?.pyq?.expiry || null,
+              materialExpiry: statusRes.access?.materials?.expiry || null,
+            }
+          : {
+              comboActive: false,
+              pyqActive: false,
+              materialActive: false,
+              comboExpiry: null,
+              pyqExpiry: null,
+              materialExpiry: null,
+            };
+
+        setData({
+          settings: { testsEnabled: true, videosEnabled: true, notificationsEnabled: true, pdfsEnabled: true, pyqsEnabled: true },
+          premiumPlans,
+          premiumStatus,
+          videos: Array.isArray(videosRes?.videos) ? videosRes.videos : [],
+          notifications: Array.isArray(notificationsRes?.notifications) ? notificationsRes.notifications : [],
+          tests: Array.isArray(testsRes?.tests) ? testsRes.tests : [],
+          pdfs: Array.isArray(pdfsRes?.materials) ? pdfsRes.materials : [],
+          pyqs: [],
+        });
       } catch (err) {
         if (!alive) return;
         setError(err?.message || 'Failed to load dashboard');

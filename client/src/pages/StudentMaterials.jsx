@@ -36,6 +36,10 @@ export default function StudentMaterials() {
 
       if (!res.ok) {
         const text = await res.text();
+        const lowered = String(text || '').toLowerCase();
+        if (res.status === 404 || lowered.includes('file not found') || lowered.includes('cannot get /uploads')) {
+          throw new Error('File not found. Please contact admin or try again later.');
+        }
         throw new Error(text || `Failed to open file (${res.status})`);
       }
 

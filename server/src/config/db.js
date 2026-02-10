@@ -7,6 +7,9 @@ function sleep(ms) {
 }
 
 export async function connectDb() {
+  mongoose.set('bufferCommands', false);
+  mongoose.set('bufferTimeoutMS', 2000);
+
   if (mongoose.connection.readyState === 1) return;
   if (connectingPromise) return connectingPromise;
 

@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
+import path from 'path';
+import mongoose from 'mongoose';
 
 import { authRouter } from './routes/auth.routes.js';
 import { adminRouter } from './routes/admin.routes.js';
@@ -10,6 +12,9 @@ import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp() {
   const app = express();
+
+  const uploadRoot = path.resolve(process.env.UPLOAD_ROOT || process.cwd());
+  const publicUploadsDir = path.join(uploadRoot, 'uploads');
 
   app.use(
     cors({
@@ -23,7 +28,14 @@ export function createApp() {
   app.use(express.json({ limit: '2mb' }));
   app.use(morgan('dev'));
 
-  app.use('/uploads', express.static('uploads'));
+  app.use((req, res, next) => {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ message: 'Database unavailable. Please try again.' });
+    }
+    return next();
+  });
+
+  app.use('/uploads', express.static(publicUploadsDir));
 
   app.get('/api/health', (req, res) => {
     res.json({ ok: true });

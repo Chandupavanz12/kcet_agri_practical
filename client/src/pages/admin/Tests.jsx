@@ -8,16 +8,28 @@ export default function Tests() {
   const [tests, setTests] = useState([]);
   const [error, setError] = useState('');
 
+  const load = async () => {
+    try {
+      const res = await apiFetch('/api/admin/tests', { token });
+      setTests(res.tests || []);
+    } catch (err) {
+      setError(err?.message || 'Failed to load tests');
+    }
+  };
+
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await apiFetch('/api/admin/tests', { token });
-        setTests(res.tests || []);
-      } catch (err) {
-        setError(err?.message || 'Failed to load tests');
-      }
-    })();
+    load();
   }, [token]);
+
+  const deleteTest = async (id) => {
+    if (!confirm('Delete this test?')) return;
+    try {
+      await apiFetch(`/api/admin/tests/${id}`, { token, method: 'DELETE' });
+      load();
+    } catch (err) {
+      setError(err?.message || 'Failed to delete test');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -34,12 +46,17 @@ export default function Tests() {
           {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
           <div className="space-y-3">
             {tests.map((t) => (
-              <div key={t.id} className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
+              <div key={t.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
                 <div>
                   <div className="text-sm font-medium">{t.title}</div>
                   <div className="text-xs text-slate-500">Questions: {t.questionCount} • {t.perQuestionSeconds}s • +{t.marksCorrect}</div>
                 </div>
-                <span className={`badge ${t.isActive ? 'badge-success' : ''}`}>{t.isActive ? 'active' : 'inactive'}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`badge ${t.isActive ? 'badge-success' : ''}`}>{t.isActive ? 'active' : 'inactive'}</span>
+                  <button type="button" className="btn-ghost text-xs" onClick={() => deleteTest(t.id)}>
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>

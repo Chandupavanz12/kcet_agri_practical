@@ -6,6 +6,7 @@ import { apiFetch } from '../lib/api.js';
 export default function AdminDashboard() {
   const { token, user } = useAuth();
   const [analytics, setAnalytics] = useState(null);
+  const [dashboard, setDashboard] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -14,15 +15,25 @@ export default function AdminDashboard() {
     (async () => {
       try {
         setLoading(true);
-        const res = await apiFetch('/api/admin/analytics', { token });
+        const res = await apiFetch('/api/admin/dashboard', { token });
         if (!alive) return;
-        setAnalytics(res);
+        setDashboard(res);
+        setLoading(false);
+
+        // Load analytics in background
+        try {
+          const a = await apiFetch('/api/admin/analytics', { token });
+          if (!alive) return;
+          setAnalytics(a);
+        } catch {
+          // ignore background failure
+        }
       } catch (err) {
         if (!alive) return;
         setError(err?.message || 'Failed to load analytics');
       } finally {
         if (!alive) return;
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     })();
     return () => {
@@ -85,13 +96,13 @@ export default function AdminDashboard() {
         <div className="card">
           <div className="card-body">
             <div className="text-sm font-semibold text-slate-800">Students</div>
-            <div className="mt-2 text-3xl font-semibold">{analytics?.studentsCount ?? 0}</div>
+            <div className="mt-2 text-3xl font-semibold">{dashboard?.students?.count ?? analytics?.studentsCount ?? 0}</div>
           </div>
         </div>
         <div className="card">
           <div className="card-body">
             <div className="text-sm font-semibold text-slate-800">Tests</div>
-            <div className="mt-2 text-3xl font-semibold">{analytics?.testsCount ?? 0}</div>
+            <div className="mt-2 text-3xl font-semibold">{dashboard?.tests?.count ?? analytics?.testsCount ?? 0}</div>
           </div>
         </div>
         <div className="card">
@@ -103,13 +114,13 @@ export default function AdminDashboard() {
         <div className="card">
           <div className="card-body">
             <div className="text-sm font-semibold text-slate-800">Videos</div>
-            <div className="mt-2 text-3xl font-semibold">{analytics?.videosCount ?? 0}</div>
+            <div className="mt-2 text-3xl font-semibold">{dashboard?.videos?.count ?? analytics?.videosCount ?? 0}</div>
           </div>
         </div>
         <div className="card">
           <div className="card-body">
             <div className="text-sm font-semibold text-slate-800">Materials</div>
-            <div className="mt-2 text-3xl font-semibold">{analytics?.materialsCount ?? 0}</div>
+            <div className="mt-2 text-3xl font-semibold">{dashboard?.materials?.count ?? analytics?.materialsCount ?? 0}</div>
           </div>
         </div>
         <div className="card">

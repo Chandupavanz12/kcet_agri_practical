@@ -14,7 +14,18 @@ export default function StudentNotifications() {
       if (opts.showLoading) setLoading(true);
       const res = await apiFetch('/api/student/notifications', { token });
       if (!isAlive()) return;
-      setNotifications(Array.isArray(res?.notifications) ? res.notifications : []);
+      const rows = Array.isArray(res?.notifications) ? res.notifications : [];
+      const seen = new Set();
+      const uniq = [];
+      for (const n of rows) {
+        const msg = String(n?.message || '').trim();
+        if (!msg) continue;
+        const key = msg.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        uniq.push({ ...n, message: msg });
+      }
+      setNotifications(uniq);
     } catch (e) {
       if (!isAlive()) return;
       setError(e?.message || 'Failed to load notifications');
@@ -83,8 +94,7 @@ export default function StudentNotifications() {
           ) : (
             notifications.map((n) => (
               <div key={n.id} className="rounded-xl border border-slate-200 bg-primary-50 p-3">
-                <div className="text-sm font-semibold">{n.title}</div>
-                <div className="mt-1 text-sm text-slate-700">{n.message}</div>
+                <div className="text-sm text-slate-700">{n.message}</div>
               </div>
             ))
           )}

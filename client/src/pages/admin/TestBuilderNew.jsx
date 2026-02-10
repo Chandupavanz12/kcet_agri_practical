@@ -8,11 +8,22 @@ export default function TestBuilder() {
   const [questionCount, setQuestionCount] = useState(10);
   const [perQuestionSeconds, setPerQuestionSeconds] = useState(30);
   const [marksCorrect, setMarksCorrect] = useState(4);
-  const [isActive, setIsActive] = useState(true);
+  const [status, setStatus] = useState('active');
+  const [createdTestId, setCreatedTestId] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [saving, setSaving] = useState(false);
   const [serverError, setServerError] = useState('');
   const [success, setSuccess] = useState('');
+  const [allTests, setAllTests] = useState([]);
+
+  const loadTests = async () => {
+    try {
+      const res = await apiFetch('/api/admin/tests', { token });
+      setAllTests(Array.isArray(res?.tests) ? res.tests : []);
+    } catch {
+      // ignore
+    }
+  };
 
   const emptyQuestion = () => ({
     questionText: '',
@@ -34,6 +45,11 @@ export default function TestBuilder() {
     }
     setQuestions(initialQuestions);
   }, [questionCount]);
+
+  useEffect(() => {
+    if (!token) return;
+    loadTests();
+  }, [token]);
 
   const updateQuestion = (idx, updates) => {
     const next = [...questions];
@@ -87,7 +103,7 @@ export default function TestBuilder() {
     try {
       const payload = {
         title: title.trim(),
-        isActive,
+        isActive: status === 'active',
         perQuestionSeconds: Number(perQuestionSeconds),
         marksCorrect: Number(marksCorrect),
         questionCount: Number(questionCount),
@@ -107,7 +123,10 @@ export default function TestBuilder() {
         method: 'POST',
         body: payload,
       });
+      const newId = res?.test?.id ?? null;
+      setCreatedTestId(newId);
       setSuccess(`Test created (ID: ${res.test?.id}) with ${res.test?.questionCount} questions.`);
+      loadTests();
       setTitle('');
       setQuestionCount(10);
       setQuestions([]);
@@ -115,6 +134,44 @@ export default function TestBuilder() {
       setServerError(err?.message || 'Failed to create test');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const deleteCreatedTest = async () => {
+    if (!createdTestId) return;
+    if (!confirm('Delete this test?')) return;
+    try {
+      setServerError('');
+      setSuccess('');
+      await apiFetch(`/api/admin/tests/${createdTestId}`, { token, method: 'DELETE' });
+      setSuccess('Test deleted');
+      setCreatedTestId(null);
+      loadTests();
+    } catch (err) {
+      setServerError(err?.message || 'Failed to delete test');
+    }
+  };
+
+  const updateTestStatus = async (id, nextStatus) => {
+    try {
+      await apiFetch(`/api/admin/tests/${id}`, {
+        token,
+        method: 'PUT',
+        body: { isActive: nextStatus === 'active' },
+      });
+      loadTests();
+    } catch (err) {
+      setServerError(err?.message || 'Failed to update test');
+    }
+  };
+
+  const deleteTest = async (id) => {
+    if (!confirm('Delete this test?')) return;
+    try {
+      await apiFetch(`/api/admin/tests/${id}`, { token, method: 'DELETE' });
+      loadTests();
+    } catch (err) {
+      setServerError(err?.message || 'Failed to delete test');
     }
   };
 
@@ -155,11 +212,23 @@ export default function TestBuilder() {
             </div>
           </div>
 
-          <div>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-              <span className="text-sm">Make test active immediately</span>
-            </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <div className="label">Status</div>
+              <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              {createdTestId ? (
+                <button type="button" className="btn-ghost w-full" onClick={deleteCreatedTest}>
+                  Delete Created Test
+                </button>
+              ) : (
+                <div className="text-xs text-slate-500">Create a test to enable delete.</div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -264,6 +333,41 @@ export default function TestBuilder() {
               {saving ? 'Creating Test...' : 'Create Test'}
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h3 className="text-base font-semibold">Manage Tests</h3>
+        </div>
+        <div className="card-body">
+          {allTests.length === 0 ? (
+            <div className="text-sm text-slate-600">No tests found.</div>
+          ) : (
+            <div className="space-y-2">
+              {allTests.map((t) => (
+                <div key={t.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-slate-900">{t.title}</div>
+                    <div className="text-xs text-slate-500">Questions: {t.questionCount} • {t.perQuestionSeconds}s • +{t.marksCorrect}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      className="input"
+                      value={t.isActive ? 'active' : 'inactive'}
+                      onChange={(e) => updateTestStatus(t.id, e.target.value)}
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                    <button type="button" className="btn-ghost text-xs" onClick={() => deleteTest(t.id)}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

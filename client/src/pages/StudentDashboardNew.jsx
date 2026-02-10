@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { apiFetch } from '../lib/api.js';
-import NotificationTicker from '../components/NotificationTicker.jsx';
 
 export default function StudentDashboardNew() {
   const { token, user } = useAuth();
@@ -55,9 +54,67 @@ export default function StudentDashboardNew() {
       try {
         setError('');
         setLoading(true);
-        const res = await apiFetch('/api/student/dashboard', { token });
+        // Step 1 (fast): load notifications first so the page can render quickly.
+        const notificationsRes = await apiFetch('/api/student/notifications', { token });
         if (!alive) return;
-        setData(res);
+
+        setData({
+          settings: { testsEnabled: true, videosEnabled: true, notificationsEnabled: true, pdfsEnabled: true, pyqsEnabled: true },
+          premiumPlans: [],
+          premiumStatus: {
+            comboActive: false,
+            pyqActive: false,
+            materialActive: false,
+            comboExpiry: null,
+            pyqExpiry: null,
+            materialExpiry: null,
+          },
+          videos: [],
+          notifications: Array.isArray(notificationsRes?.notifications) ? notificationsRes.notifications : [],
+          tests: [],
+          pdfs: [],
+          pyqs: [],
+        });
+        setLoading(false);
+
+        // Step 2 (background): load the remaining dashboard data.
+        const [plansRes, statusRes, videosRes, testsRes, pdfsRes] = await Promise.all([
+          apiFetch('/api/student/premium/plans', { token }),
+          apiFetch('/api/student/premium/status', { token }),
+          apiFetch('/api/student/videos', { token }),
+          apiFetch('/api/student/tests', { token }),
+          apiFetch('/api/student/materials?type=pdf', { token }),
+        ]);
+
+        if (!alive) return;
+
+        const premiumPlans = Array.isArray(plansRes?.plans) ? plansRes.plans : [];
+        const premiumStatus = statusRes?.access
+          ? {
+              comboActive: Boolean(statusRes.access?.combo?.unlocked),
+              pyqActive: Boolean(statusRes.access?.pyq?.unlocked),
+              materialActive: Boolean(statusRes.access?.materials?.unlocked),
+              comboExpiry: statusRes.access?.combo?.expiry || null,
+              pyqExpiry: statusRes.access?.pyq?.expiry || null,
+              materialExpiry: statusRes.access?.materials?.expiry || null,
+            }
+          : {
+              comboActive: false,
+              pyqActive: false,
+              materialActive: false,
+              comboExpiry: null,
+              pyqExpiry: null,
+              materialExpiry: null,
+            };
+
+        setData((prev) => ({
+          ...(prev || {}),
+          premiumPlans,
+          premiumStatus,
+          videos: Array.isArray(videosRes?.videos) ? videosRes.videos : [],
+          tests: Array.isArray(testsRes?.tests) ? testsRes.tests : [],
+          pdfs: Array.isArray(pdfsRes?.materials) ? pdfsRes.materials : [],
+        }));
       } catch (err) {
         if (!alive) return;
         setError(err?.message || 'Failed to load dashboard');
@@ -95,6 +152,21 @@ export default function StudentDashboardNew() {
     );
   }
 
+  const latestUniqueNotifications = (() => {
+    const seen = new Set();
+    const out = [];
+    for (const n of Array.isArray(data?.notifications) ? data.notifications : []) {
+      const msg = String(n?.message || '').trim();
+      if (!msg) continue;
+      const key = msg.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ ...n, message: msg });
+      if (out.length >= 4) break;
+    }
+    return out;
+  })();
+
   return (
     <div className="space-y-6">
       <div className="card overflow-hidden">
@@ -112,7 +184,25 @@ export default function StudentDashboardNew() {
         </div>
       </div>
 
-      <NotificationTicker token={token} initialNotifications={data?.notifications || []} autoRefresh />
+      {latestUniqueNotifications.length ? (
+        <div className="card">
+          <div className="card-header">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Notifications</h2>
+              <Link to="/student/notifications" className="btn-ghost">View all</Link>
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="space-y-2">
+              {latestUniqueNotifications.map((n) => (
+                <div key={n.id} className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800">
+                  {String(n?.message || '').trim()}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {Array.isArray(data?.premiumPlans) && data.premiumPlans.length ? (
         <div className="card overflow-hidden">

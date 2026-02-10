@@ -131,6 +131,10 @@ export default function PYQs() {
 
       if (!res.ok) {
         const msg = await res.text();
+        const lowered = String(msg || '').toLowerCase();
+        if (res.status === 404 || lowered.includes('file not found') || lowered.includes('cannot get /uploads')) {
+          throw new Error('PYQ file not found. Please contact admin or try again later.');
+        }
         throw new Error(msg || `Failed to load PDF (${res.status})`);
       }
 

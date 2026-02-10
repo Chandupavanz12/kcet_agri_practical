@@ -20,6 +20,21 @@ import { ensureSettings } from '../seed/ensureSettings.js';
 import { makePrivateMaterialRef, makePrivateUploadRef, makePublicUploadUrl } from '../middleware/upload.js';
 import { hashPassword } from '../utils/auth.js';
 
+const _ttlCache = new Map();
+
+function getOrSetCached(key, ttlMs, getter) {
+  const now = Date.now();
+  const hit = _ttlCache.get(key);
+  if (hit && hit.exp > now) return hit.value;
+  const p = Promise.resolve().then(getter);
+  _ttlCache.set(key, { exp: now + Number(ttlMs || 0), value: p });
+  p.catch(() => {
+    const cur = _ttlCache.get(key);
+    if (cur && cur.value === p) _ttlCache.delete(key);
+  });
+  return p;
+}
+
 async function getNextNumericId(sequenceName, ensureAtLeast) {
   const min = Number(ensureAtLeast || 0);
   if (Number.isFinite(min) && min > 0) {
@@ -618,19 +633,23 @@ export async function updateVideo(req, res, next) {
 
 export async function getDashboard(req, res, next) {
   try {
-    const [studentsCount, testsCount, videosCount, materialsCount] = await Promise.all([
-      User.countDocuments({ role: 'student' }).catch(() => 0),
-      Test.countDocuments({ is_active: true }).catch(() => 0),
-      Video.countDocuments({ status: 'active' }).catch(() => 0),
-      Material.countDocuments({}).catch(() => 0),
-    ]);
+    const data = await getOrSetCached('admin:dashboard:v1', 8000, async () => {
+      const [studentsCount, testsCount, videosCount, materialsCount] = await Promise.all([
+        User.countDocuments({ role: 'student' }).catch(() => 0),
+        Test.countDocuments({ is_active: true }).catch(() => 0),
+        Video.countDocuments({ status: 'active' }).catch(() => 0),
+        Material.countDocuments({}).catch(() => 0),
+      ]);
 
-    return res.json({
-      students: { count: Number(studentsCount || 0) },
-      tests: { count: Number(testsCount || 0) },
-      videos: { count: Number(videosCount || 0) },
-      materials: { count: Number(materialsCount || 0) },
+      return {
+        students: { count: Number(studentsCount || 0) },
+        tests: { count: Number(testsCount || 0) },
+        videos: { count: Number(videosCount || 0) },
+        materials: { count: Number(materialsCount || 0) },
+      };
     });
+
+    return res.json(data);
   } catch (err) {
     console.error('[getDashboard] Error:', err);
     return res.status(500).json({ 
@@ -960,7 +979,16 @@ export async function listPayments(req, res, next) {
 
 export async function createNotification(req, res, next) {
   try {
-    const { title, message, status = 'active' } = req.body;
+    const body = req.body || {};
+    const message = typeof body.message === 'string' ? body.message.trim() : '';
+    const titleRaw = typeof body.title === 'string' ? body.title.trim() : '';
+    const status = typeof body.status === 'string' ? body.status : 'active';
+
+    if (!message) {
+      return badRequest(res, 'Validation failed', { message: 'message is required' });
+    }
+
+    const title = titleRaw || (message.length > 60 ? `${message.slice(0, 60)}…` : message);
 
     const n = new Notification({
       title,
@@ -1947,37 +1975,40 @@ export async function reorderMenus(req, res) {
 // Analytics dashboard
 export async function getAnalytics(req, res) {
   try {
+    const data = await getOrSetCached('admin:analytics:v1', 8000, async () => {
+      const [
+        studentsCount,
+        testsCount,
+        specimensCount,
+        videosCount,
+        materialsCount,
+        pyqsCount,
+        resultsCount,
+        avgAccuracyAgg,
+      ] = await Promise.all([
+        User.countDocuments({ role: 'student' }),
+        Test.countDocuments({ is_active: true }),
+        Specimen.countDocuments({ status: 'active' }),
+        Video.countDocuments({ status: 'active' }),
+        Material.countDocuments({}),
+        Pyq.countDocuments({}),
+        Result.countDocuments({}),
+        Result.aggregate([{ $group: { _id: null, avg: { $avg: '$accuracy' } } }]).catch(() => []),
+      ]);
 
-    const [
-      studentsCount,
-      testsCount,
-      specimensCount,
-      videosCount,
-      materialsCount,
-      pyqsCount,
-      resultsCount,
-      avgAccuracyAgg,
-    ] = await Promise.all([
-      User.countDocuments({ role: 'student' }),
-      Test.countDocuments({ is_active: true }),
-      Specimen.countDocuments({ status: 'active' }),
-      Video.countDocuments({ status: 'active' }),
-      Material.countDocuments({}),
-      Pyq.countDocuments({}),
-      Result.countDocuments({}),
-      Result.aggregate([{ $group: { _id: null, avg: { $avg: '$accuracy' } } }]).catch(() => []),
-    ]);
-
-    return res.json({
-      studentsCount: Number(studentsCount || 0),
-      testsCount: Number(testsCount || 0),
-      specimensCount: Number(specimensCount || 0),
-      videosCount: Number(videosCount || 0),
-      materialsCount: Number(materialsCount || 0),
-      pyqsCount: Number(pyqsCount || 0),
-      resultsCount: Number(resultsCount || 0),
-      avgAccuracy: Number(avgAccuracyAgg?.[0]?.avg || 0),
+      return {
+        studentsCount: Number(studentsCount || 0),
+        testsCount: Number(testsCount || 0),
+        specimensCount: Number(specimensCount || 0),
+        videosCount: Number(videosCount || 0),
+        materialsCount: Number(materialsCount || 0),
+        pyqsCount: Number(pyqsCount || 0),
+        resultsCount: Number(resultsCount || 0),
+        avgAccuracy: Number(avgAccuracyAgg?.[0]?.avg || 0),
+      };
     });
+
+    return res.json(data);
   } catch (err) {
     console.error('[getAnalytics]', err);
     return res.status(500).json({ message: 'Failed to fetch analytics' });
