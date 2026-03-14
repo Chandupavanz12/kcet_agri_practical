@@ -8,7 +8,7 @@ function sleep(ms) {
 
 export async function connectDb() {
   mongoose.set('bufferCommands', false);
-  mongoose.set('bufferTimeoutMS', 2000);
+  mongoose.set('bufferTimeoutMS', 5000);
 
   if (mongoose.connection.readyState === 1) return;
   if (connectingPromise) return connectingPromise;
@@ -18,18 +18,26 @@ export async function connectDb() {
     throw new Error('MONGO_URI not set');
   }
 
-  const maxAttempts = Number(process.env.MONGO_CONNECT_ATTEMPTS || 10);
-  const baseDelayMs = Number(process.env.MONGO_CONNECT_DELAY_MS || 1000);
+  const maxAttempts = Number(process.env.MONGO_CONNECT_ATTEMPTS || 5);
+  const baseDelayMs = Number(process.env.MONGO_CONNECT_DELAY_MS || 500);
 
   connectingPromise = (async () => {
     let lastErr;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
         await mongoose.connect(uri, {
-          serverSelectionTimeoutMS: 10000,
-          connectTimeoutMS: 10000,
+          serverSelectionTimeoutMS: 15000,
+          connectTimeoutMS: 15000,
           socketTimeoutMS: 45000,
+          // Keep at least 1 connection open so the first real request
+          // doesn't have to establish a brand-new TCP + TLS handshake.
+          minPoolSize: 1,
           maxPoolSize: 10,
+          // Ping the server every 10 s so Atlas doesn't close idle connections.
+          heartbeatFrequencyMS: 10000,
+          // Close pool connections that have been idle > 60 s – prevents
+          // stale sockets from silently dropping on free-tier hosts.
+          maxIdleTimeMS: 60000,
         });
 
         mongoose.connection.on('error', (err) => {
@@ -39,9 +47,11 @@ export async function connectDb() {
 
         mongoose.connection.on('disconnected', () => {
           // eslint-disable-next-line no-console
-          console.error('[mongo] disconnected');
+          console.error('[mongo] disconnected – will reconnect on next request');
         });
 
+        // eslint-disable-next-line no-console
+        console.log('[mongo] connected successfully');
         return;
       } catch (err) {
         lastErr = err;

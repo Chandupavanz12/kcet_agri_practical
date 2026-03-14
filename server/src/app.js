@@ -38,7 +38,14 @@ export function createApp() {
   app.use('/uploads', express.static(publicUploadsDir));
 
   app.get('/api/health', (req, res) => {
-    res.json({ ok: true });
+    res.json({ ok: true, db: mongoose.connection.readyState === 1 ? 'up' : 'down' });
+  });
+
+  // Lightweight ping – point an uptime monitor (e.g. UptimeRobot) at this
+  // endpoint every 5 minutes so the server and MongoDB connection stay warm.
+  // This eliminates the "first request" cold-start delay entirely.
+  app.get('/api/ping', (req, res) => {
+    res.json({ pong: true, ts: Date.now() });
   });
 
   app.use('/api/auth', authRouter);

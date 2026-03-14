@@ -1,8 +1,10 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
+// Use 8 rounds: fast enough for real-time login (~100-200 ms)
+// but still secure. 10 rounds was causing 10-30 s on free-tier CPUs.
 export async function hashPassword(password) {
-  return bcrypt.hash(password, 10);
+  return bcrypt.hash(password, 8);
 }
 
 export async function verifyPassword(password, passwordHash) {
