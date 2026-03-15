@@ -144,103 +144,104 @@ export default function PremiumAccess() {
   return (
     <div className="space-y-8 page-in">
 
-      {/* ── Hero ─────────────────────────────────────────────── */}
-      <div className="premium-hero">
-        <div className="premium-hero-bg" />
-        <div className="premium-hero-content">
-          <div className="premium-hero-icon">⭐</div>
-          <h1 className="premium-hero-title">Premium Access</h1>
-          <p className="premium-hero-sub">Unlock full access to PYQs, premium study materials, and more.</p>
-          {hasAnyAccess && <span className="dash-badge dash-badge--green mt-4 inline-flex">✓ You have an active plan</span>}
-        </div>
-      </div>
 
-      {/* ── Alerts ───────────────────────────────────────────── */}
-      {error && <div className="rounded-2xl border border-red-200   bg-red-50   px-5 py-4 text-sm text-red-700">{error}</div>}
-      {message && <div className="rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm font-medium text-green-800">{message}</div>}
-
-      {/* ── Benefit strips ───────────────────────────────────── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {BENEFITS.map((b, i) => (
-          <div key={b.title} className="premium-benefit-card" style={{ animationDelay: `${i * 70}ms` }}>
-            <span className="premium-benefit-icon">{b.icon}</span>
-            <div>
-              <div className="premium-benefit-title">{b.title}</div>
-              <div className="premium-benefit-text">{b.text}</div>
-            </div>
-          </div>
-        ))}
-      </div>
 
       {/* ── Plan Cards ───────────────────────────────────────── */}
       <div>
-        <h2 className="dash-section-title">💳 Choose Your Plan</h2>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight sm:text-4xl mb-4">💳 Choose Your Plan</h2>
+          <p className="text-lg text-slate-600 max-w-2xl mx-auto">Get unlimited access to all 20 chapter materials, PYQs, and everything you need to score top marks.</p>
+        </div>
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
           {plans.map((p, i) => {
             const code = String(p.code || '').toLowerCase();
             const unlocked = Boolean(status?.[code]?.unlocked);
             const expiry = status?.[code]?.expiry;
             const bullets = PLAN_BULLETS[code] || [];
-            const meta = PLAN_META[code] || { icon: '📦', color: 'from-slate-500 to-gray-600', badge: 'Plan', highlight: false };
+            const meta = PLAN_META[code] || { icon: '📦', color: 'from-slate-500 to-gray-600', textColors: 'text-slate-600', lightBg: 'bg-slate-50', badge: 'Plan', highlight: false };
+
+            const isHighlight = meta.highlight;
 
             return (
               <div
                 key={p.id}
-                className={`premium-plan-card ${meta.highlight ? 'premium-plan-card--highlight' : ''}`}
-                style={{ animationDelay: `${i * 80}ms` }}
+                className={`relative flex flex-col overflow-hidden rounded-[2rem] border-2 bg-white shadow-xl transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl ${isHighlight ? 'border-amber-400 ring-8 ring-amber-50 scale-105 z-10' : 'border-slate-100 hover:border-blue-200'
+                  }`}
+                style={{ animationDelay: `${i * 100}ms` }}
               >
-                {meta.highlight && <div className="premium-plan-ribbon">⭐ Best Value</div>}
+                {/* Decorative background blast */}
+                <div className={`absolute -top-24 -right-24 w-48 h-48 rounded-full bg-gradient-to-br ${meta.color} opacity-10 blur-3xl`} />
+                <div className={`absolute -bottom-24 -left-24 w-48 h-48 rounded-full bg-gradient-to-tr ${meta.color} opacity-10 blur-3xl`} />
 
-                {/* Card gradient bar */}
-                <div className={`premium-plan-bar bg-gradient-to-r ${meta.color}`} />
+                {isHighlight && (
+                  <div className="absolute top-0 inset-x-0 mx-auto w-max px-4 py-1 rounded-b-xl bg-gradient-to-r from-amber-500 to-orange-500 font-bold text-[10px] tracking-widest text-white uppercase shadow-sm">
+                    ⭐ Most Popular
+                  </div>
+                )}
 
-                <div className="premium-plan-body">
-                  {/* Icon + Name */}
-                  <div className="premium-plan-top">
-                    <div className={`premium-plan-icon bg-gradient-to-br ${meta.color}`}>{meta.icon}</div>
-                    <div className="flex-1">
-                      <div className="premium-plan-name">{p.name}</div>
-                      <div className="premium-plan-duration">{p.durationDays} days validity</div>
-                      {expiry && <div className="premium-plan-expiry">Expires: {new Date(expiry).toLocaleDateString('en-IN')}</div>}
+                <div className="p-8 flex-1 flex flex-col relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={`flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br ${meta.color} shadow-lg shadow-current/20 text-white text-2xl`}>
+                      {meta.icon}
                     </div>
-                    {unlocked
-                      ? <span className="dash-badge dash-badge--green">✓ Active</span>
-                      : <span className={`dash-badge ${meta.highlight ? 'dash-badge--amber' : 'dash-badge--blue'}`}>{meta.badge}</span>
-                    }
+                    {unlocked ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" /></svg> Active
+                      </span>
+                    ) : (
+                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${isHighlight ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                        {meta.badge}
+                      </span>
+                    )}
                   </div>
 
-                  {/* Price */}
-                  <div className="premium-plan-price">
-                    {p.isFree ? <span className="premium-price-free">Free</span> : <span className="premium-price-paid">{formatINR(p.pricePaise)}</span>}
-                    {!p.isFree && <span className="premium-price-period">/year</span>}
-                  </div>
+                  <h3 className="text-xl font-bold text-slate-900">{p.name}</h3>
+                  <p className="mt-1 flex items-baseline gap-x-1">
+                    {p.isFree ? (
+                      <span className="text-4xl font-extrabold tracking-tight text-slate-900">Free</span>
+                    ) : (
+                      <>
+                        <span className={`text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br ${meta.color}`}>
+                          {formatINR(p.pricePaise)}
+                        </span>
+                        <span className="text-sm font-medium text-slate-500">/year</span>
+                      </>
+                    )}
+                  </p>
 
-                  {/* Bullets */}
-                  {bullets.length > 0 && (
-                    <ul className="premium-plan-bullets">
+                  <div className="mt-2 text-sm text-slate-500 font-medium">{p.durationDays} days access</div>
+                  {expiry && <div className="mt-1 text-xs font-semibold text-emerald-600">Expires: {new Date(expiry).toLocaleDateString('en-IN')}</div>}
+
+                  <div className="mt-8 mb-8 flex-1">
+                    <ul className="space-y-4">
                       {bullets.map((b) => (
-                        <li key={b} className="premium-plan-bullet">
-                          <span className={`premium-bullet-dot bg-gradient-to-br ${meta.color}`}>✓</span>
+                        <li key={b} className="flex gap-x-3 text-sm leading-6 text-slate-600 font-medium">
+                          <svg className={`h-6 w-5 flex-none bg-clip-text text-transparent`} style={{ color: isHighlight ? '#f59e0b' : '#3b82f6' }} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                          </svg>
                           {b}
                         </li>
                       ))}
                     </ul>
-                  )}
+                  </div>
 
-                  {/* CTA */}
-                  <div className="pt-2">
+                  <div className="mt-auto">
                     {unlocked ? (
-                      <button type="button" disabled className="premium-plan-cta premium-plan-cta--active">
-                        ✓ Already Active
+                      <button type="button" disabled className="w-full rounded-xl bg-slate-100 py-3.5 px-4 text-center text-sm font-bold text-slate-400 shadow-inner cursor-not-allowed">
+                        Already Active
                       </button>
                     ) : (
                       <button
                         type="button"
                         disabled={busy}
                         onClick={() => buy(code)}
-                        className={`premium-plan-cta ${meta.highlight ? 'premium-plan-cta--highlight' : 'premium-plan-cta--default'}`}
+                        className={`group w-full relative overflow-hidden rounded-xl py-3.5 px-4 text-center text-sm font-bold text-white shadow-md transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 ${isHighlight ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500'
+                          }`}
                       >
-                        {busy ? '⏳ Processing...' : p.isFree ? '🚀 Activate Free' : '💳 Buy Now'}
+                        <span className="relative z-10 flex items-center justify-center gap-2">
+                          {busy ? '⏳ Processing...' : p.isFree ? '🚀 Activate Free' : '💳 Unlock Now'}
+                        </span>
+                        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
                       </button>
                     )}
                   </div>

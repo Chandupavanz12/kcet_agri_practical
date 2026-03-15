@@ -14,7 +14,9 @@ import {
   Test,
   TestQuestion,
   User,
+  UserAccess,
   Video,
+  Feedback,
 } from '../models/index.js';
 import { ensureSettings } from '../seed/ensureSettings.js';
 import { makePrivateMaterialRef, makePrivateUploadRef, makePublicUploadUrl } from '../middleware/upload.js';
@@ -90,7 +92,7 @@ function extractYouTubeId(url) {
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
     /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
   ];
-  
+
   for (const pattern of patterns) {
     const match = url.match(pattern);
     if (match) return match[1];
@@ -404,14 +406,94 @@ export async function listStudents(req, res, next) {
       .sort({ created_at: -1, id: -1 })
       .lean();
 
-    const students = (rows || []).map((u) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      createdAt: u.created_at,
-    }));
+    const userIds = rows.map((u) => Number(u.id));
+    const accessRows = await UserAccess.find({ user_id: { $in: userIds } }).lean();
+    const accessByUserId = new Map(accessRows.map((a) => [Number(a.user_id), a]));
+
+    const students = rows.map((u) => {
+      const acc = accessByUserId.get(Number(u.id));
+      const now = new Date();
+
+      const hasCombo = acc?.combo_access && (!acc.expiry || new Date(acc.expiry) > now);
+      const hasPyq = acc?.pyq_access && (!acc.pyq_expiry || new Date(acc.pyq_expiry) > now);
+      const hasMaterial = acc?.material_access && (!acc.material_expiry || new Date(acc.material_expiry) > now);
+
+      let premiumStatus = 'Free';
+      if (hasCombo) premiumStatus = 'Premium (Combo)';
+      else if (hasPyq && hasMaterial) premiumStatus = 'Premium (PYQ + Materials)';
+      else if (hasPyq) premiumStatus = 'Premium (PYQ Only)';
+      else if (hasMaterial) premiumStatus = 'Premium (Materials Only)';
+
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        createdAt: u.created_at,
+        premiumStatus,
+      };
+    });
 
     return res.json({ students });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function manageStudentSubscription(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { planCode, action } = req.body; // action: 'subscribe' | 'unsubscribe'
+    const userId = Number(id);
+
+    if (!['subscribe', 'unsubscribe'].includes(action)) {
+      return res.status(400).json({ message: 'action must be subscribe or unsubscribe' });
+    }
+
+    const user = await User.findOne({ id: userId, role: 'student' }).lean();
+    if (!user) return res.status(404).json({ message: 'Student not found' });
+
+    let acc = await UserAccess.findOne({ user_id: userId });
+    if (!acc) {
+      if (action === 'unsubscribe') return res.json({ success: true });
+      acc = new UserAccess({ user_id: userId });
+    }
+
+    if (action === 'subscribe') {
+      const plan = await Plan.findOne({ code: planCode, status: 'active' }).lean();
+      if (!plan) return res.status(404).json({ message: 'Invalid or inactive plan' });
+
+      // Calculate new expiry (365 days from now by default if not set on plan)
+      const durationDays = Number(plan.duration_days) || 365;
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + durationDays);
+
+      if (planCode === 'combo') {
+        acc.combo_access = true;
+        acc.expiry = expiryDate;
+      } else if (planCode === 'pyq') {
+        acc.pyq_access = true;
+        acc.pyq_expiry = expiryDate;
+      } else if (planCode === 'materials') {
+        acc.material_access = true;
+        acc.material_expiry = expiryDate;
+      }
+    } else if (action === 'unsubscribe') {
+      if (planCode === 'combo') {
+        acc.combo_access = false;
+        acc.expiry = null;
+      } else if (planCode === 'pyq') {
+        acc.pyq_access = false;
+        acc.pyq_expiry = null;
+      } else if (planCode === 'materials') {
+        acc.material_access = false;
+        acc.material_expiry = null;
+      }
+    }
+
+    acc.updated_at = new Date();
+    await acc.save();
+
+    return res.json({ success: true, message: `Successfully ${action}d ${planCode} plan for ${user.name}` });
   } catch (err) {
     return next(err);
   }
@@ -479,7 +561,9 @@ export async function updateStudent(req, res, next) {
     const updates = {};
     if (name) updates.name = name;
     if (normalizedEmail) updates.email = normalizedEmail;
-    if (password) updates.password_hash = await hashPassword(password);
+    if (password) {
+      updates.password_hash = await hashPassword(password);
+    }
 
     if (Object.keys(updates).length === 0) {
       return res.json({ user: { id: student.id, name: student.name, email: student.email, role: student.role } });
@@ -550,7 +634,7 @@ export async function createVideo(req, res, next) {
     await v.save();
 
     return res.status(201).json({
-      video: { 
+      video: {
         id: v.id,
         title: v.title,
         videoUrl: v.video_url,
@@ -652,9 +736,9 @@ export async function getDashboard(req, res, next) {
     return res.json(data);
   } catch (err) {
     console.error('[getDashboard] Error:', err);
-    return res.status(500).json({ 
+    return res.status(500).json({
       message: 'Failed to load dashboard data',
-      error: err.message 
+      error: err.message
     });
   }
 }
@@ -977,6 +1061,19 @@ export async function listPayments(req, res, next) {
   }
 }
 
+export async function deletePayments(req, res, next) {
+  try {
+    const { ids } = req.body; // Expecting an array of numeric IDs
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'ids must be a non-empty array' });
+    }
+    await Payment.deleteMany({ id: { $in: ids.map(Number) } });
+    return res.json({ success: true, message: `Deleted ${ids.length} payment records.` });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 export async function createNotification(req, res, next) {
   try {
     const body = req.body || {};
@@ -1193,7 +1290,7 @@ export async function createTestWithQuestions(req, res, next) {
   try {
     const body = req.body || {};
     console.log('[createTestWithQuestions] Received body:', JSON.stringify(body, null, 2));
-    
+
     const title = asNonEmptyString(body.title);
     const perQuestionSeconds = Number(body.perQuestionSeconds ?? 30);
     const marksCorrect = Number(body.marksCorrect ?? 4);
@@ -1222,7 +1319,7 @@ export async function createTestWithQuestions(req, res, next) {
     // Validate each question
     const normalizedQuestions = questions.map((q, idx) => {
       console.log(`[createTestWithQuestions] Processing question ${idx}:`, JSON.stringify(q, null, 2));
-      
+
       const questionText = asNonEmptyString(q.questionText ?? q.question_text);
       const imageUrl = asNonEmptyString(q.imageUrl ?? q.image_url);
       const optionA = asNonEmptyString(q.optionA ?? q.option_a);
@@ -1231,7 +1328,7 @@ export async function createTestWithQuestions(req, res, next) {
       const optionD = asNonEmptyString(q.optionD ?? q.option_d);
       const correctOption = (q.correctOption ?? q.correct_option)?.toUpperCase();
       const questionOrder = Number(q.questionOrder ?? q.question_order ?? idx + 1);
-      
+
       console.log(`[createTestWithQuestions] Parsed question ${idx}:`, {
         questionText,
         imageUrl,
@@ -1242,7 +1339,7 @@ export async function createTestWithQuestions(req, res, next) {
         correctOption,
         questionOrder
       });
-      
+
       const qErrors = {};
       if (!questionText) qErrors.questionText = 'questionText is required';
       if (!imageUrl) qErrors.imageUrl = 'imageUrl is required';
@@ -1251,11 +1348,11 @@ export async function createTestWithQuestions(req, res, next) {
       if (!optionC) qErrors.optionC = 'optionC is required';
       if (!optionD) qErrors.optionD = 'optionD is required';
       if (!['A', 'B', 'C', 'D'].includes(correctOption)) qErrors.correctOption = 'correctOption must be A, B, C, or D';
-      
+
       if (Object.keys(qErrors).length > 0) {
         console.log(`[createTestWithQuestions] Question ${idx} errors:`, qErrors);
       }
-      
+
       return { idx, questionText, imageUrl, optionA, optionB, optionC, optionD, correctOption, questionOrder, qErrors };
     });
 
@@ -1623,30 +1720,30 @@ export async function exportResultsCsv(req, res) {
 
     const csvRows = testId
       ? [
-          ['rank', 'date', 'student_name', 'student_email', 'test_title', 'score', 'accuracy', 'time_taken_sec'],
-          ...rows.map((r, idx) => [
-            idx + 1,
-            r.date?.toISOString?.() ?? r.date,
-            r.student_name,
-            r.student_email,
-            r.test_title,
-            r.score,
-            r.accuracy,
-            r.time_taken_sec,
-          ]),
-        ]
+        ['rank', 'date', 'student_name', 'student_email', 'test_title', 'score', 'accuracy', 'time_taken_sec'],
+        ...rows.map((r, idx) => [
+          idx + 1,
+          r.date?.toISOString?.() ?? r.date,
+          r.student_name,
+          r.student_email,
+          r.test_title,
+          r.score,
+          r.accuracy,
+          r.time_taken_sec,
+        ]),
+      ]
       : [
-          ['date', 'student_name', 'student_email', 'test_title', 'score', 'accuracy', 'time_taken_sec'],
-          ...rows.map((r) => [
-            r.date?.toISOString?.() ?? r.date,
-            r.student_name,
-            r.student_email,
-            r.test_title,
-            r.score,
-            r.accuracy,
-            r.time_taken_sec,
-          ]),
-        ];
+        ['date', 'student_name', 'student_email', 'test_title', 'score', 'accuracy', 'time_taken_sec'],
+        ...rows.map((r) => [
+          r.date?.toISOString?.() ?? r.date,
+          r.student_name,
+          r.student_email,
+          r.test_title,
+          r.score,
+          r.accuracy,
+          r.time_taken_sec,
+        ]),
+      ];
 
     const csv = toCsv(csvRows);
     res.setHeader('Content-Type', 'text/csv');
@@ -2012,5 +2109,26 @@ export async function getAnalytics(req, res) {
   } catch (err) {
     console.error('[getAnalytics]', err);
     return res.status(500).json({ message: 'Failed to fetch analytics' });
+  }
+}
+
+export async function getFeedbacks(req, res, next) {
+  try {
+    const feedbacks = await Feedback.find({}, { _id: 0, __v: 0 })
+      .sort({ created_at: -1 })
+      .lean();
+    return res.json({ feedbacks });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function deleteFeedback(req, res, next) {
+  try {
+    const { id } = req.params;
+    await Feedback.deleteOne({ id: Number(id) });
+    return res.json({ success: true, message: 'Deleted feedback.' });
+  } catch (err) {
+    return next(err);
   }
 }

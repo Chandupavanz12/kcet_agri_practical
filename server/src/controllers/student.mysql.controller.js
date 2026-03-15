@@ -24,6 +24,7 @@ import {
   UserNotification,
   Menu,
   Video,
+  Feedback,
 } from '../models/index.js';
 
 function shuffle(arr) {
@@ -490,11 +491,11 @@ export async function verifyPaymentStudent(req, res, next) {
       : null;
     const payment = paymentDoc && planDoc
       ? {
-          ...paymentDoc,
-          plan_code: planDoc.code,
-          plan_name: planDoc.name,
-          duration_days: planDoc.duration_days,
-        }
+        ...paymentDoc,
+        plan_code: planDoc.code,
+        plan_name: planDoc.name,
+        duration_days: planDoc.duration_days,
+      }
       : null;
     if (!payment) return res.status(404).json({ message: 'Payment not found' });
     if (Number(payment.user_id) !== userId) return res.status(403).json({ message: 'Forbidden' });
@@ -658,48 +659,48 @@ export async function getDashboard(req, res, next) {
     const [videos, pdfs, pyqs, notifications, tests] = await Promise.all([
       settings.videosEnabled
         ? getOrSetCached('dashboard:videos:v1', 8000, () =>
-            Video.find({ status: 'active' })
-              .sort({ created_at: -1, id: -1 })
-              .limit(12)
-              .select({ id: 1, title: 1, video_url: 1, subject: 1, status: 1 })
-              .lean()
-          )
+          Video.find({ status: 'active' })
+            .sort({ created_at: -1, id: -1 })
+            .limit(12)
+            .select({ id: 1, title: 1, video_url: 1, subject: 1, status: 1 })
+            .lean()
+        )
         : [],
       settings.pdfsEnabled
         ? getOrSetCached('dashboard:pdfs:v1', 8000, () =>
-            Material.find({ type: 'pdf', status: 'active' })
-              .sort({ created_at: -1, id: -1 })
-              .limit(12)
-              .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1 })
-              .lean()
-          )
+          Material.find({ type: 'pdf', status: 'active' })
+            .sort({ created_at: -1, id: -1 })
+            .limit(12)
+            .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1 })
+            .lean()
+        )
         : [],
       settings.pyqsEnabled
         ? getOrSetCached('dashboard:pyqs:v1', 8000, () =>
-            Material.find({ type: 'pyq', status: 'active' })
-              .sort({ created_at: -1, id: -1 })
-              .limit(12)
-              .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1 })
-              .lean()
-          )
+          Material.find({ type: 'pyq', status: 'active' })
+            .sort({ created_at: -1, id: -1 })
+            .limit(12)
+            .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1 })
+            .lean()
+        )
         : [],
       settings.notificationsEnabled
         ? getOrSetCached('dashboard:notifications:v1', 5000, () =>
-            Notification.find({ status: 'active' })
-              .sort({ created_at: -1, id: -1 })
-              .limit(10)
-              .select({ id: 1, title: 1, message: 1, status: 1 })
-              .lean()
-          )
+          Notification.find({ status: 'active' })
+            .sort({ created_at: -1, id: -1 })
+            .limit(10)
+            .select({ id: 1, title: 1, message: 1, status: 1 })
+            .lean()
+        )
         : [],
       settings.testsEnabled
         ? getOrSetCached('dashboard:tests:v1', 8000, () =>
-            Test.find({ is_active: true, question_count: { $gt: 0 } })
-              .sort({ created_at: -1, id: -1 })
-              .limit(20)
-              .select({ id: 1, title: 1, question_count: 1, per_question_seconds: 1, marks_correct: 1, is_active: 1 })
-              .lean()
-          )
+          Test.find({ is_active: true, question_count: { $gt: 0 } })
+            .sort({ created_at: -1, id: -1 })
+            .limit(20)
+            .select({ id: 1, title: 1, question_count: 1, per_question_seconds: 1, marks_correct: 1, is_active: 1 })
+            .lean()
+        )
         : [],
     ]);
 
@@ -1029,19 +1030,19 @@ export async function resultDetails(req, res, next) {
 
     const questionRows = questionIds.length
       ? await TestQuestion.find({ id: { $in: questionIds } })
-          .select({
-            id: 1,
-            question_text: 1,
-            image_url: 1,
-            option_a: 1,
-            option_b: 1,
-            option_c: 1,
-            option_d: 1,
-            correct_option: 1,
-            question_order: 1,
-          })
-          .sort({ question_order: 1, id: 1 })
-          .lean()
+        .select({
+          id: 1,
+          question_text: 1,
+          image_url: 1,
+          option_a: 1,
+          option_b: 1,
+          option_c: 1,
+          option_d: 1,
+          correct_option: 1,
+          question_order: 1,
+        })
+        .sort({ question_order: 1, id: 1 })
+        .lean()
       : [];
 
     const questionById = new Map(questionRows.map((q) => [Number(q.id), q]));
@@ -1269,7 +1270,8 @@ export async function listPyqsStudent(req, res, next) {
 
 export async function listExamCentresStudent(req, res, next) {
   try {
-    const rows = await ExamCentre.find({ status: 'active', id: { $ne: null } })
+    const activePyqCentreIds = await Pyq.distinct('centre_id', { status: 'active' });
+    const rows = await ExamCentre.find({ status: 'active', id: { $in: activePyqCentreIds } })
       .sort({ name: 1, id: 1 })
       .select({ id: 1, name: 1 })
       .lean();
@@ -1284,7 +1286,9 @@ export async function listExamCentreYearsStudent(req, res, next) {
     const { centreId } = req.params;
     const cid = Number(centreId);
     if (!Number.isFinite(cid)) return res.status(400).json({ message: 'centreId is required' });
-    const rows = await ExamCentreYear.find({ centre_id: cid, status: 'active' })
+
+    const activePyqYears = await Pyq.distinct('year', { status: 'active', centre_id: cid });
+    const rows = await ExamCentreYear.find({ centre_id: cid, status: 'active', year: { $in: activePyqYears } })
       .sort({ year: -1, id: -1 })
       .select({ id: 1, year: 1 })
       .lean();
@@ -1406,6 +1410,32 @@ export async function streamMaterialFile(req, res, next) {
     const stream = fs.createReadStream(resolved);
     stream.on('error', (e) => next(e));
     return stream.pipe(res);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function submitFeedback(req, res, next) {
+  try {
+    const { message } = req.body;
+    if (!message || String(message).trim() === '') {
+      return res.status(400).json({ message: 'Message is required' });
+    }
+
+    // req.user is the JWT payload — use sub for id and direct name/email from token
+    const userId = Number(req.user?.sub);
+    const userName = String(req.user?.name || 'Unknown');
+    const userEmail = String(req.user?.email || '');
+
+    const feedback = new Feedback({
+      user_name: userName,
+      user_email: userEmail,
+      message: String(message).trim(),
+      created_at: new Date(),
+    });
+    await feedback.save();
+
+    return res.status(201).json({ success: true, message: 'Feedback submitted successfully! Thank you.' });
   } catch (err) {
     return next(err);
   }

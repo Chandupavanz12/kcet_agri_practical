@@ -10,8 +10,6 @@ export default function PYQs() {
   const [years, setYears] = useState([]);
   const [pyqs, setPyqs] = useState([]);
 
-  const isMobile = typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false;
-
   const [selectedCentreId, setSelectedCentreId] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedPyq, setSelectedPyq] = useState(null);
@@ -131,10 +129,6 @@ export default function PYQs() {
 
       if (!res.ok) {
         const msg = await res.text();
-        const lowered = String(msg || '').toLowerCase();
-        if (res.status === 404 || lowered.includes('file not found') || lowered.includes('cannot get /uploads')) {
-          throw new Error('PYQ file not found. Please contact admin or try again later.');
-        }
         throw new Error(msg || `Failed to load PDF (${res.status})`);
       }
 
@@ -158,7 +152,7 @@ export default function PYQs() {
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[1,2,3].map((i) => (
+          {[1, 2, 3].map((i) => (
             <div key={i} className="card animate-pulse">
               <div className="card-body">
                 <div className="h-4 w-32 bg-slate-200 rounded" />
@@ -173,10 +167,8 @@ export default function PYQs() {
 
   return (
     <div className="space-y-6">
-      <div className="card">
-        <div className="card-header">
-          <h2 className="text-lg font-semibold">Previous Year Questions</h2>
-        </div>
+
+      <div className="card shadow-md">
         <div className="card-body">
           {error ? (
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
@@ -234,25 +226,11 @@ export default function PYQs() {
                 {loadingPdf ? (
                   <div className="p-4 text-sm text-slate-600">Loading PDF...</div>
                 ) : (
-                  isMobile ? (
-                    <div className="p-4">
-                      <a
-                        href={pdfBlobUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-primary text-xs"
-                      >
-                        Open PDF
-                      </a>
-                      <div className="mt-2 text-xs text-slate-600">If the PDF doesn't open inside the page on mobile, use this button.</div>
-                    </div>
-                  ) : (
-                    <iframe
-                      title="PYQ PDF Viewer"
-                      src={`${pdfBlobUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                      className="h-[80vh] w-full bg-white"
-                    />
-                  )
+                  <iframe
+                    title="PYQ PDF Viewer"
+                    src={`${pdfBlobUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                    className="h-[80vh] w-full bg-white"
+                  />
                 )}
               </div>
             </div>
@@ -263,17 +241,18 @@ export default function PYQs() {
               ) : !selectedYear ? (
                 <div>
                   <div className="text-sm font-semibold">Available Years</div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="mt-4 grid gap-4 sm:grid-cols-3 lg:grid-cols-4">
                     {years.map((y) => (
                       <button
                         key={y.id}
                         type="button"
                         onClick={() => setSelectedYear(String(y.year))}
-                        className="card text-left hover:bg-slate-50"
+                        className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 text-left"
                       >
-                        <div className="card-body">
-                          <div className="text-base font-semibold">{y.year}</div>
-                          <div className="text-xs text-slate-600">Tap to view papers</div>
+                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 opacity-0 transition-opacity group-hover:opacity-100" />
+                        <div className="relative z-10">
+                          <div className="text-2xl font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{y.year}</div>
+                          <div className="mt-1 text-xs font-semibold text-slate-400 uppercase tracking-wider">View Papers →</div>
                         </div>
                       </button>
                     ))}
@@ -297,33 +276,36 @@ export default function PYQs() {
                   {pyqs.length === 0 && !loadingPyqs ? (
                     <div className="text-sm text-slate-600">No PYQs found for {selectedYear}.</div>
                   ) : (
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {pyqs.map((p) => (
-                        <div key={p.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
-                          <div className="flex-1">
-                            <div className="text-sm font-medium">{p.title}</div>
-                            <div className="text-xs text-slate-500">{p.subject} • {p.year}</div>
-                            <div className="mt-2">
+                        <div key={p.id} className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 p-5">
+                          <div>
+                            <div className="flex items-start justify-between gap-4 mb-3">
+                              <h3 className="text-base font-bold text-slate-800 leading-snug">{p.title}</h3>
                               {String(p.accessType || '').toLowerCase() === 'paid' ? (
                                 p.locked ? (
-                                  <span className="badge">Locked</span>
+                                  <span className="badge badge-warning text-[10px] px-2 py-0.5 whitespace-nowrap bg-amber-100 text-amber-700 font-bold rounded">⭐ Premium</span>
                                 ) : (
-                                  <span className="badge badge-success">Premium</span>
+                                  <span className="badge badge-info text-[10px] px-2 py-0.5 whitespace-nowrap bg-blue-100 text-blue-700 font-bold rounded">Unlocked</span>
                                 )
                               ) : (
-                                <span className="badge badge-success">Free</span>
+                                <span className="badge badge-success text-[10px] px-2 py-0.5 whitespace-nowrap bg-emerald-100 text-emerald-700 font-bold rounded">Free</span>
                               )}
                             </div>
+                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">{p.subject} • {p.year}</div>
                           </div>
-                          {p.locked ? (
-                            <button type="button" onClick={() => navigate('/student/premium')} className="btn-primary text-xs" disabled={loadingPdf}>
-                              Unlock
-                            </button>
-                          ) : (
-                            <button type="button" onClick={() => openPyq(p)} className="btn-primary text-xs" disabled={loadingPdf}>
-                              View
-                            </button>
-                          )}
+
+                          <div className="mt-5">
+                            {p.locked ? (
+                              <button type="button" onClick={() => navigate('/student/premium')} className="btn-primary text-xs w-full text-center justify-center flex bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-none text-white shadow" disabled={loadingPdf}>
+                                Unlock
+                              </button>
+                            ) : (
+                              <button type="button" onClick={() => openPyq(p)} className="btn-primary text-xs w-full text-center justify-center flex bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 border-none text-white shadow" disabled={loadingPdf}>
+                                View Document
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

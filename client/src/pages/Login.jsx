@@ -103,22 +103,20 @@ export default function Login() {
                   </div>
                 </div>
 
-                {mode === 'student' ? (
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <Link
-                      className="text-left text-sm font-semibold text-primary-700 hover:text-primary-800"
-                      to="/student/forgot-password"
-                    >
-                      Forgot password?
-                    </Link>
-                    <Link
-                      className="text-left text-sm font-semibold text-primary-700 hover:text-primary-800"
-                      to="/student/otp-login"
-                    >
-                      Login with OTP
-                    </Link>
-                  </div>
-                ) : null}
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <Link
+                    className="text-left text-sm font-semibold text-primary-700 hover:text-primary-800"
+                    to="/student/forgot-password"
+                  >
+                    Forgot password?
+                  </Link>
+                  <Link
+                    className="text-left text-sm font-semibold text-primary-700 hover:text-primary-800"
+                    to="/student/otp-login"
+                  >
+                    Login with OTP
+                  </Link>
+                </div>
 
                 {error ? (
                   <div className={"rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 " + (error ? 'shake' : '')}>

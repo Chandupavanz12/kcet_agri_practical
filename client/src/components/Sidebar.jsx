@@ -7,15 +7,30 @@ function normalizeMenus(menus) {
   if (!Array.isArray(menus)) return [];
   return menus
     .filter((m) => m && (m.status === 'active' || !m.status))
+    .filter((m) => {
+      // Hide the premium materials duplicate link, we unify both into one
+      const name = String(m.name || '').toLowerCase();
+      return name !== 'premium materials';
+    })
     .sort((a, b) => (Number(a.menu_order || a.menuOrder || 0) - Number(b.menu_order || b.menuOrder || 0)))
-    .map((m) => ({
-      id: m.id,
-      name: m.name,
-      route: m.route,
-      icon: m.icon || '📄',
-      type: m.type,
-      menuOrder: m.menu_order ?? m.menuOrder ?? 0,
-    }));
+    .map((m) => {
+      let r = m.route;
+      let n = m.name;
+      const ln = String(n || '').toLowerCase();
+      if (ln === 'free materials' || ln === 'study materials') {
+        n = 'Study Materials';
+        r = '/student/materials'; // unify
+      }
+
+      return {
+        id: m.id,
+        name: n,
+        route: r,
+        icon: m.icon || '📄',
+        type: m.type,
+        menuOrder: m.menu_order ?? m.menuOrder ?? 0,
+      };
+    });
 }
 
 function getFallbackMenus(isAdmin) {
@@ -29,6 +44,7 @@ function getFallbackMenus(isAdmin) {
       { id: 'admin-6', name: 'Materials', route: '/admin/materials', icon: '📚' },
       { id: 'admin-6b', name: 'Plans', route: '/admin/plans', icon: '💳' },
       { id: 'admin-6c', name: 'Payments', route: '/admin/payments', icon: '🧾' },
+      { id: 'admin-6d', name: 'Feedback', route: '/admin/feedback', icon: '💬' },
       { id: 'admin-7', name: 'Notifications', route: '/admin/notifications', icon: '🔔' },
       { id: 'admin-8', name: 'Results', route: '/admin/results', icon: '📈' },
       { id: 'admin-9', name: 'Settings', route: '/admin/settings', icon: '⚙️' },
@@ -41,8 +57,7 @@ function getFallbackMenus(isAdmin) {
     { id: 'stu-2', name: 'Mock Tests', route: '/student/tests', icon: '📝' },
     { id: 'stu-3', name: 'Progress', route: '/student/progress', icon: '📈' },
     { id: 'stu-4', name: 'Videos', route: '/student/videos', icon: '🎬' },
-    { id: 'stu-5', name: 'Free Materials', route: '/student/materials/free', icon: '📚' },
-    { id: 'stu-6', name: 'Premium Materials', route: '/student/materials/premium', icon: '🔒' },
+    { id: 'stu-5', name: 'Study Materials', route: '/student/materials', icon: '📚' },
     { id: 'stu-7', name: 'Premium Access', route: '/student/premium', icon: '�' },
     { id: 'stu-8', name: 'PYQs', route: '/student/pyqs', icon: '📋' },
     { id: 'stu-9', name: 'Notifications', route: '/student/notifications', icon: '🔔' },
@@ -144,7 +159,7 @@ export default function Sidebar({ isOpen, onClose }) {
               <div className="text-xs text-slate-500 leading-tight">Navigation</div>
             </div>
           </div>
-          <button type="button" className="btn-ghost lg:hidden" onClick={onClose}>
+          <button type="button" className="btn-ghost lg:hidden flex items-center gap-1 text-sm font-semibold text-slate-900 border border-slate-200 px-2 py-1 rounded" onClick={onClose}>
             Close
           </button>
         </div>

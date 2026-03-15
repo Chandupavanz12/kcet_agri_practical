@@ -15,6 +15,7 @@ import {
   createStudent,
   updateStudent,
   deleteStudent,
+  manageStudentSubscription,
   getMenus,
   createMenu,
   updateMenu,
@@ -33,6 +34,7 @@ import {
   updatePlan,
   deletePlan,
   listPayments,
+  deletePayments,
   createNotification,
   listNotifications,
   updateNotification,
@@ -69,6 +71,8 @@ import {
   deletePyq,
   getAnalytics,
   getDashboard,
+  getFeedbacks,
+  deleteFeedback,
 } from '../controllers/admin.mysql.controller.js';
 
 export const adminRouter = Router();
@@ -86,6 +90,7 @@ adminRouter.put('/menu/reorder', reorderMenus);
 adminRouter.get('/students', listStudents);
 adminRouter.post('/students', createStudent);
 adminRouter.put('/students/:id', updateStudent);
+adminRouter.post('/students/:id/subscribe', manageStudentSubscription);
 adminRouter.delete('/students/:id', deleteStudent);
 
 adminRouter.post('/upload/specimen-image', uploadImage.single('file'), uploadSpecimenImage);
@@ -119,6 +124,7 @@ adminRouter.put('/plans/:id', updatePlan);
 adminRouter.delete('/plans/:id', deletePlan);
 
 adminRouter.get('/payments', listPayments);
+adminRouter.delete('/payments', deletePayments);
 
 adminRouter.post('/notifications', createNotification);
 adminRouter.get('/notifications', listNotifications);
@@ -148,3 +154,6 @@ adminRouter.put('/pyqs/:id', updatePyq);
 adminRouter.delete('/pyqs/:id', deletePyq);
 
 adminRouter.get('/analytics', getAnalytics);
+
+adminRouter.get('/feedback', getFeedbacks);
+adminRouter.delete('/feedback/:id', deleteFeedback);

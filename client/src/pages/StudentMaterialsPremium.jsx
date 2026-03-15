@@ -40,8 +40,8 @@ export default function StudentMaterialsPremium() {
       if (!res.ok) {
         const text = await res.text();
         const lowered = String(text || '').toLowerCase();
-        if (res.status === 404 || lowered.includes('file not found') || lowered.includes('cannot get /uploads')) {
-          throw new Error('File not found. Please contact admin or try again later.');
+        if (res.status === 404 || lowered.includes('file not found')) {
+          throw new Error('File not found. Please contact admin.');
         }
         throw new Error(text || `Failed to open file (${res.status})`);
       }
@@ -89,55 +89,70 @@ export default function StudentMaterialsPremium() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="card">
-        <div className="card-body">
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="card overflow-hidden">
-        <div className="card-body bg-gradient-to-r from-secondary-50 via-white to-accent-50">
-          <div className="flex items-center justify-between gap-3">
+        <div className="card-body bg-gradient-to-r from-purple-500 to-indigo-600 p-8 shadow-lg">
+          <div className="flex items-center justify-between gap-3 text-white">
             <div>
-              <h1 className="font-display text-xl font-semibold">Premium Materials</h1>
-              <div className="mt-1 text-sm text-slate-700">Premium-only documents. Unlock with subscription.</div>
+              <h1 className="text-2xl font-bold tracking-tight">⭐ Premium Materials</h1>
+              <div className="mt-1 text-purple-100 font-medium italic">Exclusive chapter-wise notes and solved materials.</div>
             </div>
-            <Link to="/student/premium" className="btn-primary text-xs">View Plans</Link>
+            <Link to="/student/premium" className="bg-white/20 hover:bg-white/30 backdrop-blur-md px-4 py-2 rounded-xl border border-white/30 text-sm font-bold transition-colors">
+              View Plans
+            </Link>
           </div>
         </div>
       </div>
 
-      <div className="card">
+      {error ? (
+        <div className="card border-0 shadow-sm">
+          <div className="p-4 bg-red-50 border border-red-200 text-red-700 font-medium rounded-xl">{error}</div>
+        </div>
+      ) : null}
+
+      <div className="card border-0 shadow-sm">
         <div className="card-body">
           {items.length === 0 ? (
-            <div className="rounded-2xl border border-slate-200/70 bg-white p-4 text-sm text-slate-700">No premium materials available.</div>
+            <div className="p-12 text-center text-slate-500 font-medium">No premium materials available in this section.</div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((m) => (
-                <div key={m.id} className="card overflow-hidden">
-                  <div className="h-1 bg-gradient-to-r from-secondary-500 to-accent-500" />
-                  <div className="card-body">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">{m.title}</div>
-                        <div className="mt-1 text-xs text-slate-600">{m.subject}</div>
+                <div key={m.id} className="group relative bg-white rounded-2xl border border-slate-200 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+                  <div className={`h-1.5 w-full rounded-t-2xl ${m.locked ? 'bg-amber-400' : 'bg-emerald-500'}`} />
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-slate-800 line-clamp-2">{m.title}</div>
+                        <div className="mt-1 text-xs text-slate-500 font-medium">{m.subject}</div>
                       </div>
-                      {m.locked ? <span className="badge">Locked</span> : <span className="badge badge-success">Unlocked</span>}
-                    </div>
-                    <div className="mt-4">
                       {m.locked ? (
-                        <button type="button" className="btn-primary text-xs" onClick={() => navigate('/student/premium')}>
-                          Unlock
+                        <span className="shrink-0 flex items-center gap-1 bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 font-bold rounded-full border border-amber-200">
+                          ⭐ Premium
+                        </span>
+                      ) : (
+                        <span className="shrink-0 flex items-center gap-1 bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 font-bold rounded-full border border-emerald-200">
+                          ✅ Unlocked
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-6">
+                      {m.locked ? (
+                        <button
+                          type="button"
+                          className="w-full bg-slate-100 text-slate-700 hover:bg-amber-500 hover:text-white transition-all py-2.5 rounded-xl text-xs font-bold shadow-sm"
+                          onClick={() => navigate('/student/premium')}
+                        >
+                          Get Access to View
                         </button>
                       ) : (
-                        <button type="button" className="btn-primary text-xs" onClick={() => openProtectedFile(m.pdfUrl)}>
-                          View
+                        <button
+                          type="button"
+                          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white transition-all py-2.5 rounded-xl text-xs font-bold shadow-lg"
+                          onClick={() => openProtectedFile(m.pdfUrl)}
+                        >
+                          Read Now
                         </button>
                       )}
                     </div>

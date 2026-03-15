@@ -171,7 +171,12 @@ export async function studentRegister(req, res, next) {
     }
 
     const passwordHash = await hashPassword(password);
-    const doc = await new User({ name, email: emailLower, password_hash: passwordHash, role: 'student' }).save();
+    const doc = await new User({
+      name,
+      email: emailLower,
+      password_hash: passwordHash,
+      role: 'student'
+    }).save();
 
     const user = { id: doc.id, name, email: emailLower, role: 'student' };
     const token = signToken(user);
@@ -192,7 +197,7 @@ export async function requestPasswordResetByEmail(req, res, next) {
     const user = await User.findOne({ email: emailInput }).select({ id: 1, email: 1, role: 1 }).lean();
 
     // Always return a generic message to avoid revealing which emails exist.
-    if (!user || user.role !== 'student') {
+    if (!user || (user.role !== 'student' && user.role !== 'admin')) {
       return res.json({ message: 'If an account exists, an OTP has been sent to the registered email.' });
     }
 
@@ -235,7 +240,7 @@ export async function resetPasswordByEmail(req, res, next) {
     }
 
     const user = await User.findOne({ email: emailInput }).select({ id: 1, email: 1, role: 1 }).lean();
-    if (!user || user.role !== 'student') {
+    if (!user || (user.role !== 'student' && user.role !== 'admin')) {
       return res.status(400).json({ message: 'Invalid OTP' });
     }
 
@@ -268,7 +273,7 @@ export async function requestLoginOtpByEmail(req, res, next) {
     const user = await User.findOne({ email: emailInput }).select({ id: 1, email: 1, role: 1, name: 1 }).lean();
 
     // Always return generic message
-    if (!user || user.role !== 'student') {
+    if (!user || (user.role !== 'student' && user.role !== 'admin')) {
       return res.json({ message: 'If an account exists, an OTP has been sent to the registered email.' });
     }
 
@@ -309,7 +314,7 @@ export async function verifyLoginOtpByEmail(req, res, next) {
     }
 
     const user = await User.findOne({ email: emailInput }).select({ id: 1, email: 1, role: 1, name: 1 }).lean();
-    if (!user || user.role !== 'student') {
+    if (!user || (user.role !== 'student' && user.role !== 'admin')) {
       return res.status(400).json({ message: 'Invalid OTP' });
     }
 
@@ -324,8 +329,8 @@ export async function verifyLoginOtpByEmail(req, res, next) {
 
     await LoginOtp.updateOne({ id }, { $set: { used_at: new Date() } });
 
-    const token = signToken({ id: user.id, name: user.name, email: user.email, role: 'student' });
-    return res.json({ token, user: mapUserRow({ id: user.id, name: user.name, email: user.email, role: 'student' }) });
+    const token = signToken({ id: user.id, name: user.name, email: user.email, role: user.role });
+    return res.json({ token, user: mapUserRow({ id: user.id, name: user.name, email: user.email, role: user.role }) });
   } catch (err) {
     return next(err);
   }

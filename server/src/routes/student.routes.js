@@ -32,6 +32,7 @@ import {
   listMaterialsStudent,
   listVideosStudent,
   listNotificationsStudent,
+  submitFeedback,
 } from '../controllers/student.mysql.controller.js';
 
 export const studentRouter = Router();
@@ -62,6 +63,8 @@ studentRouter.get('/materials', listMaterialsStudent);
 
 studentRouter.get('/profile', getProfile);
 studentRouter.put('/profile', updateProfile);
+
+studentRouter.post('/feedback', submitFeedback);
 
 studentRouter.post('/password-reset/request', requestPasswordReset);
 studentRouter.post('/password-reset/reset', resetPassword);

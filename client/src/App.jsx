@@ -44,10 +44,11 @@ const ExamCentres = React.lazy(() => import('./pages/admin/ExamCentres.jsx'));
 const ExamCentreYears = React.lazy(() => import('./pages/admin/ExamCentreYears.jsx'));
 const Plans = React.lazy(() => import('./pages/admin/Plans.jsx'));
 const Payments = React.lazy(() => import('./pages/admin/Payments.jsx'));
+const AdminFeedback = React.lazy(() => import('./pages/admin/Feedback.jsx'));
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -55,21 +56,21 @@ function ProtectedRoute({ children, adminOnly = false }) {
       </div>
     );
   }
-  
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
+
   if (adminOnly && user.role !== 'admin') {
     return <Navigate to="/" replace />;
   }
-  
+
   return <>{children}</>;
 }
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -77,17 +78,17 @@ function AppRoutes() {
       </div>
     );
   }
-  
+
   return (
     <Routes>
       {/* Auth Routes */}
-      <Route 
-        path="/login" 
-        element={user ? <Navigate to={user.role === 'admin' ? '/' : '/student/dashboard'} replace /> : <Login />} 
+      <Route
+        path="/login"
+        element={user ? <Navigate to={user.role === 'admin' ? '/' : '/student/dashboard'} replace /> : <Login />}
       />
-      <Route 
-        path="/register" 
-        element={user ? <Navigate to={user.role === 'admin' ? '/' : '/student/dashboard'} replace /> : <Register />} 
+      <Route
+        path="/register"
+        element={user ? <Navigate to={user.role === 'admin' ? '/' : '/student/dashboard'} replace /> : <Register />}
       />
 
       <Route
@@ -98,10 +99,10 @@ function AppRoutes() {
         path="/student/otp-login"
         element={user ? <Navigate to={user.role === 'admin' ? '/' : '/student/dashboard'} replace /> : <StudentOtpLogin />}
       />
-      
+
       {/* Root Route */}
-      <Route 
-        path="/" 
+      <Route
+        path="/"
         element={
           user ? (
             user.role === 'admin' ? (
@@ -114,9 +115,9 @@ function AppRoutes() {
           ) : (
             <Navigate to="/login" replace />
           )
-        } 
+        }
       />
-      
+
       {/* Student Routes */}
       <Route
         path="/student/dashboard"
@@ -232,7 +233,7 @@ function AppRoutes() {
           <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><div className="text-lg">Loading...</div></div>}>
             <ProtectedRoute>
               <Layout>
-                <StudentMaterialsPremium />
+                <StudentMaterialsFree />
               </Layout>
             </ProtectedRoute>
           </Suspense>
@@ -310,7 +311,7 @@ function AppRoutes() {
           </Suspense>
         }
       />
-      
+
       {/* Admin Routes */}
       <Route
         path="/admin/dashboard"
@@ -433,6 +434,18 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/admin/feedback"
+        element={
+          <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><div className="text-lg">Loading...</div></div>}>
+            <ProtectedRoute adminOnly={true}>
+              <Layout>
+                <AdminFeedback />
+              </Layout>
+            </ProtectedRoute>
+          </Suspense>
+        }
+      />
+      <Route
         path="/admin/pyqs"
         element={
           <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><div className="text-lg">Loading...</div></div>}>
@@ -504,17 +517,17 @@ function AppRoutes() {
           </Suspense>
         }
       />
-      
+
       {/* 404 Route */}
-      <Route 
-        path="*" 
+      <Route
+        path="*"
         element={
           user ? (
             <Navigate to={user.role === 'admin' ? '/' : '/student/dashboard'} replace />
           ) : (
             <Navigate to="/login" replace />
           )
-        } 
+        }
       />
     </Routes>
   );

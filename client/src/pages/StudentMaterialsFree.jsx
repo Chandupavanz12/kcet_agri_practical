@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { apiFetch } from '../lib/api.js';
 
 export default function StudentMaterialsFree() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -60,7 +61,8 @@ export default function StudentMaterialsFree() {
       try {
         setLoading(true);
         setError('');
-        const res = await apiFetch('/api/student/materials?access=free&type=pdf', { token });
+        // changed from ?access=free to fetch all materials
+        const res = await apiFetch('/api/student/materials?type=pdf', { token });
         if (!alive) return;
         setItems(Array.isArray(res?.materials) ? res.materials : []);
       } catch (e) {
@@ -104,10 +106,13 @@ export default function StudentMaterialsFree() {
         <div className="card-body bg-gradient-to-r from-primary-50 via-white to-accent-50">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="font-display text-xl font-semibold">Free Materials</h1>
-              <div className="mt-1 text-sm text-slate-700">Public notes and reference documents.</div>
+              <h1 className="font-display text-xl font-semibold">📚 Study Materials</h1>
+              <div className="mt-1 text-sm text-indigo-700 font-medium bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100 inline-flex items-center gap-2 shadow-sm">
+                <span className="text-lg">🎓</span>
+                <span>The material below is a <strong>free sample</strong>. To unlock all <strong>20 chapter materials</strong>, upgrade to premium for just a minimal price!</span>
+              </div>
             </div>
-            <Link to="/student/premium" className="btn-primary text-xs">Get Premium</Link>
+            <Link to="/student/premium" className="btn-primary text-xs shrink-0">Get Premium</Link>
           </div>
         </div>
       </div>
@@ -118,16 +123,43 @@ export default function StudentMaterialsFree() {
             <div className="rounded-2xl border border-slate-200/70 bg-white p-4 text-sm text-slate-700">No materials available.</div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((m) => (
+              {[...items].sort((a, b) => {
+                const aFree = String(a.accessType || '').toLowerCase() === 'free';
+                const bFree = String(b.accessType || '').toLowerCase() === 'free';
+                if (aFree && !bFree) return -1;
+                if (!aFree && bFree) return 1;
+                return 0;
+              }).map((m) => (
                 <div key={m.id} className="card overflow-hidden">
                   <div className="h-1 bg-gradient-to-r from-accent-400 to-secondary-500" />
                   <div className="card-body">
-                    <div className="text-sm font-semibold text-slate-900">{m.title}</div>
-                    <div className="mt-1 text-xs text-slate-600">{m.subject}</div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">{m.title}</div>
+                        <div className="mt-1 text-xs text-slate-600">{m.subject}</div>
+                      </div>
+                      {m.locked ? (
+                        <span className="badge badge-warning text-[10px] px-2 py-0.5 whitespace-nowrap bg-amber-100 text-amber-700 font-bold rounded">⭐ Premium</span>
+                      ) : String(m.accessType || '').toLowerCase() === 'paid' ? (
+                        <span className="badge badge-info text-[10px] px-2 py-0.5 whitespace-nowrap bg-blue-100 text-blue-700 font-bold rounded">Unlocked</span>
+                      ) : (
+                        <span className="badge badge-success text-[10px] px-2 py-0.5 whitespace-nowrap bg-emerald-100 text-emerald-700 font-bold rounded">Free</span>
+                      )}
+                    </div>
                     <div className="mt-4">
-                      <button type="button" className="btn-primary text-xs" onClick={() => openProtectedFile(m.pdfUrl)}>
-                        View
-                      </button>
+                      {m.locked ? (
+                        <button type="button" className="btn-primary text-xs w-full sm:w-auto text-center justify-center flex
+                          bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-none text-white shadow"
+                          onClick={() => navigate('/student/premium')}>
+                          Unlock
+                        </button>
+                      ) : (
+                        <button type="button" className="btn-primary text-xs w-full sm:w-auto text-center justify-center flex
+                          bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 border-none text-white shadow"
+                          onClick={() => openProtectedFile(m.pdfUrl)}>
+                          View
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

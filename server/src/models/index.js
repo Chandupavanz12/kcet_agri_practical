@@ -463,6 +463,21 @@ MaterialCompletionSchema.index({ user_id: 1, material_id: 1 }, { unique: true })
 const MaterialCompletion =
   mongoose.models.MaterialCompletion || mongoose.model('MaterialCompletion', MaterialCompletionSchema);
 
+const FeedbackSchema = withNumericId(
+  new Schema(
+    {
+      user_name: { type: String, required: true },
+      user_email: { type: String, required: true },
+      message: { type: String, required: true },
+      created_at: { type: Date, default: () => new Date(), index: true },
+    },
+    { collection: 'feedbacks' }
+  ),
+  'feedbacks'
+);
+
+const Feedback = mongoose.models.Feedback || mongoose.model('Feedback', FeedbackSchema);
+
 export {
   Counter,
   User,
@@ -485,4 +500,5 @@ export {
   TestQuestion,
   Result,
   MaterialCompletion,
+  Feedback,
 };
