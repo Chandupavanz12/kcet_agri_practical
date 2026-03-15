@@ -3,6 +3,59 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { apiFetch } from '../lib/api.js';
 
+const MANAGE_LINKS = [
+  { to: '/admin/students', icon: '👥', label: 'Students', desc: 'View & manage students', color: 'from-violet-500 to-purple-600' },
+  { to: '/admin/tests', icon: '📝', label: 'Tests', desc: 'Manage mock tests', color: 'from-blue-500 to-indigo-600' },
+  { to: '/admin/tests/builder', icon: '🔧', label: 'Test Builder', desc: 'Create new tests', color: 'from-cyan-500 to-blue-600' },
+  { to: '/admin/videos', icon: '🎥', label: 'Videos', desc: 'Upload & manage videos', color: 'from-rose-500 to-pink-600' },
+  { to: '/admin/materials', icon: '📚', label: 'Materials', desc: 'Study PDFs & notes', color: 'from-emerald-500 to-teal-600' },
+  { to: '/admin/pyqs', icon: '📄', label: 'PYQs', desc: 'Previous year questions', color: 'from-amber-500 to-orange-500' },
+  { to: '/admin/plans', icon: '💳', label: 'Plans', desc: 'Manage subscription plans', color: 'from-green-500 to-emerald-600' },
+  { to: '/admin/payments', icon: '💰', label: 'Payments', desc: 'View payment records', color: 'from-yellow-500 to-amber-600' },
+  { to: '/admin/notifications', icon: '🔔', label: 'Notifications', desc: 'Broadcast announcements', color: 'from-indigo-500 to-violet-600' },
+  { to: '/admin/results', icon: '🏆', label: 'Results', desc: 'View test scores', color: 'from-red-500 to-rose-600' },
+  { to: '/admin/menu', icon: '🗂️', label: 'Menu Mgmt', desc: 'Configure navigation menus', color: 'from-slate-500 to-gray-600' },
+  { to: '/admin/settings', icon: '⚙️', label: 'Settings', desc: 'App-wide settings', color: 'from-gray-500 to-slate-700' },
+];
+
+function StatCard({ icon, label, value, sub, color, delay }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), delay ?? 0);
+    return () => clearTimeout(t);
+  }, [delay]);
+
+  return (
+    <div className={`admin-stat-card ${visible ? 'admin-stat-card--in' : ''}`} style={{ transitionDelay: `${delay}ms` }}>
+      <div className={`admin-stat-icon bg-gradient-to-br ${color}`}>{icon}</div>
+      <div className="admin-stat-info">
+        <div className="admin-stat-value">{value ?? 0}</div>
+        <div className="admin-stat-label">{label}</div>
+        {sub && <div className="admin-stat-sub">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+function ManageCard({ to, icon, label, desc, color, idx }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), 60 * idx);
+    return () => clearTimeout(t);
+  }, [idx]);
+
+  return (
+    <Link to={to} className={`admin-manage-card ${visible ? 'admin-manage-card--in' : ''}`}>
+      <div className={`admin-manage-icon bg-gradient-to-br ${color}`}>{icon}</div>
+      <div className="admin-manage-body">
+        <div className="admin-manage-label">{label}</div>
+        <div className="admin-manage-desc">{desc}</div>
+      </div>
+      <span className="admin-manage-arrow">›</span>
+    </Link>
+  );
+}
+
 export default function AdminDashboard() {
   const { token, user } = useAuth();
   const [analytics, setAnalytics] = useState(null);
@@ -20,168 +73,91 @@ export default function AdminDashboard() {
         setDashboard(res);
         setLoading(false);
 
-        // Load analytics in background
         try {
           const a = await apiFetch('/api/admin/analytics', { token });
           if (!alive) return;
           setAnalytics(a);
-        } catch {
-          // ignore background failure
-        }
+        } catch { /* ignore background failure */ }
       } catch (err) {
         if (!alive) return;
-        setError(err?.message || 'Failed to load analytics');
-      } finally {
-        if (!alive) return;
-        if (alive) setLoading(false);
+        setError(err?.message || 'Failed to load dashboard');
+        setLoading(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [token]);
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="card animate-pulse">
-          <div className="card-body">
-            <div className="h-6 w-48 bg-slate-200 rounded" />
-            <div className="mt-2 h-4 w-64 bg-slate-200 rounded" />
-          </div>
+      <div className="space-y-6 page-in">
+        <div className="dash-hero-skeleton" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map(i => <div key={i} className="dash-skeleton-card" />)}
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {[1,2,3].map((i) => (
-            <div key={i} className="card animate-pulse">
-              <div className="card-body">
-                <div className="h-4 w-20 bg-slate-200 rounded" />
-                <div className="mt-2 h-8 w-12 bg-slate-200 rounded" />
-              </div>
-            </div>
-          ))}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="dash-skeleton-card h-20" />)}
         </div>
       </div>
     );
   }
 
+  const d = dashboard || {};
+  const a = analytics || {};
+
+  const stats = [
+    { icon: '👥', label: 'Students', value: d.students?.count ?? a.studentsCount ?? 0, color: 'from-violet-500 to-purple-600', delay: 0 },
+    { icon: '📝', label: 'Tests', value: d.tests?.count ?? a.testsCount ?? 0, color: 'from-blue-500 to-indigo-600', delay: 70 },
+    { icon: '🎥', label: 'Videos', value: d.videos?.count ?? a.videosCount ?? 0, color: 'from-rose-500 to-pink-600', delay: 140 },
+    { icon: '📚', label: 'Materials', value: d.materials?.count ?? a.materialsCount ?? 0, color: 'from-emerald-500 to-teal-600', delay: 210 },
+    { icon: '📄', label: 'PYQs', value: a.pyqsCount ?? 0, color: 'from-amber-500 to-orange-500', delay: 280 },
+    { icon: '🧪', label: 'Specimens', value: a.specimensCount ?? 0, color: 'from-cyan-500 to-blue-600', delay: 350 },
+    { icon: '🏆', label: 'Results', value: a.resultsCount ?? 0, color: 'from-red-500 to-rose-600', delay: 420 },
+    { icon: '🎯', label: 'Avg Accuracy', value: `${a.avgAccuracy ? Math.round(a.avgAccuracy) : 0}%`, color: 'from-green-500 to-emerald-600', delay: 490 },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="card overflow-hidden">
-        <div className="card-body bg-gradient-to-r from-primary-50 via-white to-slate-50">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-xl font-semibold">Admin Dashboard</h1>
-              <p className="mt-1 text-sm text-slate-600">Welcome back, {user?.name}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="badge">Admin</span>
-              <span className="badge-success">Active</span>
-            </div>
+    <div className="space-y-8 page-in">
+
+      {/* ── Hero Banner ─────────────────────────────────────── */}
+      <div className="admin-hero">
+        <div className="admin-hero-bg" />
+        <div className="admin-hero-content">
+          <div>
+            <div className="admin-hero-role">⚡ Administrator</div>
+            <h1 className="admin-hero-name">Welcome, {user?.name || 'Admin'}</h1>
+            <p className="admin-hero-sub">Manage your KCET Agri Practical platform from here</p>
+          </div>
+          <div className="admin-hero-badges">
+            <span className="dash-badge dash-badge--green">✓ Active</span>
+            <span className="dash-badge dash-badge--purple">Admin</span>
           </div>
         </div>
       </div>
 
-      {error ? (
-        <div className="card">
-          <div className="card-body">
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {error}
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{error}</div>
+      )}
 
-      {/* Analytics Cards */}
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
-        <div className="card">
-          <div className="card-body">
-            <div className="text-sm font-semibold text-slate-800">Students</div>
-            <div className="mt-2 text-3xl font-semibold">{dashboard?.students?.count ?? analytics?.studentsCount ?? 0}</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-body">
-            <div className="text-sm font-semibold text-slate-800">Tests</div>
-            <div className="mt-2 text-3xl font-semibold">{dashboard?.tests?.count ?? analytics?.testsCount ?? 0}</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-body">
-            <div className="text-sm font-semibold text-slate-800">Specimens</div>
-            <div className="mt-2 text-3xl font-semibold">{analytics?.specimensCount ?? 0}</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-body">
-            <div className="text-sm font-semibold text-slate-800">Videos</div>
-            <div className="mt-2 text-3xl font-semibold">{dashboard?.videos?.count ?? analytics?.videosCount ?? 0}</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-body">
-            <div className="text-sm font-semibold text-slate-800">Materials</div>
-            <div className="mt-2 text-3xl font-semibold">{dashboard?.materials?.count ?? analytics?.materialsCount ?? 0}</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-body">
-            <div className="text-sm font-semibold text-slate-800">PYQs</div>
-            <div className="mt-2 text-3xl font-semibold">{analytics?.pyqsCount ?? 0}</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-body">
-            <div className="text-sm font-semibold text-slate-800">Results</div>
-            <div className="mt-2 text-3xl font-semibold">{analytics?.resultsCount ?? 0}</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-body">
-            <div className="text-sm font-semibold text-slate-800">Avg Accuracy</div>
-            <div className="mt-2 text-3xl font-semibold">
-              {analytics?.avgAccuracy ? Math.round(analytics.avgAccuracy) : 0}%
-            </div>
-          </div>
+      {/* ── Analytics Stats ──────────────────────────────────── */}
+      <div>
+        <h2 className="dash-section-title">📊 Platform Overview</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {stats.map((s) => (
+            <StatCard key={s.label} {...s} />
+          ))}
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="card">
-        <div className="card-header">
-          <h2 className="text-lg font-semibold">Manage</h2>
-        </div>
-        <div className="card-body">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Link to="/admin/students" className="btn-ghost justify-start">
-              Students
-            </Link>
-            <Link to="/admin/tests" className="btn-ghost justify-start">
-              Tests
-            </Link>
-            <Link to="/admin/tests/builder" className="btn-primary justify-start">
-              Test Builder
-            </Link>
-            <Link to="/admin/videos" className="btn-ghost justify-start">
-              Videos
-            </Link>
-            <Link to="/admin/materials" className="btn-ghost justify-start">
-              Materials
-            </Link>
-            <Link to="/admin/pyqs" className="btn-ghost justify-start">
-              PYQs
-            </Link>
-            <Link to="/admin/notifications" className="btn-ghost justify-start">
-              Notifications
-            </Link>
-            <Link to="/admin/settings" className="btn-ghost justify-start">
-              Settings
-            </Link>
-            <Link to="/admin/results" className="btn-ghost justify-start">
-              Results
-            </Link>
-          </div>
+      {/* ── Management Grid ──────────────────────────────────── */}
+      <div>
+        <h2 className="dash-section-title">⚙️ Manage Platform</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {MANAGE_LINKS.map((l, i) => (
+            <ManageCard key={l.to} {...l} idx={i} />
+          ))}
         </div>
       </div>
+
     </div>
   );
 }
