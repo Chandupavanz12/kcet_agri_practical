@@ -13,12 +13,10 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 }
 
+// ── Brevo HTTP sender ──────────────────────────────────────────────────────
 async function sendViaBrevoHttp({ apiKey, fromEmail, fromName, toEmail, subject, text }) {
   const payload = JSON.stringify({
-    sender: {
-      email: fromEmail,
-      name: fromName || fromEmail,
-    },
+    sender: { email: fromEmail, name: fromName || fromEmail },
     to: [{ email: toEmail }],
     subject,
     textContent: text,
@@ -34,39 +32,73 @@ async function sendViaBrevoHttp({ apiKey, fromEmail, fromName, toEmail, subject,
       'content-type': 'application/json',
       'content-length': Buffer.byteLength(payload),
     },
-    timeout: 12000,
+    timeout: 15000,
   };
 
   await new Promise((resolve, reject) => {
     const req = https.request(options, (resp) => {
       let body = '';
       resp.setEncoding('utf8');
-      resp.on('data', (chunk) => {
-        body += chunk;
-      });
+      resp.on('data', (chunk) => { body += chunk; });
       resp.on('end', () => {
         if (resp.statusCode && resp.statusCode >= 200 && resp.statusCode < 300) {
           resolve(true);
           return;
         }
         let parsed;
-        try {
-          parsed = body ? JSON.parse(body) : null;
-        } catch {
-          parsed = { message: body };
-        }
-        reject(new Error(parsed?.message || parsed?.error || 'Brevo email send failed'));
+        try { parsed = body ? JSON.parse(body) : null; } catch { parsed = { message: body }; }
+        reject(new Error(parsed?.message || parsed?.error || `Brevo send failed (HTTP ${resp.statusCode})`));
       });
     });
-    req.on('timeout', () => {
-      req.destroy(new Error('Brevo email request timeout'));
-    });
+    req.on('timeout', () => req.destroy(new Error('Brevo request timed out after 15 s')));
     req.on('error', (e) => reject(e));
     req.write(payload);
     req.end();
   });
 }
 
+// ── Singleton SMTP transporter ─────────────────────────────────────────────
+// A single instance is reused across all requests (connection pooling).
+// Creating a new transporter per-email causes unnecessary TCP handshakes.
+let _smtpTransporter = null;
+
+function getSmtpTransporter() {
+  if (_smtpTransporter) return _smtpTransporter;
+
+  const host = String(process.env.SMTP_HOST || '').trim();
+  const port = Number(String(process.env.SMTP_PORT || '587').trim());
+  const smtpUser = String(process.env.SMTP_USER || '').trim();
+  const pass = String(process.env.SMTP_PASS || '').trim();
+  const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
+
+  if (!host || !smtpUser || !pass || !Number.isFinite(port)) {
+    const err = new Error(
+      `SMTP not configured on server. ` +
+      `host="${host || '(empty)'}" user="${smtpUser || '(empty)'}" port=${port}. ` +
+      `Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS in your hosting platform's environment variables.`
+    );
+    err.code = 'EMAIL_NOT_CONFIGURED';
+    throw err;
+  }
+
+  _smtpTransporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user: smtpUser, pass },
+    pool: true,          // reuse connections
+    maxConnections: 3,
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 30_000,
+  });
+
+  // eslint-disable-next-line no-console
+  console.log(`[mail] SMTP transporter initialised → ${host}:${port}  user=${smtpUser}`);
+  return _smtpTransporter;
+}
+
+// ── Main sendMail ──────────────────────────────────────────────────────────
 async function sendMail({ toEmail, subject, text }) {
   const brevoApiKey = String(process.env.BREVO_API_KEY || '').trim();
   const fromRaw = String(process.env.SMTP_FROM || process.env.SMTP_USER || '').trim();
@@ -76,48 +108,51 @@ async function sendMail({ toEmail, subject, text }) {
   const fromEmail = fromMatch ? String(fromMatch[2] || '').trim() : fallbackFrom;
 
   if (brevoApiKey) {
-    await sendViaBrevoHttp({
-      apiKey: brevoApiKey,
-      fromEmail,
-      fromName,
-      toEmail,
-      subject,
-      text,
-    });
+    // eslint-disable-next-line no-console
+    console.log(`[mail] → Brevo API  to="${toEmail}"  subject="${subject}"`);
+    await sendViaBrevoHttp({ apiKey: brevoApiKey, fromEmail, fromName, toEmail, subject, text });
+    // eslint-disable-next-line no-console
+    console.log(`[mail] ✓ Brevo sent OK to "${toEmail}"`);
     return;
   }
 
-  const host = String(process.env.SMTP_HOST || '').trim();
-  const port = Number(String(process.env.SMTP_PORT || 587).trim());
-  const smtpUser = String(process.env.SMTP_USER || '').trim();
-  const pass = String(process.env.SMTP_PASS || '').trim();
-  const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
-  const from = fromRaw || smtpUser || 'no-reply@example.com';
-
-  if (!host || !smtpUser || !pass || !Number.isFinite(port)) {
-    const err = new Error('Email service not configured');
-    err.code = 'EMAIL_NOT_CONFIGURED';
-    throw err;
-  }
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: { user: smtpUser, pass },
-    connectionTimeout: 12_000,
-    greetingTimeout: 12_000,
-    socketTimeout: 20_000,
-  });
-
-  await transporter.sendMail({
-    from,
-    to: toEmail,
-    subject,
-    text,
-  });
+  // Fallback: SMTP
+  const from = fromRaw || String(process.env.SMTP_USER || '').trim() || 'no-reply@example.com';
+  // eslint-disable-next-line no-console
+  console.log(`[mail] → SMTP  to="${toEmail}"  subject="${subject}"`);
+  const transporter = getSmtpTransporter();
+  await transporter.sendMail({ from, to: toEmail, subject, text });
+  // eslint-disable-next-line no-console
+  console.log(`[mail] ✓ SMTP sent OK to "${toEmail}"`);
 }
 
+// ── Shared mail-error handler ──────────────────────────────────────────────
+// Always logs the full error to the server console (visible in hosting
+// dashboard logs) then returns an appropriate JSON response to the client.
+function handleMailError(err, res, label) {
+  // eslint-disable-next-line no-console
+  console.error(`[mail] ✗ ${label} FAILED  code=${err?.code || 'n/a'}  msg=${err?.message || err}`);
+
+  const msg = String(err?.message || '').toLowerCase();
+  const isNotConfigured = err?.code === 'EMAIL_NOT_CONFIGURED' || msg.includes('not configured');
+  const isTimeout = msg.includes('timeout') || msg.includes('timed out') ||
+    String(err?.code || '').toLowerCase().includes('timeout');
+  const isAuth = msg.includes('invalid login') || msg.includes('535') ||
+    msg.includes('authentication') || msg.includes('credential');
+
+  if (isNotConfigured) {
+    return res.status(500).json({ message: 'Email service is not configured on the server. Please contact the administrator.' });
+  }
+  if (isAuth) {
+    return res.status(500).json({ message: 'Email authentication failed on the server. Please contact the administrator.' });
+  }
+  if (isTimeout) {
+    return res.status(500).json({ message: 'Email service timed out. Please try again in a moment.' });
+  }
+  return res.status(500).json({ message: `Could not send OTP email. Please try again. (${err?.message || 'unknown error'})` });
+}
+
+// ── Student register ───────────────────────────────────────────────────────
 export async function studentRegister(req, res, next) {
   try {
     const { name, email, password } = req.body;
@@ -125,7 +160,6 @@ export async function studentRegister(req, res, next) {
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'name, email, password are required' });
     }
-
     if (!isValidEmail(email)) {
       return res.status(400).json({ message: 'Invalid email' });
     }
@@ -141,13 +175,13 @@ export async function studentRegister(req, res, next) {
 
     const user = { id: doc.id, name, email: emailLower, role: 'student' };
     const token = signToken(user);
-
     return res.json({ token, user });
   } catch (err) {
     return next(err);
   }
 }
 
+// ── Password reset – request OTP ──────────────────────────────────────────
 export async function requestPasswordResetByEmail(req, res, next) {
   try {
     const emailInput = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
@@ -177,19 +211,7 @@ export async function requestPasswordResetByEmail(req, res, next) {
         text: `Your password reset OTP is ${otp}. This OTP is valid for 10 minutes. If you did not request this, you can ignore this email.`,
       });
     } catch (e) {
-      const prod = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
-      const hasBrevo = Boolean(String(process.env.BREVO_API_KEY || '').trim());
-      const msg = String(e?.message || '').toLowerCase();
-      if (prod && (msg.includes('timeout') || msg.includes('timed out') || String(e?.code || '').toLowerCase().includes('timeout'))) {
-        return res.status(500).json({ message: 'Email service connection timeout' });
-      }
-      if (prod) {
-        if (hasBrevo) {
-          return res.status(500).json({ message: `Email send failed: ${String(e?.message || 'Brevo error')}` });
-        }
-        return res.status(500).json({ message: 'Email service not configured' });
-      }
-      return res.json({ message: e?.message || 'Email send failed', otp });
+      return handleMailError(e, res, 'requestPasswordResetByEmail');
     }
 
     return res.json({ message: 'If an account exists, an OTP has been sent to the registered email.' });
@@ -198,6 +220,7 @@ export async function requestPasswordResetByEmail(req, res, next) {
   }
 }
 
+// ── Password reset – verify OTP + set new password ─────────────────────────
 export async function resetPasswordByEmail(req, res, next) {
   try {
     const emailInput = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
@@ -234,6 +257,7 @@ export async function resetPasswordByEmail(req, res, next) {
   }
 }
 
+// ── OTP login – request OTP ────────────────────────────────────────────────
 export async function requestLoginOtpByEmail(req, res, next) {
   try {
     const emailInput = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
@@ -263,19 +287,7 @@ export async function requestLoginOtpByEmail(req, res, next) {
         text: `Your login OTP is ${otp}. This OTP is valid for 10 minutes. If you did not request this, you can ignore this email.`,
       });
     } catch (e) {
-      const prod = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
-      const hasBrevo = Boolean(String(process.env.BREVO_API_KEY || '').trim());
-      const msg = String(e?.message || '').toLowerCase();
-      if (prod && (msg.includes('timeout') || msg.includes('timed out') || String(e?.code || '').toLowerCase().includes('timeout'))) {
-        return res.status(500).json({ message: 'Email service connection timeout' });
-      }
-      if (prod) {
-        if (hasBrevo) {
-          return res.status(500).json({ message: `Email send failed: ${String(e?.message || 'Brevo error')}` });
-        }
-        return res.status(500).json({ message: 'Email service not configured' });
-      }
-      return res.json({ message: e?.message || 'Email send failed', otp });
+      return handleMailError(e, res, 'requestLoginOtpByEmail');
     }
 
     return res.json({ message: 'If an account exists, an OTP has been sent to the registered email.' });
@@ -284,6 +296,7 @@ export async function requestLoginOtpByEmail(req, res, next) {
   }
 }
 
+// ── OTP login – verify OTP ─────────────────────────────────────────────────
 export async function verifyLoginOtpByEmail(req, res, next) {
   try {
     const emailInput = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
@@ -318,12 +331,12 @@ export async function verifyLoginOtpByEmail(req, res, next) {
   }
 }
 
+// ── Student login (password) ───────────────────────────────────────────────
 export async function studentLogin(req, res, next) {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email: (email || '').toLowerCase() }).lean();
-
     if (!user || user.role !== 'student') {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -340,12 +353,12 @@ export async function studentLogin(req, res, next) {
   }
 }
 
+// ── Admin login ────────────────────────────────────────────────────────────
 export async function adminLogin(req, res, next) {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email: (email || '').toLowerCase() }).lean();
-
     if (!user || user.role !== 'admin') {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -362,6 +375,7 @@ export async function adminLogin(req, res, next) {
   }
 }
 
+// ── /api/auth/me ───────────────────────────────────────────────────────────
 export async function me(req, res) {
   return res.json({ user: req.user });
 }
