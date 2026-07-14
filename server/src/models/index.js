@@ -42,6 +42,7 @@ const UserSchema = withNumericId(
       email: { type: String, required: true, trim: true, lowercase: true, unique: true, index: true },
       password_hash: { type: String, required: true },
       role: { type: String, enum: ['student', 'admin'], default: 'student', index: true },
+      last_otp_verified_at: { type: Date, default: null },
       created_at: { type: Date, default: () => new Date() },
       updated_at: { type: Date, default: () => new Date() },
     },

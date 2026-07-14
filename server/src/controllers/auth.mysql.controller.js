@@ -411,6 +411,7 @@ export async function verifyLoginOtpByEmail(req, res, next) {
     if (new Date() > new Date(expires_at)) return res.status(400).json({ message: 'OTP expired' });
 
     await LoginOtp.updateOne({ id }, { $set: { used_at: new Date() } });
+    await User.updateOne({ id: user.id }, { $set: { last_otp_verified_at: new Date() } });
 
     const token = signToken({ id: user.id, name: user.name, email: user.email, role: user.role });
     return res.json({ token, user: mapUserRow({ id: user.id, name: user.name, email: user.email, role: user.role }) });
@@ -525,6 +526,15 @@ export async function adminLogin(req, res, next) {
       }
     }
 
+    if (user.last_otp_verified_at) {
+      const msSinceOTP = Date.now() - new Date(user.last_otp_verified_at).getTime();
+      if (msSinceOTP < 24 * 60 * 60 * 1000) {
+        const userObj = mapUserRow(user);
+        const token = signToken(userObj);
+        return res.json({ token, user: userObj, message: 'Admin login successful bypass OTP', requiresOtp: false });
+      }
+    }
+
     // Instead of logging in directly, send OTP for 2-step verification
     const otp = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
     const secret = process.env.PASSWORD_RESET_OTP_SECRET || process.env.JWT_SECRET || 'dev-secret';
@@ -574,6 +584,7 @@ export async function verifyAdminLoginOtp(req, res, next) {
     if (new Date() > new Date(row.expires_at)) return res.status(400).json({ message: 'OTP expired' });
 
     await LoginOtp.updateOne({ id: row.id }, { $set: { used_at: new Date() } });
+    await User.updateOne({ id: user.id }, { $set: { last_otp_verified_at: new Date() } });
 
     const userObj = mapUserRow(user);
     const token = signToken(userObj);
