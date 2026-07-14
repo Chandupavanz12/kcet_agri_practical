@@ -686,10 +686,6 @@ export async function getPaymentStatusStudent(req, res, next) {
     if (recentPayment.status === 'paid') {
       const paidAt = recentPayment.paid_at ? new Date(recentPayment.paid_at) : null;
 
-      // ── Admin revocation check ──────────────────────────────────────────
-      // If admin revoked AFTER the payment was made, do NOT re-grant.
-      // The admin's decision takes priority. The student would need to make
-      // a brand-new payment (with paid_at > admin_revoked_at) to get access.
       if (adminRevokedAt && paidAt && adminRevokedAt > paidAt) {
         return res.json({
           hasPending: false,
@@ -703,13 +699,6 @@ export async function getPaymentStatusStudent(req, res, next) {
       if (planDoc) {
         const expiry = await grantAccessForPlan(userId, String(planDoc.code), Number(planDoc.duration_days || 365));
         _ttlCache.delete(`access:status:${userId}`);
-        _ttlCache.delete('materials:list:v1:pdf:all');
-        _ttlCache.delete('materials:list:v1:pdf:paid');
-        _ttlCache.delete('materials:list:v1:pyq:all');
-        _ttlCache.delete('materials:list:v1:pyq:paid');
-        _ttlCache.delete('materials:list:v1:all:all');
-        _ttlCache.delete('dashboard:pdfs:v1');
-        _ttlCache.delete('dashboard:pyqs:v1');
         return res.json({
           activated: true,
           planCode: planDoc.code,
@@ -719,12 +708,46 @@ export async function getPaymentStatusStudent(req, res, next) {
       }
     }
 
-    // Status is still 'created' — payment not yet captured.
-    // Also respect admin_revoked_at for pending orders (don't show hasPending
-    // if the order was created before admin revoked — edge case).
     const createdAt = recentPayment.created_at ? new Date(recentPayment.created_at) : null;
     if (adminRevokedAt && createdAt && adminRevokedAt > createdAt) {
       return res.json({ hasPending: false, adminRevoked: true });
+    }
+
+    // ── Razorpay Auto-Recovery Polling ──────────────────────────────────────────
+    // If webhook failed or was missed when switching UPI apps, we manually poll
+    // the Razorpay API dynamically to force-capture the payment success.
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (keyId && keySecret && recentPayment.razorpay_order_id) {
+      try {
+        const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+        const https = (await import('https')).default;
+        const data = await new Promise((resolve) => {
+          const r = https.request({
+            method: 'GET', hostname: 'api.razorpay.com',
+            path: `/v1/orders/${recentPayment.razorpay_order_id}/payments`,
+            headers: { Authorization: `Basic ${auth}` }
+          }, (resp) => {
+            let body = ''; resp.on('data', c => { body += c });
+            resp.on('end', () => { try { resolve(JSON.parse(body)); } catch (e) { resolve({}); } });
+          });
+          r.on('error', () => resolve({}));
+          r.end();
+        });
+
+        if (data && data.items && Array.isArray(data.items)) {
+          const successful = data.items.find(i => i.status === 'captured' || i.status === 'authorized');
+          if (successful) {
+            await Payment.updateOne({ id: recentPayment.id }, { $set: { status: 'paid', razorpay_payment_id: successful.id, paid_at: new Date(), updated_at: new Date() } });
+            const planDoc = await Plan.findOne({ id: Number(recentPayment.plan_id) }).lean();
+            if (planDoc) {
+              const expiry = await grantAccessForPlan(userId, String(planDoc.code), Number(planDoc.duration_days || 365));
+              _ttlCache.delete(`access:status:${userId}`);
+              return res.json({ activated: true, planCode: planDoc.code, planName: planDoc.name, expiry });
+            }
+          }
+        }
+      } catch (err) { }
     }
 
     return res.json({
@@ -1328,8 +1351,8 @@ export async function resultDetails(req, res, next) {
       const question = questionById.get(Number(resp.questionId));
 
       let finalImgUrl = '';
-      if (question && question.image_url && typeof question.image_url === 'string' && question.image_url.trim() !== '') {
-        if (question.image_url.startsWith('http')) {
+      if (question) {
+        if (question.image_url && typeof question.image_url === 'string' && question.image_url.startsWith('http')) {
           finalImgUrl = question.image_url;
         } else {
           finalImgUrl = `/api/mock-question-image/${question.id}`;
@@ -1417,7 +1440,12 @@ export async function getProfile(req, res, next) {
 
     const user = await User.findOne({ id: userId }).select({ id: 1, name: 1, email: 1, role: 1 }).lean();
     if (!user) return res.status(404).json({ message: 'User not found' });
-    return res.json({ user });
+
+    const accessRow = await ensureUserAccessRow(userId);
+    const active = computeActiveAccess(accessRow);
+    const isPremium = active.comboActive || active.pyqActive || active.materialActive;
+
+    return res.json({ user: { ...user, isPremium } });
   } catch (err) {
     return next(err);
   }

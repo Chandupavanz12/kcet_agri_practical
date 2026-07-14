@@ -2,26 +2,47 @@ import fs from 'fs';
 import mongoose from 'mongoose';
 
 import { getFilesDb } from '../config/db.js';
+import { getMockResultModel, getMockTestModel, getMockTestQuestionModel } from '../config/mockTestDb.js';
+import {
+  Counter,
+  Feedback,
+  getExamCentreModel,
+  getExamCentreYearModel,
+  getMaterialModel,
+  getPyqModel,
+  Menu,
+  Notification,
+  Payment,
+  Plan,
+  Result,
+  Settings,
+  Specimen,
+  User,
+  UserAccess,
+  Video
+} from '../models/index.js';
+import { ensureSettings } from '../seed/ensureSettings.js';
+import { hashPassword } from '../utils/auth.js';
 
 async function deleteFromGridFSByUrl(url) {
   if (!url) return;
   const db = getFilesDb();
   if (!db) return;
-  
+
   let gridFsIdStr = null;
   if (typeof url === 'string') {
     if (url.includes('gridfs:')) gridFsIdStr = url.split('gridfs:')[1];
     else if (url.includes('/api/public/gridfs/')) gridFsIdStr = url.split('/api/public/gridfs/')[1];
   }
-  
+
   if (gridFsIdStr) {
     try {
       const objId = new mongoose.Types.ObjectId(gridFsIdStr);
       let bucket = new mongoose.mongo.GridFSBucket(db, { bucketName: 'uploads' });
-      
+
       // Try to find the file in the new DB
       let files = await bucket.find({ _id: objId }).toArray();
-      
+
       // If not in new DB, fallback to old DB
       if ((!files || files.length === 0) && db !== mongoose.connection.db) {
         const fallbackBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
@@ -30,9 +51,9 @@ async function deleteFromGridFSByUrl(url) {
           bucket = fallbackBucket;
         }
       }
-      
+
       await bucket.delete(objId);
-    } catch(err) {
+    } catch (err) {
       // Ignore if not found
     }
   }
@@ -43,48 +64,20 @@ async function uploadToGridFS(filePath, filename, mimetype) {
   const bucket = new mongoose.mongo.GridFSBucket(db, {
     bucketName: 'uploads'
   });
-  
+
   return new Promise((resolve, reject) => {
     const uploadStream = bucket.openUploadStream(filename, {
       contentType: mimetype
     });
     const readStream = fs.createReadStream(filePath);
-    
+
     readStream.on('error', reject);
     uploadStream.on('error', reject);
-    
+
     readStream.pipe(uploadStream)
       .on('finish', () => resolve(uploadStream.id.toString()));
   });
 }
-import {
-  Counter,
-  ExamCentre,
-  getExamCentreModel,
-  ExamCentreYear,
-  getExamCentreYearModel,
-  Material,
-  getMaterialModel,
-  Menu,
-  Notification,
-  Payment,
-  Plan,
-  Pyq,
-  getPyqModel,
-  Result,
-  Settings,
-  Specimen,
-  Test,
-  TestQuestion,
-  User,
-  UserAccess,
-  Video,
-  Feedback,
-} from '../models/index.js';
-import { getMockTestModel, getMockTestQuestionModel, getMockResultModel } from '../config/mockTestDb.js';
-import { ensureSettings } from '../seed/ensureSettings.js';
-import { makePrivateMaterialRef, makePrivateUploadRef, makePublicUploadUrl } from '../middleware/upload.js';
-import { hashPassword } from '../utils/auth.js';
 
 
 const _ttlCache = new Map();
@@ -296,10 +289,10 @@ export async function uploadSpecimenImage(req, res) {
     const base64 = fileBuffer.toString('base64');
     const mimeType = req.file.mimetype || 'image/jpeg';
     const dataUri = `data:${mimeType};base64,${base64}`;
-    
+
     // Attempt to clean up the temporary ephemeral file
-    fs.unlink(req.file.path, () => {});
-    
+    fs.unlink(req.file.path, () => { });
+
     return res.json({ url: dataUri });
   } catch (err) {
     console.error('Error generating base64 for image:', err);
@@ -313,7 +306,7 @@ export async function uploadMaterialPdf(req, res) {
   }
   try {
     const gridFsId = await uploadToGridFS(req.file.path, req.file.originalname, req.file.mimetype || 'application/pdf');
-    fs.unlink(req.file.path, () => {});
+    fs.unlink(req.file.path, () => { });
     return res.json({ url: `/api/public/gridfs/${gridFsId}` });
   } catch (err) {
     console.error('Error generating gridfs id for material pdf:', err);
@@ -327,7 +320,7 @@ export async function uploadMaterialPdfPrivate(req, res) {
   }
   try {
     const gridFsId = await uploadToGridFS(req.file.path, req.file.originalname, req.file.mimetype || 'application/pdf');
-    fs.unlink(req.file.path, () => {});
+    fs.unlink(req.file.path, () => { });
     return res.json({ ref: `gridfs:${gridFsId}` });
   } catch (err) {
     console.error('Error generating gridfs id for private material pdf:', err);
@@ -341,7 +334,7 @@ export async function uploadPyqPdfPrivate(req, res) {
   }
   try {
     const gridFsId = await uploadToGridFS(req.file.path, req.file.originalname, req.file.mimetype || 'application/pdf');
-    fs.unlink(req.file.path, () => {});
+    fs.unlink(req.file.path, () => { });
     return res.json({ ref: `gridfs:${gridFsId}` });
   } catch (err) {
     console.error('Error generating gridfs id for private pyq pdf:', err);
@@ -355,7 +348,7 @@ export async function uploadPyqPdfPublic(req, res) {
   }
   try {
     const gridFsId = await uploadToGridFS(req.file.path, req.file.originalname, req.file.mimetype || 'application/pdf');
-    fs.unlink(req.file.path, () => {});
+    fs.unlink(req.file.path, () => { });
     return res.json({ url: `/api/public/gridfs/${gridFsId}` });
   } catch (err) {
     console.error('Error generating gridfs id for public pyq pdf:', err);
@@ -1162,6 +1155,52 @@ export async function deletePlan(req, res, next) {
 
 export async function listPayments(req, res, next) {
   try {
+    // ---- Auto-sync latest created payments from Razorpay ----
+    const pending = await Payment.find({ status: { $in: ['created', 'pending'] } }).sort({ created_at: -1 }).limit(10).lean();
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (pending.length > 0 && keyId && keySecret) {
+      const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+      const https = (await import('https')).default;
+      await Promise.all(pending.map(async p => {
+        if (!p.razorpay_order_id) return;
+        try {
+          const data = await new Promise((resolve) => {
+            const rq = https.request({
+              method: 'GET', hostname: 'api.razorpay.com',
+              path: `/v1/orders/${p.razorpay_order_id}/payments`,
+              headers: { Authorization: `Basic ${auth}` }
+            }, (resp) => {
+              let body = ''; resp.on('data', c => { body += c });
+              resp.on('end', () => { try { resolve(JSON.parse(body)); } catch (e) { resolve({}); } });
+            });
+            rq.on('error', () => resolve({}));
+            rq.end();
+          });
+          if (data && data.items && Array.isArray(data.items)) {
+            const successful = data.items.find(i => i.status === 'captured' || i.status === 'authorized');
+            if (successful) {
+              await Payment.updateOne({ id: p.id }, { $set: { status: 'paid', razorpay_payment_id: successful.id, paid_at: new Date(), updated_at: new Date() } });
+              const planDoc = await Plan.findOne({ id: Number(p.plan_id) }).lean();
+              if (planDoc) {
+                const duration = Number(planDoc.duration_days || 365);
+                const expiry = new Date(Date.now() + duration * 24 * 60 * 60 * 1000);
+                const pc = planDoc.code;
+                let acc = await UserAccess.findOne({ user_id: Number(p.user_id) });
+                if (!acc) acc = new UserAccess({ user_id: Number(p.user_id) });
+                if (pc === 'combo') { acc.combo_access = true; acc.expiry = expiry; }
+                else if (pc === 'pyq') { acc.pyq_access = true; acc.pyq_expiry = expiry; }
+                else if (pc === 'materials') { acc.material_access = true; acc.material_expiry = expiry; }
+                acc.updated_at = new Date();
+                await acc.save();
+              }
+            }
+          }
+        } catch (e) { }
+      }));
+    }
+    // ---------------------------------------------------------
+
     const rows = await Payment.find({}, { _id: 0, __v: 0 })
       .sort({ created_at: -1, id: -1 })
       .limit(200)
@@ -1943,13 +1982,13 @@ export async function listPyqs(req, res, next) {
       .lean();
 
     const pyqList = (rows || []);
-    
+
     const centreIds = [...new Set(pyqList.map((p) => Number(p.centre_id)).filter((x) => Number.isFinite(x) && x > 0))];
     const ExamCentreModel = await getExamCentreModel();
-    const centres = centreIds.length > 0 
+    const centres = centreIds.length > 0
       ? await ExamCentreModel.find({ id: { $in: centreIds } }, { _id: 0, id: 1, name: 1 }).lean()
       : [];
-    
+
     const centreById = new Map((centres || []).map((c) => [Number(c.id), c]));
 
     const out = pyqList.map((p) => ({
@@ -2053,13 +2092,13 @@ export async function updatePyq(req, res) {
 export async function deletePyq(req, res) {
   try {
     const { id } = req.params;
-    
+
     const PyqModel = await getPyqModel();
     const existing = await PyqModel.findOne({ id: Number(id) }, { id: 1, pdf_url: 1, _id: 0 }).lean();
     if (existing && existing.pdf_url) {
       await deleteFromGridFSByUrl(existing.pdf_url);
     }
-    
+
     await PyqModel.deleteOne({ id: Number(id) });
     return res.json({ deleted: true });
   } catch (err) {
@@ -2287,7 +2326,7 @@ export async function getTestQuestions(req, res, next) {
     const MockQuestion = await getMockTestQuestionModel();
 
     let questionsRows = await MockQuestion.find({ test_id: Number(id) }).sort({ question_order: 1 }).lean();
-    
+
     // map the database fields to camelCase
     const questions = (questionsRows || []).map(q => ({
       id: q.id,
@@ -2313,7 +2352,7 @@ export async function addTestQuestion(req, res, next) {
     const body = req.body || {};
     const MockTest = await getMockTestModel();
     const MockQuestion = await getMockTestQuestionModel();
-    
+
     // Validate test exists in new DB
     let test = await MockTest.findOne({ id: Number(id) }).lean();
     if (!test) return res.status(404).json({ message: 'Test not found' });
@@ -2329,12 +2368,12 @@ export async function addTestQuestion(req, res, next) {
       correct_option: body.correctOption || 'A',
       question_order: 999,
     });
-    
+
     await newQuestionRow.save();
 
     // Increment question_count in the new DB
     await MockTest.updateOne({ id: Number(id) }, { $inc: { question_count: 1 } });
-    
+
     return res.json({ success: true, questionId: newQuestionRow.id });
   } catch (err) {
     return next(err);
@@ -2345,7 +2384,7 @@ export async function updateTestQuestion(req, res, next) {
   try {
     const { id, questionId } = req.params;
     const body = req.body || {};
-    
+
     const updates = {};
     if (Object.prototype.hasOwnProperty.call(body, 'questionText')) updates.question_text = body.questionText;
     if (Object.prototype.hasOwnProperty.call(body, 'imageUrl')) updates.image_url = body.imageUrl;
@@ -2359,7 +2398,7 @@ export async function updateTestQuestion(req, res, next) {
       const MockQuestion = await getMockTestQuestionModel();
       await MockQuestion.updateOne({ id: Number(questionId), test_id: Number(id) }, { $set: updates });
     }
-    
+
     return res.json({ success: true });
   } catch (err) {
     return next(err);
@@ -2377,7 +2416,7 @@ export async function deleteTestQuestion(req, res, next) {
     if (r.deletedCount > 0) {
       await MockTest.updateOne({ id: Number(id) }, { $inc: { question_count: -1 } });
     }
-    
+
     return res.json({ success: true });
   } catch (err) {
     return next(err);
