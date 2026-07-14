@@ -8,6 +8,8 @@ import { connectMockTestDb } from './config/mockTestDb.js';
 import { ensureAdminUser } from './seed/ensureAdmin.js';
 import { ensureSettings } from './seed/ensureSettings.js';
 
+import { initCounsellingCron } from './services/counseling/cron.js';
+
 const PORT = process.env.PORT || 5000;
 
 await connectDb();
@@ -16,6 +18,8 @@ await ensureAdminUser();
 await ensureSettings();
 
 const app = createApp();
+
+initCounsellingCron();
 
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console

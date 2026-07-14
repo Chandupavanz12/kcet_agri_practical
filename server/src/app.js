@@ -1,15 +1,16 @@
-import express from 'express';
 import cors from 'cors';
+import express from 'express';
+import fs from 'fs';
+import mongoose from 'mongoose';
 import morgan from 'morgan';
 import path from 'path';
-import mongoose from 'mongoose';
-import fs from 'fs';
 
-import { authRouter } from './routes/auth.routes.js';
-import { adminRouter } from './routes/admin.routes.js';
-import { studentRouter } from './routes/student.routes.js';
 import { razorpayWebhook } from './controllers/student.mysql.controller.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { adminRouter } from './routes/admin.routes.js';
+import { authRouter } from './routes/auth.routes.js';
+import { counselingRouter } from './routes/counseling.routes.js';
+import { studentRouter } from './routes/student.routes.js';
 
 export function createApp() {
   const app = express();
@@ -32,14 +33,14 @@ export function createApp() {
       await connectMockTestDb();
       const MockQuestion = await getMockTestQuestionModel();
       const q = await MockQuestion.findOne({ id: qId }).lean();
-      
+
       if (!q || !q.image_url) {
         console.warn(`[image-proxy] Image not found for Q#${qId}`);
         return res.status(404).send('Image not found');
       }
 
       const imgData = q.image_url;
-      
+
       // Explicitly allow any origin to read the image (simple CORS for images)
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -54,7 +55,7 @@ export function createApp() {
         res.setHeader('Cache-Control', 'public, max-age=86400');
         return res.end(buffer);
       }
-      
+
       // It's a URL path – redirect
       return res.redirect(imgData);
     } catch (err) {
@@ -87,7 +88,7 @@ export function createApp() {
   app.use(express.json({ limit: '100mb' }));
   app.use(morgan('dev'));
 
-// (Removed image route from here)
+  // (Removed image route from here)
 
   app.use((req, res, next) => {
     if (mongoose.connection.readyState !== 1) {
@@ -100,19 +101,19 @@ export function createApp() {
   const imageCache = new Map();
   app.use('/uploads', (req, res, next) => {
     if (req.method !== 'GET') return next();
-    
+
     try {
       const cleanPath = decodeURIComponent(req.path);
       if (cleanPath.includes('..')) return next();
-      
+
       const filePath = path.join(publicUploadsDir, cleanPath);
-      
+
       if (imageCache.has(filePath)) {
         res.type(path.extname(filePath)); // Natively set correct MIME
         res.set('Cache-Control', 'public, max-age=31536000, immutable');
         return res.end(imageCache.get(filePath)); // Safest binary send
       }
-      
+
       fs.readFile(filePath, (err, data) => {
         if (err) return next();
         if (imageCache.size < 5000) {
@@ -162,7 +163,7 @@ export function createApp() {
 
       let bucket = new mongoose.mongo.GridFSBucket(filesDb, { bucketName: 'uploads' });
       let files = await bucket.find({ _id: objId }).toArray();
-      
+
       if ((!files || files.length === 0) && filesDb !== mongoose.connection.db) {
         const fallbackBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
         const fallbackFiles = await fallbackBucket.find({ _id: objId }).toArray();
@@ -193,10 +194,10 @@ export function createApp() {
           const writeStream = fs.createWriteStream(tmpPath);
           cacheStream.pipe(writeStream);
           writeStream.on('finish', () => {
-            try { fs.renameSync(tmpPath, cachePath); } catch(_) {}
+            try { fs.renameSync(tmpPath, cachePath); } catch (_) { }
           });
-          writeStream.on('error', () => { try { fs.unlinkSync(tmpPath); } catch(_){} });
-        } catch(_) {}
+          writeStream.on('error', () => { try { fs.unlinkSync(tmpPath); } catch (_) { } });
+        } catch (_) { }
       });
     } catch (err) {
       if (err.name === 'BSONError' || String(err.message).includes('hex')) {
@@ -209,6 +210,7 @@ export function createApp() {
   app.use('/api/auth', authRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/student', studentRouter);
+  app.use('/api/counseling', counselingRouter);
 
   app.use(errorHandler);
 
