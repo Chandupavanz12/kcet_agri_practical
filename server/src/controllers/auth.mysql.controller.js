@@ -99,7 +99,7 @@ function getSmtpTransporter() {
 }
 
 // ── Main sendMail ──────────────────────────────────────────────────────────
-async function sendMail({ toEmail, subject, text }) {
+export async function sendMail({ toEmail, subject, text }) {
   const brevoApiKey = String(process.env.BREVO_API_KEY || '').trim();
   const fromRaw = String(process.env.SMTP_FROM || process.env.SMTP_USER || '').trim();
   const fallbackFrom = fromRaw || 'no-reply@example.com';

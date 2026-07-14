@@ -23,6 +23,7 @@ import {
 } from '../models/index.js';
 import { ensureSettings } from '../seed/ensureSettings.js';
 import { hashPassword } from '../utils/auth.js';
+import { sendMail } from './auth.mysql.controller.js';
 
 async function deleteFromGridFSByUrl(url) {
   if (!url) return;
@@ -2317,6 +2318,28 @@ export async function deleteFeedback(req, res, next) {
     return res.json({ success: true, message: 'Deleted feedback.' });
   } catch (err) {
     return next(err);
+  }
+}
+
+export async function replyFeedback(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { replyText } = req.body;
+    if (!replyText) return res.status(400).json({ message: 'Reply text is required' });
+
+    const feedback = await Feedback.findOne({ id: Number(id) }).lean();
+    if (!feedback) return res.status(404).json({ message: 'Feedback not found' });
+
+    await sendMail({
+      toEmail: feedback.user_email,
+      subject: 'Reply to your feedback - KCET Agri Practical',
+      text: `Hello ${feedback.user_name},\n\nRegarding your feedback:\n"${feedback.message}"\n\nAdmin Reply:\n${replyText}\n\nBest Regards,\nKCET Agri Practical Team`
+    });
+
+    return res.json({ success: true, message: 'Reply sent successfully.' });
+  } catch (err) {
+    console.error('[replyFeedback]', err);
+    return res.status(500).json({ message: 'Failed to send reply' });
   }
 }
 
