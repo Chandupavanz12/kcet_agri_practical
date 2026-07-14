@@ -14,12 +14,12 @@
  * Run: node migrate-mocktest-data.js
  */
 
-import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 dotenv.config();
 
 const OLD_URI = process.env.MONGO_URI;
-const NEW_URI = process.env.MONGO_URI_MOCKTEST || 'mongodb+srv://apdoddegowda15_db_user:WmjA55WfXfocDPQG@cns.7c1suwu.mongodb.net/?appName=cns';
+const NEW_URI = process.env.MONGO_URI_MOCKTEST || 'mongodb://localhost:27017/kcet_agri';
 
 if (!OLD_URI) {
   console.error('❌ MONGO_URI not set in .env');
@@ -43,15 +43,15 @@ console.log('✅ Connected to NEW database');
 // ─── Schema (minimal, no validation, just copy raw docs) ─────────────────────
 const rawSchema = (collection) => new mongoose.Schema({}, { strict: false, collection });
 
-const OldTest    = oldConn.model('OldTest',     rawSchema('tests'));
-const OldQ       = oldConn.model('OldQ',         rawSchema('test_questions'));
-const OldResult  = oldConn.model('OldResult',    rawSchema('results'));
-const OldCounter = oldConn.model('OldCounter',   rawSchema('counters'));
+const OldTest = oldConn.model('OldTest', rawSchema('tests'));
+const OldQ = oldConn.model('OldQ', rawSchema('test_questions'));
+const OldResult = oldConn.model('OldResult', rawSchema('results'));
+const OldCounter = oldConn.model('OldCounter', rawSchema('counters'));
 
-const NewTest    = newConn.model('NewTest',      rawSchema('tests'));
-const NewQ       = newConn.model('NewQ',          rawSchema('test_questions'));
-const NewResult  = newConn.model('NewResult',    rawSchema('results'));
-const NewCounter = newConn.model('NewCounter',   rawSchema('counters'));
+const NewTest = newConn.model('NewTest', rawSchema('tests'));
+const NewQ = newConn.model('NewQ', rawSchema('test_questions'));
+const NewResult = newConn.model('NewResult', rawSchema('results'));
+const NewCounter = newConn.model('NewCounter', rawSchema('counters'));
 
 // ─── Helper: bulk insert raw docs ────────────────────────────────────────────
 async function bulkInsert(Model, docs, label) {
@@ -82,9 +82,9 @@ if (newTestCount === 0) {
 
   console.log(`   Found in OLD DB: ${oldTests.length} tests, ${oldQs.length} questions, ${oldResults.length} results`);
 
-  await bulkInsert(NewTest,    oldTests,    'tests');
-  await bulkInsert(NewQ,       oldQs,       'questions');
-  await bulkInsert(NewResult,  oldResults,  'results');
+  await bulkInsert(NewTest, oldTests, 'tests');
+  await bulkInsert(NewQ, oldQs, 'questions');
+  await bulkInsert(NewResult, oldResults, 'results');
 
   // Copy counters so auto-increment IDs continue correctly
   for (const counter of oldCounters) {

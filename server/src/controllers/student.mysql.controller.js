@@ -1351,8 +1351,8 @@ export async function resultDetails(req, res, next) {
       const question = questionById.get(Number(resp.questionId));
 
       let finalImgUrl = '';
-      if (question) {
-        if (question.image_url && typeof question.image_url === 'string' && question.image_url.startsWith('http')) {
+      if (question && question.image_url) {
+        if (typeof question.image_url === 'string' && question.image_url.startsWith('http')) {
           finalImgUrl = question.image_url;
         } else {
           finalImgUrl = `/api/mock-question-image/${question.id}`;
