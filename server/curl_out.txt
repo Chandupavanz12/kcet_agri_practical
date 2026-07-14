@@ -1,0 +1,13 @@
+* Host localhost:5000 was resolved.
+* IPv6: ::1
+* IPv4: 127.0.0.1
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+  0      0   0      0   0      0      0      0                              0*   Trying [::1]:5000...
+*   Trying 127.0.0.1:5000...
+  0      0   0      0   0      0      0      0           00:01              0* connect to ::1 port 5000 from :: port 58250 failed: Connection refused
+* connect to 127.0.0.1 port 5000 from 0.0.0.0 port 58251 failed: Connection refused
+* Failed to connect to localhost port 5000 after 2253 ms: Could not connect to server
+  0      0   0      0   0      0      0      0           00:02              0
+* closing connection #0
+curl: (7) Failed to connect to localhost port 5000 after 2253 ms: Could not connect to server
