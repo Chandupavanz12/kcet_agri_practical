@@ -59,6 +59,7 @@ import {
   listVideos,
   manageStudentSubscription,
   reorderMenus,
+  replyFeedback,
   updateExamCentre,
   updateExamCentreYear,
   updateMaterial,
