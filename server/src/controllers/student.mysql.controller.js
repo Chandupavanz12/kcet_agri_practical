@@ -1110,7 +1110,7 @@ export async function startTest(req, res, next) {
     const questions = questionRows.map((q, idx) => {
       let finalImgUrl = '';
       if (q.has_image) {
-        finalImgUrl = `${baseUrl}/api/mock-question-image/${q.id}`;
+        finalImgUrl = `/api/mock-question-image/${q.id}`;
       } else if (q.image_url && typeof q.image_url === 'string') {
         finalImgUrl = q.image_url;
       }
@@ -1332,7 +1332,7 @@ export async function resultDetails(req, res, next) {
         if (question.image_url.startsWith('http')) {
           finalImgUrl = question.image_url;
         } else {
-          finalImgUrl = `${baseUrl}/api/mock-question-image/${question.id}`;
+          finalImgUrl = `/api/mock-question-image/${question.id}`;
         }
       }
 
