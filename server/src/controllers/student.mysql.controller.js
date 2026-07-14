@@ -1,39 +1,30 @@
-import { ensureSettings } from '../seed/ensureSettings.js';
-import mongoose from 'mongoose';
-import { getFilesDb } from '../config/db.js';
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
+import fs from 'fs';
 import https from 'https';
+import mongoose from 'mongoose';
 import nodemailer from 'nodemailer';
-import { hashPassword } from '../utils/auth.js';
+import path from 'path';
+import { getFilesDb } from '../config/db.js';
+import { getMockResultModel, getMockTestModel, getMockTestQuestionModel } from '../config/mockTestDb.js';
 import {
-  ExamCentre,
+  Feedback,
   getExamCentreModel,
-  ExamCentreYear,
   getExamCentreYearModel,
-  LoginOtp,
-  Material,
   getMaterialModel,
+  getPyqModel,
   MaterialCompletion,
+  Menu,
   Notification,
   PasswordReset,
   Payment,
   Plan,
-  Pyq,
-  getPyqModel,
-  Result,
-  Test,
-  TestQuestion,
+  Specimen,
   User,
   UserAccess,
   UserNotification,
-  Menu,
-  Video,
-  Feedback,
-  Specimen,
+  Video
 } from '../models/index.js';
-import { getMockTestModel, getMockTestQuestionModel, getMockResultModel } from '../config/mockTestDb.js';
+import { ensureSettings } from '../seed/ensureSettings.js';
 
 
 function shuffle(arr) {
@@ -607,7 +598,7 @@ export async function verifyPaymentRedirect(req, res, next) {
     const orderId = String(req.body?.razorpay_order_id || req.query?.razorpay_order_id || '').trim();
     const paymentId = String(req.body?.razorpay_payment_id || req.query?.razorpay_payment_id || '').trim();
     const signature = String(req.body?.razorpay_signature || req.query?.razorpay_signature || '').trim();
-    
+
     // Always redirect back to the app on error or success
     const failRedirect = `${process.env.CLIENT_ORIGIN || 'http://localhost:5173'}/student/premium?error=PaymentVerificationFailed`;
     const successRedirect = `${process.env.CLIENT_ORIGIN || 'http://localhost:5173'}/student/premium?success=PremiumActivated`;
@@ -763,9 +754,9 @@ export async function listMaterialsStudent(req, res, next) {
     const dbFilter = { ...filter, status: 'active' };
     const cacheKey = `materials:list:v1:${dbFilter.type || 'all'}:${dbFilter.access_type || 'all'}`;
     const rows = await getOrSetCached(cacheKey, 800, async () => (await getMaterialModel()).find(dbFilter)
-        .sort({ created_at: -1, id: -1 })
-        .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1, created_at: 1 })
-        .lean()
+      .sort({ created_at: -1, id: -1 })
+      .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1, created_at: 1 })
+      .lean()
     );
 
     const [materialsUnlocked, pyqUnlocked] = await Promise.all([
@@ -882,35 +873,35 @@ export async function getDashboard(req, res, next) {
         : [],
       settings.pdfsEnabled
         ? getOrSetCached('dashboard:pdfs:v1', 800, async () => (await getMaterialModel()).find({ type: 'pdf', status: 'active' })
-            .sort({ created_at: -1, id: -1 })
-            .limit(12)
-            .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1 })
-            .lean()
+          .sort({ created_at: -1, id: -1 })
+          .limit(12)
+          .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1 })
+          .lean()
         )
         : [],
       settings.pyqsEnabled
         ? getOrSetCached('dashboard:pyqs:v1', 800, async () => {
-            const MaterialModel = await getMaterialModel();
-            const PyqModel = await getPyqModel();
+          const MaterialModel = await getMaterialModel();
+          const PyqModel = await getPyqModel();
 
-            const [fromMaterials, fromPyqs] = await Promise.all([
-               MaterialModel.find({ type: 'pyq', status: 'active' })
-                .sort({ created_at: -1, id: -1 })
-                .limit(12)
-                .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1 })
-                .lean(),
-               PyqModel.find({ status: 'active' })
-                .sort({ created_at: -1, id: -1 })
-                .limit(12)
-                .select({ id: 1, title: 1, pdf_url: 1, subject: 1, access_type: 1 })
-                .lean()
-            ]);
+          const [fromMaterials, fromPyqs] = await Promise.all([
+            MaterialModel.find({ type: 'pyq', status: 'active' })
+              .sort({ created_at: -1, id: -1 })
+              .limit(12)
+              .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1 })
+              .lean(),
+            PyqModel.find({ status: 'active' })
+              .sort({ created_at: -1, id: -1 })
+              .limit(12)
+              .select({ id: 1, title: 1, pdf_url: 1, subject: 1, access_type: 1 })
+              .lean()
+          ]);
 
-            const merged = [...fromMaterials, ...fromPyqs]
-              .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
-              .slice(0, 12);
-            return merged;
-          })
+          const merged = [...fromMaterials, ...fromPyqs]
+            .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+            .slice(0, 12);
+          return merged;
+        })
         : [],
       settings.notificationsEnabled
         ? getOrSetCached('dashboard:notifications:v1', 5000, () =>
@@ -923,10 +914,10 @@ export async function getDashboard(req, res, next) {
         : [],
       settings.testsEnabled
         ? (async () => {
-            const MockTest = await getMockTestModel();
-            const newT = await MockTest.find({ is_active: true, question_count: { $gt: 0 } }).sort({ created_at: -1, id: -1 }).limit(20).select({ id: 1, title: 1, question_count: 1, per_question_seconds: 1, marks_correct: 1, is_active: 1 }).lean();
-            return newT || [];
-          })()
+          const MockTest = await getMockTestModel();
+          const newT = await MockTest.find({ is_active: true, question_count: { $gt: 0 } }).sort({ created_at: -1, id: -1 }).limit(20).select({ id: 1, title: 1, question_count: 1, per_question_seconds: 1, marks_correct: 1, is_active: 1 }).lean();
+          return newT || [];
+        })()
         : [],
     ]);
 
@@ -1050,7 +1041,8 @@ export async function startTest(req, res, next) {
     // Fetch questions using aggregation to check for image presence without downloading 12MB of base64 data
     let questionRows = await MockQuestion.aggregate([
       { $match: { test_id: Number(testId) } },
-      { $project: {
+      {
+        $project: {
           id: 1,
           question_text: 1,
           option_a: 1,
@@ -1060,8 +1052,9 @@ export async function startTest(req, res, next) {
           correct_option: 1,
           question_order: 1,
           // Check if image_url exists and is not empty
-          has_image: { $cond: [ { $and: [ { $ne: ["$image_url", null] }, { $ne: ["$image_url", ""] } ] }, true, false ] }
-      }},
+          has_image: { $cond: [{ $and: [{ $ne: ["$image_url", null] }, { $ne: ["$image_url", ""] }] }, true, false] }
+        }
+      },
       { $sort: { question_order: 1, id: 1 } }
     ]);
     console.log('[startTest] Questions found:', questionRows.length);
@@ -1072,17 +1065,17 @@ export async function startTest(req, res, next) {
         { $match: { status: 'active' } },
         { $sample: { size: test.question_count || 50 } }
       ]);
-      
+
       questionRows = specimens.map((s, idx) => {
         let opts = ['Option A', 'Option B', 'Option C', 'Option D'];
         try {
-           if (s.options_json) {
-             const parsed = JSON.parse(s.options_json);
-             if (Array.isArray(parsed) && parsed.length >= 4) {
-               opts = parsed;
-             }
-           }
-        } catch(e) {}
+          if (s.options_json) {
+            const parsed = JSON.parse(s.options_json);
+            if (Array.isArray(parsed) && parsed.length >= 4) {
+              opts = parsed;
+            }
+          }
+        } catch (e) { }
         return {
           id: s.id,
           image_url: s.image_url,
@@ -1121,7 +1114,7 @@ export async function startTest(req, res, next) {
       } else if (q.image_url && typeof q.image_url === 'string') {
         finalImgUrl = q.image_url;
       }
-      
+
       return {
         index: idx,
         id: q.id,
@@ -1326,12 +1319,27 @@ export async function resultDetails(req, res, next) {
       : [];
 
     const questionById = new Map(questionRows.map((q) => [Number(q.id), q]));
+
+    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.get('host') || 'localhost';
+    const baseUrl = `${proto}://${host}`;
+
     const detailedResponses = responses.map((resp) => {
       const question = questionById.get(Number(resp.questionId));
+
+      let finalImgUrl = '';
+      if (question && question.image_url && typeof question.image_url === 'string' && question.image_url.trim() !== '') {
+        if (question.image_url.startsWith('http')) {
+          finalImgUrl = question.image_url;
+        } else {
+          finalImgUrl = `${baseUrl}/api/mock-question-image/${question.id}`;
+        }
+      }
+
       return {
         ...resp,
         questionText: question?.question_text || '',
-        imageUrl: question?.image_url || '',
+        imageUrl: finalImgUrl,
         options: question ? [question.option_a, question.option_b, question.option_c, question.option_d] : [],
         correctOption: question?.correct_option || '',
         questionOrder: question?.question_order || 0,
@@ -1660,7 +1668,7 @@ export async function streamPyqPdf(req, res, next) {
         if (!filesDb) return res.status(503).json({ message: 'Database connecting...' });
         let bucket = new mongoose.mongo.GridFSBucket(filesDb, { bucketName: 'uploads' });
         const objId = new mongoose.Types.ObjectId(gridId);
-        
+
         const cacheDir = path.join(process.cwd(), 'uploads', 'gridfs_cache');
         if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
         const cachePath = path.join(cacheDir, `${gridId}.pdf`);
@@ -1706,10 +1714,10 @@ export async function streamPyqPdf(req, res, next) {
             const writeStream = fs.createWriteStream(tmpPath);
             cacheStream.pipe(writeStream);
             writeStream.on('finish', () => {
-              try { fs.renameSync(tmpPath, cachePath); } catch(_) {}
+              try { fs.renameSync(tmpPath, cachePath); } catch (_) { }
             });
-            writeStream.on('error', () => { try { fs.unlinkSync(tmpPath); } catch(_){} });
-          } catch(err) { console.error('BG cache error:', err); }
+            writeStream.on('error', () => { try { fs.unlinkSync(tmpPath); } catch (_) { } });
+          } catch (err) { console.error('BG cache error:', err); }
         });
         return;
       } catch (e) {
@@ -1778,7 +1786,7 @@ export async function streamMaterialFile(req, res, next) {
         if (!filesDb) return res.status(503).json({ message: 'Database connecting...' });
         let bucket = new mongoose.mongo.GridFSBucket(filesDb, { bucketName: 'uploads' });
         const objId = new mongoose.Types.ObjectId(gridId);
-        
+
         const cacheDir = path.join(process.cwd(), 'uploads', 'gridfs_cache');
         if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
         const cachePath = path.join(cacheDir, `${gridId}.pdf`);
@@ -1824,10 +1832,10 @@ export async function streamMaterialFile(req, res, next) {
             const writeStream = fs.createWriteStream(tmpPath);
             cacheStream.pipe(writeStream);
             writeStream.on('finish', () => {
-              try { fs.renameSync(tmpPath, cachePath); } catch(_) {}
+              try { fs.renameSync(tmpPath, cachePath); } catch (_) { }
             });
-            writeStream.on('error', () => { try { fs.unlinkSync(tmpPath); } catch(_){} });
-          } catch(err) { console.error('BG cache error:', err); }
+            writeStream.on('error', () => { try { fs.unlinkSync(tmpPath); } catch (_) { } });
+          } catch (err) { console.error('BG cache error:', err); }
         });
         return;
       } catch (e) {
