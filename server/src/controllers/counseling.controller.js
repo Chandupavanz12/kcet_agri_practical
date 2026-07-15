@@ -42,7 +42,8 @@ export async function getDeadlines(req, res, next) {
 export async function savePushToken(req, res, next) {
     try {
         const { token, deviceType } = req.body;
-        const userId = req.user.id;
+        const userId = req.user?.sub || req.user?.id;
+        if (!userId) return res.status(401).json({ message: 'User not authenticated' });
         if (!token) return res.status(400).json({ message: 'Token is required' });
 
         await ExpoPushToken.findOneAndUpdate(

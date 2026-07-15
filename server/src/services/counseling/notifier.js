@@ -21,6 +21,7 @@ export async function sendPushNotifications(title, body, data = {}) {
                 data,
                 priority: 'high',
                 channelId: 'default',
+                badge: 1,
             });
         }
 
@@ -56,6 +57,7 @@ export async function sendPushNotificationToUser(userId, title, body, data = {})
                 data,
                 priority: 'high',
                 channelId: 'default',
+                badge: 1,
             });
         }
 
