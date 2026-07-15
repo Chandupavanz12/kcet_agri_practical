@@ -871,9 +871,40 @@ export async function listVideosStudent(req, res, next) {
 
 export async function listNotificationsStudent(req, res, next) {
   try {
-    const rows = await Notification.find({ status: 'active' }).sort({ created_at: -1, id: -1 }).limit(10).lean();
-    const notifications = rows.map((n) => ({ id: n.id, title: n.title, message: n.message, status: n.status }));
-    return res.json({ notifications });
+    const globalRow = await Notification.find({ status: 'active' })
+      .sort({ created_at: -1, id: -1 })
+      .limit(10)
+      .lean();
+    const globalN = globalRow.map((n) => ({
+      _id: n._id?.toString() || Math.random().toString(),
+      id: n.id,
+      title: n.title,
+      message: n.message,
+      status: n.status,
+      created_at: n.created_at,
+      type: 'global'
+    }));
+
+    let personalN = [];
+    if (req.user?.sub) {
+      const { UserNotification } = await import('../models/index.js');
+      const up = await UserNotification.find({ user_id: Number(req.user.sub) })
+        .sort({ created_at: -1 })
+        .limit(10)
+        .lean();
+      personalN = up.map((n) => ({
+        _id: n._id?.toString() || Math.random().toString(),
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        status: n.status,
+        created_at: n.created_at,
+        type: 'personal'
+      }));
+    }
+
+    const notifications = [...globalN, ...personalN].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return res.json({ notifications: notifications.slice(0, 15) });
   } catch (err) {
     return next(err);
   }

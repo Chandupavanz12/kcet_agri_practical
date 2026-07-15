@@ -19,6 +19,7 @@ export async function sendPushNotifications(title, body, data = {}) {
                 title,
                 body,
                 data,
+                priority: 'high',
             });
         }
 
@@ -35,5 +36,36 @@ export async function sendPushNotifications(title, body, data = {}) {
         }
     } catch (err) {
         console.error('Failed to send push notifications', err);
+    }
+}
+
+export async function sendPushNotificationToUser(userId, title, body, data = {}) {
+    try {
+        const tokensDoc = await ExpoPushToken.find({ userId: String(userId) }).lean();
+        if (!tokensDoc || tokensDoc.length === 0) return;
+
+        const messages = [];
+        for (let pushToken of tokensDoc) {
+            if (!Expo.isExpoPushToken(pushToken.expoPushToken)) continue;
+            messages.push({
+                to: pushToken.expoPushToken,
+                sound: 'default',
+                title,
+                body,
+                data,
+                priority: 'high',
+            });
+        }
+
+        const chunks = expo.chunkPushNotifications(messages);
+        for (let chunk of chunks) {
+            try {
+                await expo.sendPushNotificationsAsync(chunk);
+            } catch (error) {
+                console.error('Error sending push notifications chunk', error);
+            }
+        }
+    } catch (err) {
+        console.error('Failed to send push notification to user', err);
     }
 }

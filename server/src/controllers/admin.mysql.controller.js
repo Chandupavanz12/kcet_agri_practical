@@ -19,9 +19,11 @@ import {
   Specimen,
   User,
   UserAccess,
+  UserNotification,
   Video
 } from '../models/index.js';
 import { ensureSettings } from '../seed/ensureSettings.js';
+import { sendPushNotificationToUser } from '../services/counseling/notifier.js';
 import { hashPassword } from '../utils/auth.js';
 import { sendMail } from './auth.mysql.controller.js';
 
@@ -2340,11 +2342,33 @@ export async function replyFeedback(req, res, next) {
     const feedback = await Feedback.findOne({ id: Number(id) }).lean();
     if (!feedback) return res.status(404).json({ message: 'Feedback not found' });
 
-    await sendMail({
-      toEmail: feedback.user_email,
-      subject: 'Reply to your feedback - KCET Agri Practical',
-      text: `Hello ${feedback.user_name},\n\nRegarding your feedback:\n"${feedback.message}"\n\nAdmin Reply:\n${replyText}\n\nBest Regards,\nKCET Agri Practical Team`
-    });
+    const userDoc = await User.findOne({ email: feedback.user_email }).lean();
+    if (userDoc) {
+      const title = 'Feedback Reply';
+      const message = `Admin replied to your feedback:\n\n${replyText}`;
+
+      const userNotification = new UserNotification({
+        user_id: userDoc.id,
+        title,
+        message,
+        status: 'unread',
+        created_at: new Date()
+      });
+      await userNotification.save();
+
+      // Ensure the push notification is sent with high priority
+      await sendPushNotificationToUser(userDoc.id, title, message, {
+        type: 'feedback_reply',
+        feedbackId: feedback.id
+      });
+    } else {
+      // Fallback if no matching user found
+      await sendMail({
+        toEmail: feedback.user_email,
+        subject: 'Reply to your feedback - KCET Agri Practical',
+        text: `Hello ${feedback.user_name},\n\nRegarding your feedback:\n"${feedback.message}"\n\nAdmin Reply:\n${replyText}\n\nBest Regards,\nKCET Agri Practical Team`
+      });
+    }
 
     return res.json({ success: true, message: 'Reply sent successfully.' });
   } catch (err) {

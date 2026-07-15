@@ -5,7 +5,7 @@ const pdfParse = require('pdf-parse');
 
 export async function parsePdfContent(pdfUrl) {
     try {
-        const response = await axios.get(pdfUrl, { responseType: 'arraybuffer' });
+        const response = await axios.get(pdfUrl, { responseType: 'arraybuffer', timeout: 10000 });
         const data = await pdfParse(response.data);
         const text = data.text;
 
