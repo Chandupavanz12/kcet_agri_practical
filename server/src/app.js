@@ -138,7 +138,7 @@ export function createApp() {
   // endpoint every 5 minutes so the server and MongoDB connection stay warm.
   // This eliminates the "first request" cold-start delay entirely.
   app.get('/api/ping', (req, res) => {
-    res.json({ pong: true, ts: Date.now() });
+    res.json({ pong: true, version: '2.0.0-verified', ts: Date.now() });
   });
 
   app.get('/api/public/gridfs/:id', async (req, res, next) => {
