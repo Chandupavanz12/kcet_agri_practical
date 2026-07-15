@@ -12,6 +12,12 @@
       "supportsTablet": true
     },
     "android": {
+      "permissions": [
+        "NOTIFICATIONS",
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

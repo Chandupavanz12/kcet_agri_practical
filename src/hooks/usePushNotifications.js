@@ -69,6 +69,14 @@ async function registerForPushNotificationsAsync() {
     }
     if (finalStatus !== 'granted') {
         console.log('Failed to get push token for push notification!');
+        Alert.alert(
+            'Push Notifications Disabled',
+            'To receive alerts for feedback and admin updates, please enable notifications in your phone settings.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Settings', onPress: () => Linking.openSettings() }
+            ]
+        );
         return;
     }
     try {
