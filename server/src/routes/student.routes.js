@@ -45,6 +45,9 @@ const paymentLimiter = simpleRateLimit({
   keyGenerator: (req) => `${req.ip}:${req.user?.sub || ''}`,
 });
 
+// Note: Checkout needs to be public because the external browser doesn't have the Bearer token!
+studentRouter.get('/premium/checkout', serveRazorpayCheckoutHtml);
+
 studentRouter.use(requireAuth, requireRole('student', 'admin'));
 
 studentRouter.get('/dashboard', getDashboard);
@@ -85,5 +88,3 @@ studentRouter.get('/premium/status', getAccessStatusStudent);
 studentRouter.get('/premium/payment-status', getPaymentStatusStudent);
 studentRouter.post('/premium/order', paymentLimiter, createPaymentOrderStudent);
 studentRouter.post('/premium/verify', paymentLimiter, verifyPaymentStudent);
-studentRouter.get('/premium/checkout', serveRazorpayCheckoutHtml);
-

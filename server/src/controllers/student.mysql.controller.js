@@ -468,34 +468,6 @@ export async function createPaymentOrderStudent(req, res, next) {
       return res.json({ free: true, plan: { code: plan.code, name: plan.name }, expiry });
     }
 
-    // ── Guard 2: reuse a recent 'created' order instead of charging twice ─
-    // If a 'created' (pending) order exists for this user+plan within the
-    // last 24 hours, reuse it. This avoids creating a second Razorpay order
-    // when the student comes back after switching to UPI/bank app.
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const pendingPayment = await Payment.findOne({
-      user_id: userId,
-      plan_id: Number(plan.id),
-      status: 'created',
-      created_at: { $gte: oneDayAgo },
-    })
-      .sort({ created_at: -1 })
-      .lean();
-
-    if (pendingPayment) {
-      // There's an existing order the student likely already paid on their UPI app.
-      // Return the SAME orderId so Razorpay won't charge again and the frontend
-      // can show the existing payment modal or the student can verify manually.
-      return res.json({
-        orderId: String(pendingPayment.razorpay_order_id),
-        amountPaise: Number(plan.price_paise),
-        currency: 'INR',
-        keyId: process.env.RAZORPAY_KEY_ID,
-        plan: { code: plan.code, name: plan.name, durationDays },
-        user: { name: req.user?.name, email: req.user?.email },
-        pendingOrderReused: true,
-      });
-    }
 
     const receipt = `rcpt_${userId}_${planCode}_${Date.now()}`;
     const order = await razorpayCreateOrder({
