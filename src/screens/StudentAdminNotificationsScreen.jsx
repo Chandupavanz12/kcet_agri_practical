@@ -52,7 +52,7 @@ export default function StudentAdminNotificationsScreen() {
       ) : (
         <FlatList
           data={notifications}
-          keyExtractor={item => item._id}
+          keyExtractor={item => String(item._id || item.id || Math.random())}
           style={styles.list}
           contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
           refreshing={refreshing}

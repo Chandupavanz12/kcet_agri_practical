@@ -1281,9 +1281,9 @@ export async function createNotification(req, res, next) {
 
     // Broadcast Expo Push Notification for Admin Notifications
     try {
-      const { sendPushNotification } = await import('../services/counseling/notifier.js');
+      const { sendPushNotifications } = await import('../services/counseling/notifier.js');
       // Fire-and-forget push notification globally to all devices
-      sendPushNotification(`📢 Admin: ${title}`, message, { type: 'admin_notification', id: n.id }).catch(e => console.error('Admin Push Err:', e));
+      sendPushNotifications(`📢 Admin: ${title}`, message, { type: 'admin_notification', id: n.id }).catch(e => console.error('Admin Push Err:', e));
     } catch (pushErr) {
       console.error('[Admin] Push hook error:', pushErr);
     }
