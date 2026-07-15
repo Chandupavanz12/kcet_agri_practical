@@ -1952,3 +1952,86 @@ export async function submitFeedback(req, res, next) {
     return next(err);
   }
 }
+
+export async function serveRazorpayCheckoutHtml(req, res) {
+  const { orderId, amount, name, email, planId } = req.query;
+  if (!orderId) {
+    return res.status(400).send('Invalid request: Missing Order ID');
+  }
+
+  const razorpayKey = process.env.RAZORPAY_KEY_ID;
+  const webCallbackUrl = `/api/student/premium/verify`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+        <title>Premium Access Checkout</title>
+        <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+            .container { text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); width: 90%; max-width: 400px; }
+            h2 { color: #0f172a; margin-bottom: 8px; }
+            p { color: #475569; margin-bottom: 24px; font-size: 14px; }
+            button { background-color: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; transition: background-color 0.2s; }
+            button:active { background-color: #1d4ed8; }
+            .loading { color: #64748b; font-size: 14px; margin-top: 16px; display: none; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h2>Secure Checkout</h2>
+            <p>You are upgrading to <b>${planId || 'Premium'}</b> for ₹${amount ? (amount / 100).toFixed(2) : '0.00'}.</p>
+            <button id="pay-btn">Pay Now with Razorpay</button>
+            <div id="loading" class="loading">Loading Razorpay... Please do not close this window.</div>
+        </div>
+
+        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+        <script>
+            var options = {
+                "key": "${razorpayKey}",
+                "amount": "${amount}", 
+                "currency": "INR",
+                "name": "KCET Agriculture Practical",
+                "description": "Premium Access Upgrade",
+                "image": "https://kcet-agri-practical.onrender.com/assets/images/favicon.png",
+                "order_id": "${orderId}",
+                "callback_url": "${webCallbackUrl}?razorpay_order_id=${orderId}",
+                "prefill": {
+                    "name": "${name || ''}",
+                    "email": "${email || ''}"
+                },
+                "theme": {
+                    "color": "#2563eb"
+                },
+                "modal": {
+                    "ondismiss": function() {
+                         document.getElementById('loading').style.display = 'none';
+                         document.getElementById('pay-btn').style.display = 'block';
+                    }
+                }
+            };
+            var rzp = new Razorpay(options);
+
+            document.getElementById('pay-btn').onclick = function(e){
+                e.preventDefault();
+                document.getElementById('pay-btn').style.display = 'none';
+                document.getElementById('loading').style.display = 'block';
+                rzp.open();
+            }
+            
+            // Auto open on load
+            window.onload = function() {
+                document.getElementById('pay-btn').style.display = 'none';
+                document.getElementById('loading').style.display = 'block';
+                rzp.open();
+            };
+        </script>
+    </body>
+    </html>
+  `;
+  res.setHeader('Content-Type', 'text/html');
+  res.send(html);
+}
+

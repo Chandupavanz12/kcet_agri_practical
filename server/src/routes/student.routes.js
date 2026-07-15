@@ -1,39 +1,40 @@
 import { Router } from 'express';
 
 import { requireAuth } from '../middleware/auth.js';
-import { requireRole } from '../middleware/requireRole.js';
 import { simpleRateLimit } from '../middleware/rateLimit.js';
+import { requireRole } from '../middleware/requireRole.js';
 
 import {
-  getDashboard,
-  getMenus,
-  listActiveTests,
-  startTest,
-  submitTest,
-  myResults,
-  myProgress,
-  resultDetails,
   completeMaterial,
+  createPaymentOrderStudent,
+  getAccessStatusStudent,
+  getDashboard,
   getMaterialCompletions,
+  getMenus,
+  getPaymentStatusStudent,
   getProfile,
-  updateProfile,
-  requestPasswordReset,
-  resetPassword,
-  listPyqsStudent,
+  listActiveTests,
   listExamCentresStudent,
   listExamCentreYearsStudent,
-  listPyqsByCentreYear,
-  streamPyqPdf,
-  streamMaterialFile,
-  listPlansStudent,
-  getAccessStatusStudent,
-  createPaymentOrderStudent,
-  verifyPaymentStudent,
-  getPaymentStatusStudent,
   listMaterialsStudent,
-  listVideosStudent,
   listNotificationsStudent,
+  listPlansStudent,
+  listPyqsByCentreYear,
+  listPyqsStudent,
+  listVideosStudent,
+  myProgress,
+  myResults,
+  requestPasswordReset,
+  resetPassword,
+  resultDetails,
+  serveRazorpayCheckoutHtml,
+  startTest,
+  streamMaterialFile,
+  streamPyqPdf,
   submitFeedback,
+  submitTest,
+  updateProfile,
+  verifyPaymentStudent,
 } from '../controllers/student.mysql.controller.js';
 
 export const studentRouter = Router();
@@ -84,3 +85,5 @@ studentRouter.get('/premium/status', getAccessStatusStudent);
 studentRouter.get('/premium/payment-status', getPaymentStatusStudent);
 studentRouter.post('/premium/order', paymentLimiter, createPaymentOrderStudent);
 studentRouter.post('/premium/verify', paymentLimiter, verifyPaymentStudent);
+studentRouter.get('/premium/checkout', serveRazorpayCheckoutHtml);
+
