@@ -1,5 +1,4 @@
 import Constants from 'expo-constants';
-import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
@@ -10,7 +9,7 @@ Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
         shouldPlaySound: true,
-        shouldSetBadge: false,
+        shouldSetBadge: true,
     }),
 });
 
@@ -62,25 +61,22 @@ async function registerForPushNotificationsAsync() {
         });
     }
 
-    if (Device.isDevice) {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        if (existingStatus !== 'granted') {
-            const { status } = await Notifications.requestPermissionsAsync();
-            finalStatus = status;
-        }
-        if (finalStatus !== 'granted') {
-            console.log('Failed to get push token for push notification!');
-            return;
-        }
-        try {
-            const projectId = Constants?.expoConfig?.extra?.eas?.projectId || 'd28b77ba-ba20-41b4-af4f-2d2798807fe6';
-            token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-        } catch (e) {
-            token = `${e}`;
-        }
-    } else {
-        console.log('Must use physical device for Push Notifications');
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+    }
+    if (finalStatus !== 'granted') {
+        console.log('Failed to get push token for push notification!');
+        return;
+    }
+    try {
+        const projectId = Constants?.expoConfig?.extra?.eas?.projectId || 'd28b77ba-ba20-41b4-af4f-2d2798807fe6';
+        token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    } catch (e) {
+        console.log('Error getting expo push token', e);
+        token = `${e}`;
     }
 
     return token;
