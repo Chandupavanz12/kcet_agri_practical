@@ -1,17 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
-const CATEGORIES = ['All', 'UGCET', 'UGNEET', 'Result', 'Seat Matrix', 'Mock Allotment', 'Cutoff', '1st Round', '2nd Round', 'Extended Round'];
+const CATEGORIES = ['All'];
 
-export default function StudentNotificationsScreen() {
+export default function StudentAdminNotificationsScreen() {
   const { token } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All');
   const [refreshing, setRefreshing] = useState(false);
 
   const loadNotifications = async (opts = { showLoading: true }) => {
@@ -19,17 +18,7 @@ export default function StudentNotificationsScreen() {
       setError('');
       if (opts.showLoading) setLoading(true);
 
-      let endpoint = '/api/counseling/notifications';
-      const params = new URLSearchParams();
-      if (activeCategory !== 'All') {
-        if (['UGCET', 'UGNEET'].includes(activeCategory)) params.append('category', activeCategory);
-        else params.append('type', activeCategory);
-      }
-
-      const queryString = params.toString();
-      if (queryString) endpoint += '?' + queryString;
-
-      const res = await apiFetch(endpoint, { token });
+      const res = await apiFetch('/api/student/notifications', { token });
       setNotifications(res?.notifications || []);
     } catch (e) {
       setError(e?.message || 'Failed to load notifications');
@@ -41,47 +30,14 @@ export default function StudentNotificationsScreen() {
 
   useEffect(() => {
     loadNotifications({ showLoading: true });
-  }, [token, activeCategory]);
-
-  const markAsRead = async (id) => {
-    try {
-      await apiFetch(`/api/counseling/notifications/${id}/read`, { token, method: 'POST' });
-      setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
-    } catch (e) { console.error('Failed to mark read', e); }
-  };
-
-  const handleOpenPdf = (pdfUrl, id) => {
-    if (id) markAsRead(id);
-    if (pdfUrl) Linking.openURL(pdfUrl);
-  };
-
-  const renderFilterChips = () => (
-    <View style={styles.chipScroll}>
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={CATEGORIES}
-        keyExtractor={item => item}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.chip, activeCategory === item && styles.chipActive]}
-            onPress={() => setActiveCategory(item)}
-          >
-            <Text style={[styles.chipText, activeCategory === item && styles.chipTextActive]}>{item}</Text>
-          </TouchableOpacity>
-        )}
-      />
-    </View>
-  );
+  }, [token]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>KEA ALERTS</Text>
-        <Text style={styles.headerSubtitle}>Real-time Counselling Assistant</Text>
+        <Text style={styles.headerTitle}>ADMIN ALERTS</Text>
+        <Text style={styles.headerSubtitle}>Official Messages from KCET Agri</Text>
       </View>
-
-      {renderFilterChips()}
 
       {!!error && (
         <View style={styles.errorBox}>
@@ -91,7 +47,7 @@ export default function StudentNotificationsScreen() {
 
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4f46e5" />
+          <ActivityIndicator size="large" color="#ef4444" />
         </View>
       ) : (
         <FlatList
@@ -104,29 +60,18 @@ export default function StudentNotificationsScreen() {
             setRefreshing(true);
             loadNotifications({ showLoading: false });
           }}
-          ListEmptyComponent={<Text style={styles.emptyText}>No notifications found for {activeCategory}.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>No admin notifications yet.</Text>}
           renderItem={({ item: n }) => (
-            <View style={[styles.card, !n.isRead && styles.cardUnread]}>
+            <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{n.category} | {n.notificationType}</Text>
+                <View style={[styles.badge, { backgroundColor: '#ef4444' }]}>
+                  <Text style={[styles.badgeText, { color: '#fff' }]}>Admin Notice</Text>
                 </View>
-                {!n.isRead && <View style={styles.unreadDot} />}
               </View>
               <Text style={styles.title}>{n.title}</Text>
-              <Text style={styles.summary}>{n.summary}</Text>
-
+              <Text style={styles.summary}>{n.message}</Text>
               <View style={styles.cardFooter}>
                 <Text style={styles.dateText}>{new Date(n.created_at).toLocaleString()}</Text>
-                {n.pdfUrl ? (
-                  <TouchableOpacity style={styles.btnAction} onPress={() => handleOpenPdf(n.pdfUrl, n._id)}>
-                    <Text style={styles.btnActionText}>Open PDF</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity style={styles.btnActionOutlined} onPress={() => markAsRead(n._id)}>
-                    <Text style={styles.btnActionTextOutlined}>Mark Read</Text>
-                  </TouchableOpacity>
-                )}
               </View>
             </View>
           )}

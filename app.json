@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "my-mobile-app",
-    "slug": "my-mobile-app",
+    "name": "KCET Agriculture Practical",
+    "slug": "kcet-agriculture-practical",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -19,7 +19,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.chandu.kcetapp"
     },
     "web": {
       "output": "static",
@@ -38,11 +39,20 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d28b77ba-ba20-41b4-af4f-2d2798807fe6"
+      }
     }
   }
 }

@@ -25,7 +25,6 @@ import {
 import { ensureSettings } from '../seed/ensureSettings.js';
 import { sendPushNotificationToUser } from '../services/counseling/notifier.js';
 import { hashPassword } from '../utils/auth.js';
-import { sendMail } from './auth.mysql.controller.js';
 
 async function deleteFromGridFSByUrl(url) {
   if (!url) return;
@@ -2362,15 +2361,11 @@ export async function replyFeedback(req, res, next) {
         feedbackId: feedback.id
       });
     } else {
-      // Fallback if no matching user found
-      await sendMail({
-        toEmail: feedback.user_email,
-        subject: 'Reply to your feedback - KCET Agri Practical',
-        text: `Hello ${feedback.user_name},\n\nRegarding your feedback:\n"${feedback.message}"\n\nAdmin Reply:\n${replyText}\n\nBest Regards,\nKCET Agri Practical Team`
-      });
+      // We only reply in app now.
+      return res.status(404).json({ message: 'User not found in system for in-app reply' });
     }
 
-    return res.json({ success: true, message: 'Reply sent successfully.' });
+    return res.json({ success: true, message: 'In-app reply sent successfully.' });
   } catch (err) {
     console.error('[replyFeedback]', err);
     return res.status(500).json({ message: 'Failed to send reply' });

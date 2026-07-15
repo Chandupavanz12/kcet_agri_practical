@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { apiFetch } from '../api/client.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function AdminCRUDPage({
   title,
@@ -125,7 +125,7 @@ export default function AdminCRUDPage({
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <View style={styles.headerCard}>
         <View style={styles.headerRow}>
           <View>
@@ -269,7 +269,7 @@ export default function AdminCRUDPage({
           )}
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 

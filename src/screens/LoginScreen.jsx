@@ -30,6 +30,8 @@ export default function LoginScreen() {
           const data = await loginAdmin({ email, password });
           if (data.requiresOtp) {
             setAdminStep('otp');
+          } else if (data.user?.role === 'admin') {
+            router.replace('/admin/dashboard');
           }
         } else {
           const data = await verifyAdminLoginOtp({ email, otp: adminOtp });
@@ -50,31 +52,12 @@ export default function LoginScreen() {
     }
   }
 
-  async function onOAuth(provider) {
-    try {
-      if (mode === 'admin') {
-        setError('OAuth not supported for admin');
-        return;
-      }
-      setBusy(true);
-      const data = await oauthStudent({
-        email: `mock_${provider}@example.com`,
-        name: `Mock ${provider} User`,
-        provider,
-        providerId: `mock_${provider}_id`
-      });
-      router.replace('/student/dashboard');
-    } catch (err) {
-      setError(err?.message || 'OAuth login failed');
-    } finally {
-      setBusy(false);
-    }
-  }
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <PublicHeader />
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View>
@@ -155,16 +138,14 @@ export default function LoginScreen() {
                   </View>
                 </View>
 
-                {mode === 'student' && (
-                  <View style={styles.linksRow}>
-                    <TouchableOpacity onPress={() => router.push('/forgot-password')}>
-                      <Text style={styles.linkText}>Forgot password?</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => router.push('/otp-login')}>
-                      <Text style={styles.linkText}>Login with OTP</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+                <View style={styles.linksRow}>
+                  <TouchableOpacity onPress={() => router.push('/forgot-password')}>
+                    <Text style={styles.linkText}>Forgot password?</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => router.push('/otp-login')}>
+                    <Text style={styles.linkText}>Login with OTP</Text>
+                  </TouchableOpacity>
+                </View>
               </>
             )}
 
@@ -174,27 +155,13 @@ export default function LoginScreen() {
               </View>
             )}
 
-            <TouchableOpacity onPress={onSubmit} disabled={busy}>
+            <TouchableOpacity onPress={onSubmit} disabled={busy} activeOpacity={0.8}>
               <LinearGradient colors={['#10b981', '#2563eb']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.submitBtn}>
                 <Text style={styles.submitBtnText}>{busy ? 'Please wait...' : mode === 'admin' && adminStep === 'details' ? 'Get OTP' : 'Login'}</Text>
               </LinearGradient>
             </TouchableOpacity>
 
-            {mode === 'student' && (
-              <View style={styles.oauthContainer}>
-                <View style={styles.divider}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>OR</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-                <TouchableOpacity style={styles.oauthBtnGoogle} onPress={() => onOAuth('Google')}>
-                  <Text style={styles.oauthBtnTextGoogle}>Sign in with Google</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.oauthBtnFacebook} onPress={() => onOAuth('Facebook')}>
-                  <Text style={styles.oauthBtnTextFacebook}>Sign in with Facebook</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+
           </View>
 
           <View style={styles.footerLinks}>
@@ -207,10 +174,7 @@ export default function LoginScreen() {
 
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
-            <LinearGradient
-              colors={['#10b981', '#059669']}
-              style={styles.infoLogoBox}
-            >
+            <LinearGradient colors={['#10b981', '#059669']} style={styles.infoLogoBox}>
               <Text style={styles.infoLogoText}>KA</Text>
             </LinearGradient>
             <View>
@@ -218,7 +182,6 @@ export default function LoginScreen() {
               <Text style={styles.infoSubtitle}>Learn faster. Practice smarter.</Text>
             </View>
           </View>
-
           <View style={styles.infoGrid}>
             <View style={styles.infoGridItem}>
               <Text style={styles.infoGridTitle}>Mock Tests</Text>
@@ -237,7 +200,6 @@ export default function LoginScreen() {
               <Text style={styles.infoGridDesc}>Manage content and results.</Text>
             </View>
           </View>
-
           <View style={styles.tipBox}>
             <Text style={styles.tipTitle}>Tip</Text>
             <Text style={styles.tipText}>Use the timed mock test daily to improve specimen identification speed.</Text>
@@ -251,7 +213,7 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f8fafc' },
-  container: { padding: 16, paddingVertical: 32, gap: 24 },
+  container: { padding: 16, paddingVertical: 16, gap: 24 },
   card: { backgroundColor: '#ffffff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 15, elevation: 4 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
   title: { fontSize: 28, fontWeight: '900', color: '#0f172a' },
@@ -282,14 +244,6 @@ const styles = StyleSheet.create({
   sentText: { fontSize: 13, color: '#64748b', marginBottom: 4 },
   footerLinks: { flexDirection: 'row', marginTop: 28, justifyContent: 'center' },
   footerText: { fontSize: 15, color: '#64748b', fontWeight: '500' },
-  oauthContainer: { marginTop: 20, gap: 12 },
-  divider: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#e2e8f0' },
-  dividerText: { marginHorizontal: 10, color: '#94a3b8', fontSize: 12, fontWeight: '600' },
-  oauthBtnGoogle: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
-  oauthBtnTextGoogle: { color: '#334155', fontSize: 15, fontWeight: '700' },
-  oauthBtnFacebook: { backgroundColor: '#1877F2', borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
-  oauthBtnTextFacebook: { color: '#fff', fontSize: 15, fontWeight: '700' },
   infoCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   infoLogoBox: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

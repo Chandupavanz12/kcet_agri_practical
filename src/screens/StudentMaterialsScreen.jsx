@@ -1,11 +1,11 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { API_BASE_URL as apiBaseUrl } from '../config/env';
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
+import { API_BASE_URL as apiBaseUrl } from '../config/env';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function StudentMaterialsScreen() {
   const { token } = useAuth();
@@ -32,11 +32,10 @@ export default function StudentMaterialsScreen() {
     const urlWithToken = absoluteUrl.includes('?')
       ? `${absoluteUrl}&token=${token}`
       : `${absoluteUrl}?token=${token}`;
-      
-    // Use Google Docs viewer on Android for much faster rendering of large PDFs
-    const finalUrl = Platform.OS === 'android' 
-      ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(urlWithToken)}`
-      : urlWithToken;
+
+    // Removing Google Docs viewer because it restricts previewing files larger than its internal limit,
+    // causing the "this file is too large to preview" error.
+    const finalUrl = urlWithToken;
 
     WebBrowser.openBrowserAsync(finalUrl).catch(() => {
       Alert.alert('Error', 'Failed to open PDF. Please try again.');

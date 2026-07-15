@@ -1,0 +1,76 @@
+<a id="ContentPlaceHolder1_keaid2179" class="text-decoration-none" href="indexnew.aspx" style="color:white;">ಮುಖಪುಟ</a>
+<a href="#" class="text-decoration-none"><i class="fas fa-angle-right text-white mx-1"></i></a>
+<a id="ContentPlaceHolder1_keaid4981" class="text-decoration-none" href="indexnew.aspx" style="color:white;"> ಪ್ರವೇಶಗಳು </a>
+<a href="#" class="text-decoration-none"><i class="fas fa-angle-right text-white mx-1"></i></a>
+<a id="ContentPlaceHolder1_keaid1136284" class="text-decoration-none" style="color:white;">ಯುಜಿ ಸಿಇಟಿ - 2026</a>
+<a id='lnk1137408' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/ugcet_2026_feesbreakupkannada.pdf' style='color:black'>UGCET PROVISIONAL FEES STRUCTURE – 2026-27</a>
+<a id='lnk1137407' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/ahskannada.pdf' style='color:black'>Eligiblity Criteria, Nomenclature and Course Duration of Allied Health Science Course in KEA Portal - reg</a>
+<a id='lnk1137193' href='https://keaonline.karnataka.gov.in/main/index.php' style='color:black'>UGCET - 2026 OPTION ENTRY LINK</a>
+<a id='1137094' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/onlineapp2026_appointment/forms/login.aspx' Target='_blank'> UGCET 2026  ಪರಿಶೀಲಿಸದ ಅಭ್ಯರ್ಥಿಗಳಿಗೆ ಸ್ಲಾಟ್ ಬುಕಿಂಗ್ ಲಿಂಕ್</a>
+<a id='1136833' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/onlineapp2026/forms/login.aspx' Target='_blank'> UGCET - 2026 ಆನ್‌ಲೈನ್ ಅರ್ಜಿ ಎಡಿಟ್ ಲಿಂಕ್.</a>
+<a id='1136823' class='note-text font-weight-bold' href='https://www.cetonline.karnataka.gov.in/KEA_EXAM_PORTAL/Forms/Candidates/Login' Target='_blank'> ಯುಜಿಸಿಇಟಿ ಕೃಷಿ 2026 ಪ್ರಾಯೋಗಿಕ ಕೋಟಾ ಪ್ರವೇಶ ಟಿಕೆಟ್ ಡೌನ್‌ಲೋಡ್ ಲಿಂಕ್-2</a>
+<a id='1136814' class='note-text font-weight-bold' href='https://www.uasbangalore.edu.in/eligible-and-not-eligible-list-for-practical-test-2026-as-on-7-5-2026/' Target='_blank'> ಕೃಷಿ ಕೋಟಾಕ್ಕೆ ಅರ್ಹ ಮತ್ತು ಅನರ್ಹ ಅಭ್ಯರ್ಥಿಗಳ ಪಟ್ಟಿ</a>
+<a id='1136813' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/UGCET_Admit_Card_2026/Forms/Login.aspx' Target='_blank'> ಯುಜಿಸಿಇಟಿ ಕೃಷಿ 2026 ಪ್ರಾಯೋಗಿಕ ಕೋಟಾ ಪ್ರವೇಶ ಟಿಕೆಟ್ ಡೌನ್‌ಲೋಡ್ ಲಿಂಕ್</a>
+<a id='1136812' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/onlineapp2026_appointment/forms/login.aspx' Target='_blank'> UGCET – 2026 ದಾಖಲಾತಿ ಪರಿಶೀಲನೆಗಾಗಿ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಲಿಂಕ್ (Eligibility Clause B ರಿಂದ Clause O ವರೆಗೆ ಅರ್ಹತಾ ಷರತ್ತುಗಳನ್ನು ಆಯ್ಕೆ ಮಾಡಿದ ಅಭ್ಯರ್ಥಿಗಳಿಗಾಗಿ)</a>
+<a id='1136793' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/onlineapp2026_print/forms/login.aspx' Target='_blank'> ಯುಜಿಸಿಇಟಿ 2026 ಆನ್‌ಲೈನ್ ಅರ್ಜಿ ಮುದ್ರಣ ಲಿಂಕ್.</a>
+<a id='1137096' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/UGCET_PWD_REPORT_2026kannada.pdf' Target='_blank'> ದೈಹಿಕ ಅಂಗವಿಕಲ ಅಭ್ಯರ್ಥಿಗಳ ಅರ್ಹತಾ ಪಟ್ಟಿ</a>
+<a id='1136843' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/CBSEICSE_2026kannada.pdf' Target='_blank'> ಪ್ರಕಟಣೆ- CBSE / CISCE ಮತ್ತು ಇತರ ರಾಜ್ಯ ಮಂಡಳಿಯ ಅಭ್ಯರ್ಥಿಗಳ 10+2 ಅಂಕಗಳ ನವೀಕರಣ.</a>
+<a id='1137164' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_BPTkannada.pdf' Target='_blank'> ಬಿಪಿಟಿಯ ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್ (ಭೌತಚಿಕಿತ್ಸೆ) -2026</a>
+<a id='1137163' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_AHS_BPOkannada.pdf' Target='_blank'> ಬಿ. ಎಸ್ಸಿ ಎಎಚ್‌ಎಸ್ ಕೋರ್ಸ್‌ಗಳ ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್ - 2026</a>
+<a id='1137132' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_Agri_Practical_CompleteLogReportkannada.pdf' Target='_blank'> ಬಿ.ಎಸ್ಸಿ. ಕೃಷಿ ಮತ್ತು ಇತರ ಕೃಷಿ ವಿಜ್ಞಾನ ಕೋರ್ಸ್‌ಗಳ ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್ - (Agriculturist Quota).</a>
+<a id='1137131' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_Agriculture_CompleteLogReportkannada.pdf' Target='_blank'> ಬಿ.ಎಸ್ಸಿ. ಕೃಷಿ ಮತ್ತು ಇತರ ಕೃಷಿ ವಿಜ್ಞಾನ ಕೋರ್ಸ್‌ಗಳ ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್ - (Regular Quota).</a>
+<a id='1137130' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_Veterkannada.pdf' Target='_blank'> ಪಶುವೈದ್ಯಕೀಯ  ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್(B.V. Sc & AH)-(Agriculturist Quota).</a>
+<a id='1137129' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_Veter_CompleteLogReportkannada.pdf' Target='_blank'> ಪಶುವೈದ್ಯಕೀಯ  ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್(B.V. Sc & AH)-(Regular Quota).</a>
+<a id='1137128' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_Nursingkannada.pdf' Target='_blank'> ಬಿ.ಎಸ್ಸಿ. ನರ್ಸಿಂಗ್‌ನ ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್.</a>
+<a id='1136679' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/YADGIR__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಯಾದಗಿರಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136678' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/VIJAYAPURA__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ವಿಜಯಪುರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136677' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/VIJAYANAGARA__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ವಿಜಯನಗರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136676' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/UTTARA_KANNADA__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಉತ್ತರ ಕನ್ನಡ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136675' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/UDUPI__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಉಡುಪಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136674' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/TUMKUR__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ತುಮಕೂರು ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136673' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/SHIMOGA__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಶಿವಮೊಗ್ಗ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136672' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/RAMANAGARA__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ರಾಮನಗರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136671' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/RAICHUR__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ರಾಯಚೂರು ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136670' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/MYSURU__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಮೈಸೂರು ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136669' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/MANDYA__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಮಂಡ್ಯ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136668' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KOPPAL__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಕೊಪ್ಪಳ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136667' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KOLAR__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಕೋಲಾರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136666' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KODAGU__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಕೊಡಗು PH ಪಟ್ಟಿ</a>
+<a id='1136665' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KALABURAGI__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಕಲಬುರ್ಗಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136664' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/HAVAERI__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಹಾವೇರಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136663' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/HASSAN__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಹಾಸನ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136662' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/GADAG_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಗದಗ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136661' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/DHARWAD_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಧಾರವಾಡ PH ಪಟ್ಟಿ</a>
+<a id='1136660' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/DAVANAGERE_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ದಾವಣಗೆರೆ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136659' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/DHARWAD_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಧಾರವಾಡ PH ಪಟ್ಟಿ</a>
+<a id='1136658' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/DAVANAGERE_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ದಾವಣಗೆರೆ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136657' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/DAKSHINA_KANNADA_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ದಕ್ಷಿಣ ಕನ್ನಡ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136656' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/CHIKKAMAGALURU_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಚಿಕ್ಕಮಗಳೂರು ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136655' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/CHITRADURGA_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಚಿತ್ರದುರ್ಗ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136654' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/CHIKODI(_BELAGAVI)_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಚಿಕ್ಕೋಡಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136653' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/CHIKBALLAPUR__PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಚಿಕ್ಕಬಳ್ಳಾಪುರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136652' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/CHAMARAJANAGARA__PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಚಾಮರಾಜನಗರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136651' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BIDAR_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಬೀದರ್ PH ಪಟ್ಟಿ</a>
+<a id='1136650' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BENGALURU_RURAL_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಬೆಂಗಳೂರು ಗ್ರಾಮಾಂತರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136649' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BENGALURU_NORTH_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಬೆಂಗಳೂರು ಉತ್ತರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136648' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BENGALURU_SOUTH_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಬೆಂಗಳೂರು ದಕ್ಷಿಣ PH ಪಟ್ಟಿ</a>
+<a id='1136647' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BELAGAVI_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಬೆಳಗಾವಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136646' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BALLARI_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಬಳ್ಳಾರಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136645' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BAGALKOTE_PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಬಾಗಲಕೋಟೆಯ pH ಪಟ್ಟಿ</a>
+<a href="mailto:keauthority-ka@nic.in" class="text-white text-decoration-none"><span id="keaid1285">ಇ ಮೇಲ್:keauthority-ka@nic.in</span></a>
+<a id="keaid1286" class="text-white text-decoration-none" href="indexnew.aspx">ವೆಬ್ ಸೈಟ್ </a>
+<a href="https://www.youtube.com/@keavikasana5543" target="_blank" >Follow us on You Tube</a>
+<a href="privacy.html" target="_blank" ><span id="keaid10869">Privacy Policy</span></a>
+<a href="refund.html" target="_blank" ><span id="keaid10870">Refund and Cancellation Policy</span></a>
+<a href="Terms.html" target="_blank" ><span id="keaid10871">Product / Service Details</span></a>
+<a href="Terms.html" target="_blank" ><span id="keaid10873">Terms & Conditions</span></a>
+<a id="keaid1289" class="selected text-decoration-none" href="indexnew.aspx">ಮುಖಪುಟ</a>
+<a id="keaid2102" class="selected text-decoration-none">ಪ್ರವೇಶಗಳು </a>
+<a id="keaid2177" class="selected text-decoration-none" href="https://cetonline.karnataka.gov.in/keawebentry456/archive.pdf"> ಪತ್ರಾಗಾರ</a>
+<a id="keaid2178" class="selected text-decoration-none" href="indexnew.aspx">ನೇಮಕಾತಿ</a>
+<a id="keaid2074" class="selected text-decoration-none" href="RTI.aspx"> ಮಾಹಿತಿ ಹಕ್ಕು ಅಧಿನಿಯಮ</a>
+<a id="keaid2075" class="selected text-decoration-none" href="Tenders.aspx">ಟೆಂಡರ್</a>
+<a id="keaid2118" class="selected text-decoration-none" href="https://cetonline.karnataka.gov.in/keawebentry456/cet2020/vikasana_timetable.pdf">ವಿಕಸನ</a>
+<a id="keaid8362" class="selected text-decoration-none" href="vidhyartimitra.aspx">ವಿದ್ಯಾರ್ಥಿ ಮಿತ್ರ</a>
+<a id="button"><i class="fas fa-chevron-up"></i></a>
+<a href="#" class="foot-color">NIC</a>

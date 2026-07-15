@@ -1,9 +1,9 @@
-import React, { useEffect } from 'react';
-import { Drawer } from 'expo-router/drawer';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
+import { usePathname, useRouter } from 'expo-router';
+import { Drawer } from 'expo-router/drawer';
+import React, { useEffect } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { useRouter, usePathname } from 'expo-router';
 
 function CustomDrawerContent(props) {
   const { user, logout } = useAuth();
@@ -24,6 +24,7 @@ function CustomDrawerContent(props) {
     { label: 'Premium Access', icon: '⭐', route: '/student/premium' },
     { label: 'PYQs', icon: '📄', route: '/student/pyqs' },
     { label: 'Notifications', icon: '🔔', route: '/student/notifications' },
+    { label: 'Admin Notifications', icon: '📢', route: '/student/admin-notifications' },
     { label: 'Profile', icon: '👤', route: '/student/profile' },
   ];
 
@@ -107,6 +108,7 @@ export default function StudentLayout() {
       <Drawer.Screen name="premium" options={{ title: 'Premium Access' }} />
       <Drawer.Screen name="pyqs" options={{ title: 'PYQs' }} />
       <Drawer.Screen name="notifications" options={{ title: 'Notifications' }} />
+      <Drawer.Screen name="admin-notifications" options={{ title: 'Admin Notifications' }} />
       <Drawer.Screen name="profile" options={{ title: 'Profile' }} />
       <Drawer.Screen name="mock-test/[id]" options={{ title: 'Mock Test' }} />
       <Drawer.Screen name="mock-test/result" options={{ title: 'Test Result' }} />

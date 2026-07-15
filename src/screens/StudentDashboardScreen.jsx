@@ -1,60 +1,70 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { API_BASE_URL as apiBaseUrl } from '../config/env';
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useAuth } from '../contexts/AuthContext.jsx';
-import { apiFetch } from '../api/client.js';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { apiFetch } from '../api/client.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function StudentDashboardScreen() {
   const { token, user } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams();
-  
+
   const [data, setData] = useState(null);
   const [tests, setTests] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    let alive = true;
+    try {
+      setError('');
+      const [dashRes, testsRes, notifRes] = await Promise.all([
+        apiFetch('/api/student/dashboard', { token }).catch(() => null),
+        apiFetch('/api/student/tests', { token }).catch(() => null),
+        apiFetch('/api/student/notifications', { token }).catch(() => null)
+      ]);
+
+      if (!alive) return;
+      setData(dashRes);
+      setTests(Array.isArray(testsRes?.tests) ? testsRes.tests : []);
+
+      const rows = Array.isArray(notifRes?.notifications) ? notifRes.notifications : [];
+      const seen = new Set();
+      const uniq = [];
+      for (const n of rows) {
+        const msg = String(n?.message || '').trim();
+        if (!msg) continue;
+        const key = msg.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        uniq.push({ ...n, message: msg });
+      }
+      setNotifications(uniq);
+    } catch (err) {
+      if (!alive) return;
+      setError(err?.message || 'Failed to load dashboard data');
+    } finally {
+      if (alive) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+    return () => { alive = false; };
+  };
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const [dashRes, testsRes, notifRes] = await Promise.all([
-          apiFetch('/api/student/dashboard', { token }).catch(() => null),
-          apiFetch('/api/student/tests', { token }).catch(() => null),
-          apiFetch('/api/student/notifications', { token }).catch(() => null)
-        ]);
+    loadData(true);
+  }, [token]);
 
-        if (!alive) return;
-        setData(dashRes);
-        setTests(Array.isArray(testsRes?.tests) ? testsRes.tests : []);
-
-        const rows = Array.isArray(notifRes?.notifications) ? notifRes.notifications : [];
-        const seen = new Set();
-        const uniq = [];
-        for (const n of rows) {
-          const msg = String(n?.message || '').trim();
-          if (!msg) continue;
-          const key = msg.toLowerCase();
-          if (seen.has(key)) continue;
-          seen.add(key);
-          uniq.push({ ...n, message: msg });
-        }
-        setNotifications(uniq);
-      } catch (err) {
-        if (!alive) return;
-        setError(err?.message || 'Failed to load dashboard data');
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData(false);
   }, [token]);
 
   useEffect(() => {
@@ -83,23 +93,29 @@ export default function StudentDashboardScreen() {
   }
 
   // Get the latest notification or fall back to default
-  const latestNotification = notifications.length > 0 
-    ? notifications[0].message 
+  const latestNotification = notifications.length > 0
+    ? notifications[0].message
     : "Mock test-2 will be scheduled on today 6pm";
 
   // Get mock tests or fall back to default list
-  const displayTests = tests.length > 0 
-    ? tests.slice(0, 6) 
+  const displayTests = tests.length > 0
+    ? tests.slice(0, 6)
     : [
-        { id: 'mock-6', title: 'Mock test-6', questionCount: 20 },
-        { id: 'mock-5', title: 'Mock test-5', questionCount: 20 },
-        { id: 'mock-4', title: 'Mock test-4', questionCount: 20 },
-      ];
+      { id: 'mock-6', title: 'Mock test-6', questionCount: 20 },
+      { id: 'mock-5', title: 'Mock test-5', questionCount: 20 },
+      { id: 'mock-4', title: 'Mock test-4', questionCount: 20 },
+    ];
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#10b981']} />
+        }
+      >
+
         {/* Error / Success Banners */}
         {!!error && (
           <View style={styles.errorBox}>
@@ -120,12 +136,22 @@ export default function StudentDashboardScreen() {
               <Text style={styles.welcomeSub}>Welcome back, {user?.name || 'Student'} 👋</Text>
             </View>
             <View style={styles.badgeContainer}>
-              <View style={styles.badgePrep}>
-                <Text style={styles.badgePrepText}>KCET Prep</Text>
-              </View>
-              <View style={styles.badgeActive}>
-                <Text style={styles.badgeActiveText}>Active</Text>
-              </View>
+              {(data?.premiumStatus?.comboActive || data?.premiumStatus?.pyqActive || data?.premiumStatus?.materialActive) ? (
+                <>
+                  <View style={[styles.badgeActive, { backgroundColor: '#fef3c7', borderColor: '#fcd34d' }]}>
+                    <Text style={[styles.badgeActiveText, { color: '#d97706' }]}>👑 Premium User</Text>
+                  </View>
+                  {data?.premiumStatus?.comboActive && (
+                    <View style={styles.badgePrep}>
+                      <Text style={styles.badgePrepText}>Combo Plan Active</Text>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <View style={styles.badgePrep}>
+                  <Text style={styles.badgePrepText}>Free Student</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -138,12 +164,26 @@ export default function StudentDashboardScreen() {
               <Text style={styles.viewAllLink}>View all</Text>
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.notificationBox}>
             <Text style={styles.notificationText}>
               {latestNotification}
             </Text>
           </View>
+        </View>
+
+        {/* Feedback Section */}
+        <View style={[styles.card, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}>
+          <View style={[styles.cardHeader, { marginBottom: 8 }]}>
+            <Text style={[styles.cardTitle, { color: '#1e3a8a' }]}>Have Suggestions?</Text>
+          </View>
+          <Text style={{ color: '#3b82f6', marginBottom: 12, fontSize: 13 }}>Share your feedback or queries with the admin directly.</Text>
+          <TouchableOpacity
+            onPress={() => handleNavigation('/student/feedback')}
+            style={styles.btnAction}
+          >
+            <Text style={[styles.btnActionText, { textAlign: 'center' }]}>Submit Feedback</Text>
+          </TouchableOpacity>
         </View>
 
         {/* 3. Mock Tests Grid Card */}
@@ -163,8 +203,8 @@ export default function StudentDashboardScreen() {
                   <Text style={styles.testInfo}>
                     {t.questionCount || t.question_count || 20} questions • 30s per question
                   </Text>
-                  
-                  <TouchableOpacity 
+
+                  <TouchableOpacity
                     onPress={() => handleNavigation(`/student/mock-test/${t.id}`)}
                     style={styles.gradientBtnWrapper}
                   >
@@ -192,7 +232,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f5f5f4' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   container: { padding: 16, gap: 16, paddingBottom: 32 },
-  
+
   errorBox: { backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 4 },
   errorText: { color: '#b91c1c', fontSize: 14, fontWeight: '600' },
   successBox: { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 4 },
@@ -210,7 +250,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  
+
   // Welcome Card Styles
   welcomeContainer: {
     flexDirection: 'row',
@@ -346,4 +386,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  btnAction: { backgroundColor: '#3b82f6', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  btnActionText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 });

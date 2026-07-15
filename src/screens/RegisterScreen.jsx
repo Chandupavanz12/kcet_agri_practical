@@ -64,24 +64,12 @@ export default function RegisterScreen() {
     }
   }
 
-  async function onOAuth(provider) {
-    try {
-      const data = await oauthStudent({
-        email: `mock_${provider}@example.com`,
-        name: `Mock ${provider} User`,
-        provider,
-        providerId: `mock_${provider}_id`
-      });
-      router.replace('/student/dashboard');
-    } catch (err) {
-      setError(err?.message || 'OAuth login failed');
-    }
-  }
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <PublicHeader />
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.title}>Create your account</Text>
@@ -134,13 +122,13 @@ export default function RegisterScreen() {
             )}
 
             {step === 'details' ? (
-              <TouchableOpacity onPress={onRequestOtp} disabled={busy}>
+              <TouchableOpacity onPress={onRequestOtp} disabled={busy} activeOpacity={0.8}>
                 <LinearGradient colors={['#10b981', '#2563eb']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.submitBtn}>
                   <Text style={styles.submitBtnText}>{busy ? 'Sending OTP...' : 'Continue'}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity onPress={onVerifyOtp} disabled={busy}>
+              <TouchableOpacity onPress={onVerifyOtp} disabled={busy} activeOpacity={0.8}>
                 <LinearGradient colors={['#10b981', '#2563eb']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.submitBtn}>
                   <Text style={styles.submitBtnText}>{busy ? 'Registering...' : 'Verify & Register'}</Text>
                 </LinearGradient>
@@ -148,21 +136,7 @@ export default function RegisterScreen() {
             )}
           </View>
 
-          {step === 'details' && (
-            <View style={styles.oauthContainer}>
-              <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>OR</Text>
-                <View style={styles.dividerLine} />
-              </View>
-              <TouchableOpacity style={styles.oauthBtnGoogle} onPress={() => onOAuth('Google')}>
-                <Text style={styles.oauthBtnTextGoogle}>Sign up with Google</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.oauthBtnFacebook} onPress={() => onOAuth('Facebook')}>
-                <Text style={styles.oauthBtnTextFacebook}>Sign up with Facebook</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+
 
           <View style={styles.footerLinks}>
             <Text style={styles.footerText}>Already have an account? </Text>
@@ -171,6 +145,7 @@ export default function RegisterScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
       </ScrollView>
       <PublicFooter />
     </SafeAreaView>
@@ -179,7 +154,7 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f8fafc' },
-  container: { padding: 16, paddingVertical: 32, alignItems: 'center' },
+  container: { padding: 16, paddingVertical: 16, alignItems: 'center' },
   card: { backgroundColor: '#ffffff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 15, elevation: 4, width: '100%', maxWidth: 500 },
   cardHeader: { marginBottom: 24 },
   title: { fontSize: 28, fontWeight: '900', color: '#0f172a' },
@@ -204,8 +179,12 @@ const styles = StyleSheet.create({
   divider: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#e2e8f0' },
   dividerText: { marginHorizontal: 10, color: '#94a3b8', fontSize: 12, fontWeight: '600' },
-  oauthBtnGoogle: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
-  oauthBtnTextGoogle: { color: '#334155', fontSize: 15, fontWeight: '700' },
-  oauthBtnFacebook: { backgroundColor: '#1877F2', borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
-  oauthBtnTextFacebook: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  oauthBtnGoogle: { flexDirection: 'row', backgroundColor: '#ea4335', borderRadius: 16, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  oauthBtnTextGoogle: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  oauthBtnFacebook: { flexDirection: 'row', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  oauthBtnTextFacebook: { color: '#334155', fontSize: 15, fontWeight: '700' },
+  oauthIcon: { marginRight: 10 },
+  helpBox: { alignItems: 'center', marginTop: 10, paddingBottom: 20 },
+  helpText: { fontSize: 14, color: '#64748b', fontWeight: '500' },
+  helpLink: { fontSize: 14, color: '#075985', fontWeight: '700', marginTop: 4 },
 });

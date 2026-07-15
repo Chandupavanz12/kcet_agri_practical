@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { useRouter, usePathname } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function TopMenu() {
@@ -48,6 +48,14 @@ export default function TopMenu() {
           { label: 'Take Test', link: '/student/tests' },
           { label: 'View Results', link: '/student/results' },
           { label: 'Test History', link: '/student/results' },
+        ]
+      },
+      {
+        label: 'Feedback',
+        icon: '💬',
+        link: '/student/feedback',
+        submenu: [
+          { label: 'Submit Feedback', link: '/student/feedback' }
         ]
       },
     ],
@@ -144,7 +152,7 @@ export default function TopMenu() {
                 <Text style={styles.menuIcon}>{item.icon}</Text>
                 <Text style={[styles.menuLabel, isActive(item.link) && styles.menuLabelActive]}>{item.label}</Text>
               </TouchableOpacity>
-              
+
               {item.submenu && openDropdown === item.label && (
                 <View style={styles.dropdown}>
                   {item.submenu.map((subItem, subIndex) => (

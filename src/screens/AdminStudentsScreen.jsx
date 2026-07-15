@@ -1,8 +1,8 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Modal, FlatList } from 'react-native';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function AdminStudentsScreen() {
   const { token } = useAuth();
@@ -10,6 +10,8 @@ export default function AdminStudentsScreen() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterYear, setFilterYear] = useState('All');
+  const [filterPlan, setFilterPlan] = useState('All');
 
   const plans = [
     { code: 'combo', label: '🌟 Combo Plan (All Access)' },
@@ -88,31 +90,51 @@ export default function AdminStudentsScreen() {
   const handleDeleteStudent = async (id, name) => {
     Alert.alert('Delete', `PERMANENTLY delete "${name}"?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try {
-          setBusy(true);
-          await apiFetch(`/api/admin/students/${id}`, { token, method: 'DELETE' });
-          setMessage(`Student "${name}" deleted.`);
-          closeModal();
-          fetchStudents();
-        } catch (err) {
-          Alert.alert('Error', err.message || 'Failed to delete.');
-        } finally {
-          setBusy(false);
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            setBusy(true);
+            await apiFetch(`/api/admin/students/${id}`, { token, method: 'DELETE' });
+            setMessage(`Student "${name}" deleted.`);
+            closeModal();
+            fetchStudents();
+          } catch (err) {
+            Alert.alert('Error', err.message || 'Failed to delete.');
+          } finally {
+            setBusy(false);
+          }
         }
-      }}
+      }
     ]);
   };
 
-  const filteredStudents = students.filter(s =>
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const availableYears = Array.from(new Set(students.map(s => {
+    return new Date(s.createdAt || s.created_at || Date.now()).getFullYear().toString();
+  }))).sort((a, b) => b.localeCompare(a));
+
+  const filteredStudents = students.filter(s => {
+    const sYear = new Date(s.createdAt || s.created_at || Date.now()).getFullYear().toString();
+    const n = String(s.name || '').toLowerCase();
+    const e = String(s.email || '').toLowerCase();
+    const searchLow = String(searchTerm || '').toLowerCase();
+    const matchSearch = n.includes(searchLow) || e.includes(searchLow);
+    const matchYear = filterYear === 'All' || sYear === filterYear;
+    let matchPlan = true;
+    if (filterPlan !== 'All') {
+      const pStat = String(s.premiumStatus || '').toLowerCase();
+      if (filterPlan === 'free') matchPlan = pStat.includes('free');
+      else if (filterPlan === 'combo') matchPlan = pStat.includes('combo');
+      else if (filterPlan === 'pyq') matchPlan = pStat.includes('pyq');
+      else if (filterPlan === 'materials') matchPlan = pStat.includes('materials');
+      else matchPlan = pStat.includes(filterPlan);
+    }
+    return matchSearch && matchYear && matchPlan;
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={[styles.container, { flex: 1 }]}>
-        
+
         {/* Header */}
         <View style={styles.headerCard}>
           <Text style={styles.headerTitle}>👥 Student Management</Text>
@@ -124,6 +146,28 @@ export default function AdminStudentsScreen() {
             value={searchTerm}
             onChangeText={setSearchTerm}
           />
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Year:</Text>
+              {['All', ...availableYears].map(y => (
+                <TouchableOpacity key={'yr' + y} style={[styles.filterChip, filterYear === y && styles.filterChipActive]} onPress={() => setFilterYear(y)}>
+                  <Text style={[styles.filterChipText, filterYear === y && styles.filterChipTextActive]}>{y}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Plan:</Text>
+              {['All', 'free', 'combo', 'pyq', 'materials'].map(p => (
+                <TouchableOpacity key={'pl' + p} style={[styles.filterChip, filterPlan === p && styles.filterChipActive]} onPress={() => setFilterPlan(p)}>
+                  <Text style={[styles.filterChipText, filterPlan === p && styles.filterChipTextActive]}>{p.toUpperCase()}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
         </View>
 
         {!!message && (
@@ -157,11 +201,11 @@ export default function AdminStudentsScreen() {
                   return (
                     <View style={styles.studentItem}>
                       <View style={styles.studentInfoBox}>
-                        <Text style={styles.studentName}>{s.name}</Text>
-                        <Text style={styles.studentEmail}>{s.email}</Text>
-                        <Text style={styles.studentMeta}>ID #{s.id} • {new Date(s.createdAt).toLocaleDateString()}</Text>
+                        <Text style={styles.studentName}>{s.name || 'Unnamed'}</Text>
+                        <Text style={styles.studentEmail}>{s.email || 'No email'}</Text>
+                        <Text style={styles.studentMeta}>ID #{s.id} • {new Date(s.createdAt || s.created_at || Date.now()).toLocaleDateString()}</Text>
                       </View>
-                      
+
                       <View style={styles.studentStatusBox}>
                         <View style={[styles.statusBadge, isPremium ? styles.statusPremium : styles.statusFree]}>
                           <Text style={[styles.statusBadgeText, isPremium ? styles.statusPremiumText : styles.statusFreeText]}>
@@ -196,14 +240,14 @@ export default function AdminStudentsScreen() {
               </View>
               <View style={styles.modalBody}>
                 <Text style={styles.label}>Full Name</Text>
-                <TextInput style={styles.input} value={editForm.name} onChangeText={t => setEditForm({...editForm, name: t})} />
-                
+                <TextInput style={styles.input} value={editForm.name} onChangeText={t => setEditForm({ ...editForm, name: t })} />
+
                 <Text style={styles.label}>Email Address</Text>
-                <TextInput style={styles.input} value={editForm.email} onChangeText={t => setEditForm({...editForm, email: t})} keyboardType="email-address" />
-                
+                <TextInput style={styles.input} value={editForm.email} onChangeText={t => setEditForm({ ...editForm, email: t })} keyboardType="email-address" />
+
                 <Text style={styles.label}>Reset Password</Text>
-                <TextInput style={styles.input} value={editForm.password} onChangeText={t => setEditForm({...editForm, password: t})} placeholder="Leave blank to keep current" secureTextEntry />
-                
+                <TextInput style={styles.input} value={editForm.password} onChangeText={t => setEditForm({ ...editForm, password: t })} placeholder="Leave blank to keep current" secureTextEntry />
+
                 <View style={styles.modalActions}>
                   <TouchableOpacity style={styles.btnPrimary} onPress={handleUpdateStudent} disabled={busy}>
                     <Text style={styles.btnPrimaryText}>{busy ? 'Saving...' : '💾 Save Changes'}</Text>
@@ -316,4 +360,10 @@ const styles = StyleSheet.create({
   btnPrimaryText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
   btnDangerGhost: { flex: 1, borderWidth: 1, borderColor: '#fecaca', backgroundColor: '#fff', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
   btnDangerGhostText: { color: '#dc2626', fontSize: 14, fontWeight: 'bold' },
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 16 },
+  filterLabel: { fontSize: 12, color: '#e0e7ff', fontWeight: 'bold', marginRight: 4, textTransform: 'uppercase' },
+  filterChip: { backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  filterChipActive: { backgroundColor: '#fef3c7', borderColor: '#fde68a' },
+  filterChipText: { fontSize: 12, color: '#fff', fontWeight: '600' },
+  filterChipTextActive: { color: '#b45309' },
 });

@@ -1,10 +1,10 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
 import { API_BASE_URL as apiBaseUrl } from '../config/env';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function MockTestScreen() {
   const { id: testId } = useLocalSearchParams();
@@ -16,7 +16,7 @@ export default function MockTestScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [responses, setResponses] = useState({});
   const [secondsLeft, setSecondsLeft] = useState(null);
-  const [startTime] = useState(Date.now());
+  const [startTime, setStartTime] = useState(Date.now());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -31,6 +31,11 @@ export default function MockTestScreen() {
       try {
         setLoading(true);
         setLoadError('');
+        setSubmitting(false);
+        submittedRef.current = false;
+        setCurrentIndex(0);
+        setResponses({});
+        setStartTime(Date.now());
 
         let resolvedTestId = testId;
         if (!resolvedTestId) {
@@ -53,6 +58,19 @@ export default function MockTestScreen() {
         setTest(res.test);
         setQuestions(Array.isArray(res.questions) ? res.questions : []);
         setSecondsLeft((res.test?.questionCount || 0) * (res.test?.perQuestionSeconds || 0));
+
+        // Preload images to ensure they display quickly when user navigates to them
+        if (Array.isArray(res.questions)) {
+          res.questions.forEach((q) => {
+            if (q.imageUrl) {
+              const url = q.imageUrl.startsWith('http')
+                ? q.imageUrl
+                : `${apiBaseUrl}${q.imageUrl.startsWith('/') ? '' : '/'}${q.imageUrl}`;
+              Image.prefetch(url).catch(() => { });
+            }
+          });
+        }
+
         if (!res.test || !Array.isArray(res.questions) || res.questions.length === 0) {
           throw new Error('No questions returned for this test');
         }

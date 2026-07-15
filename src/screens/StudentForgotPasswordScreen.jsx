@@ -1,11 +1,11 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView,  } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
-import PublicHeader from '../components/PublicHeader.jsx';
 import PublicFooter from '../components/PublicFooter.jsx';
+import PublicHeader from '../components/PublicHeader.jsx';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function StudentForgotPasswordScreen() {
   const { user } = useAuth();
@@ -26,13 +26,6 @@ export default function StudentForgotPasswordScreen() {
     }, 1000);
     return () => clearInterval(t);
   }, [resendLeftSec]);
-
-  if (user) {
-    setTimeout(() => {
-      router.replace(user.role === 'admin' ? '/admin/dashboard' : '/student/dashboard');
-    }, 0);
-    return null;
-  }
 
   async function handleSendOtp() {
     setMessage('');

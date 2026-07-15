@@ -1,10 +1,10 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView,  } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../contexts/AuthContext.jsx';
-import PublicHeader from '../components/PublicHeader.jsx';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import PublicFooter from '../components/PublicFooter.jsx';
+import PublicHeader from '../components/PublicHeader.jsx';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function StudentOtpLoginScreen() {
   const { user, requestStudentLoginOtp, loginStudentWithOtp } = useAuth();
@@ -14,13 +14,6 @@ export default function StudentOtpLoginScreen() {
   const [otp, setOtp] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-
-  if (user) {
-    setTimeout(() => {
-      router.replace(user.role === 'admin' ? '/admin/dashboard' : '/student/dashboard');
-    }, 0);
-    return null;
-  }
 
   async function handleSendOtp() {
     setMessage('');
@@ -54,7 +47,10 @@ export default function StudentOtpLoginScreen() {
     try {
       setBusy(true);
       const res = await loginStudentWithOtp({ email: e, otp });
-      if (res?.user?.role === 'student') {
+      if (res?.user?.role === 'admin') {
+        router.replace('/admin/dashboard');
+        return;
+      } else if (res?.user?.role === 'student') {
         router.replace('/student/dashboard');
         return;
       }

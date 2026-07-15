@@ -1,8 +1,8 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 function formatINR(paise) {
   const n = Number(paise || 0) / 100;
@@ -16,12 +16,34 @@ export default function AdminPaymentsScreen() {
   const [error, setError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [timeFilter, setTimeFilter] = useState('All');
+
+  const filteredItems = useMemo(() => {
+    if (timeFilter === 'All') return items;
+    const now = new Date();
+    return items.filter(p => {
+      const d = new Date(p.createdAt);
+      if (timeFilter === 'Today') {
+        return d.getDate() === now.getDate() &&
+          d.getMonth() === now.getMonth() &&
+          d.getFullYear() === now.getFullYear();
+      }
+      if (timeFilter === 'Monthly') {
+        return d.getMonth() === now.getMonth() &&
+          d.getFullYear() === now.getFullYear();
+      }
+      if (timeFilter === 'Yearly') {
+        return d.getFullYear() === now.getFullYear();
+      }
+      return true;
+    });
+  }, [items, timeFilter]);
 
   const totalPaid = useMemo(() => {
-    return items
+    return filteredItems
       .filter((p) => p.status === 'paid' || p.status === 'free')
       .reduce((sum, p) => sum + Number(p.amountPaise || 0), 0);
-  }, [items]);
+  }, [filteredItems]);
 
   const fetchData = async () => {
     try {
@@ -53,29 +75,31 @@ export default function AdminPaymentsScreen() {
     if (!selectedIds.length) return;
     Alert.alert('Delete', `Are you sure you want to delete ${selectedIds.length} payment record(s)?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try {
-          setBusy(true);
-          await apiFetch('/api/admin/payments', {
-            token,
-            method: 'DELETE',
-            body: { ids: selectedIds }
-          });
-          setSelectedIds([]);
-          fetchData();
-        } catch (err) {
-          Alert.alert('Error', err.message || 'Deletion failed');
-        } finally {
-          setBusy(false);
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            setBusy(true);
+            await apiFetch('/api/admin/payments', {
+              token,
+              method: 'DELETE',
+              body: { ids: selectedIds }
+            });
+            setSelectedIds([]);
+            fetchData();
+          } catch (err) {
+            Alert.alert('Error', err.message || 'Deletion failed');
+          } finally {
+            setBusy(false);
+          }
         }
-      }}
+      }
     ]);
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
-        
+
         <View style={styles.heroCard}>
           <View style={styles.heroHeader}>
             <View style={{ flex: 1 }}>
@@ -83,10 +107,23 @@ export default function AdminPaymentsScreen() {
               <Text style={styles.heroSubtitle}>Review transactions and track total revenue.</Text>
             </View>
             <View style={styles.revenueBox}>
-              <Text style={styles.revenueLabel}>TOTAL REVENUE</Text>
+              <Text style={styles.revenueLabel}>{timeFilter === 'All' ? 'TOTAL' : timeFilter.toUpperCase()} REVENUE</Text>
               <Text style={styles.revenueValue}>{formatINR(totalPaid)}</Text>
             </View>
           </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 16 }}>
+            <View style={styles.filterRow}>
+              {['All', 'Today', 'Monthly', 'Yearly'].map(tf => (
+                <TouchableOpacity
+                  key={tf}
+                  style={[styles.filterChip, timeFilter === tf && styles.filterChipActive]}
+                  onPress={() => setTimeFilter(tf)}
+                >
+                  <Text style={[styles.filterChipText, timeFilter === tf && styles.filterChipTextActive]}>{tf}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
         </View>
 
         {!!error && (
@@ -98,7 +135,7 @@ export default function AdminPaymentsScreen() {
         <View style={styles.controlsRow}>
           <View style={styles.controlsLeft}>
             <TouchableOpacity style={styles.btnSelectAll} onPress={handleSelectAll}>
-              <Text style={styles.btnSelectAllText}>{selectedIds.length === items.length && items.length > 0 ? 'Deselect All' : 'Select All'}</Text>
+              <Text style={styles.btnSelectAllText}>{selectedIds.length === filteredItems.length && filteredItems.length > 0 ? 'Deselect All' : 'Select All'}</Text>
             </TouchableOpacity>
             {selectedIds.length > 0 && (
               <TouchableOpacity style={styles.btnDeleteBulk} onPress={handleDeleteBulk} disabled={busy}>
@@ -106,17 +143,17 @@ export default function AdminPaymentsScreen() {
               </TouchableOpacity>
             )}
           </View>
-          <Text style={styles.countText}>Showing {items.length}</Text>
+          <Text style={styles.countText}>Showing {filteredItems.length}</Text>
         </View>
 
         <View style={styles.card}>
           {loading ? (
             <ActivityIndicator size="large" color="#10b981" style={{ marginVertical: 40 }} />
-          ) : items.length === 0 ? (
+          ) : filteredItems.length === 0 ? (
             <Text style={styles.emptyText}>No payments found in history.</Text>
           ) : (
             <View style={styles.list}>
-              {items.map((p) => {
+              {filteredItems.map((p) => {
                 const isSelected = selectedIds.includes(p.id);
                 return (
                   <TouchableOpacity
@@ -195,4 +232,9 @@ const styles = StyleSheet.create({
   pMeta: { fontSize: 10, color: '#94a3b8' },
   pMetaBold: { color: '#475569', fontWeight: 'bold' },
   pDate: { fontSize: 10, color: '#64748b', fontWeight: '500', marginTop: 4 },
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 16 },
+  filterChip: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  filterChipActive: { backgroundColor: '#fff', borderColor: '#fff' },
+  filterChipText: { fontSize: 12, color: '#ecfdf5', fontWeight: '600' },
+  filterChipTextActive: { color: '#10b981' },
 });

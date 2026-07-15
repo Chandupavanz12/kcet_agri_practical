@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
-import { useRouter, usePathname } from 'expo-router';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { usePathname, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { apiFetch } from '../api/client.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 const { width, height } = Dimensions.get('window');
 
@@ -21,7 +21,7 @@ function normalizeMenus(menus) {
       const ln = String(n || '').toLowerCase();
       if (ln === 'free materials' || ln === 'study materials') {
         n = 'Study Materials';
-        r = '/student/materials'; 
+        r = '/student/materials';
       }
 
       return {
@@ -57,6 +57,7 @@ function getFallbackMenus(isAdmin) {
   return [
     { id: 'stu-1', name: 'Dashboard', route: '/student/dashboard', icon: '📊' },
     { id: 'stu-2', name: 'Mock Tests', route: '/student/tests', icon: '📝' },
+    { id: 'stu-2b', name: 'Feedback', route: '/student/feedback', icon: '💬' },
     { id: 'stu-3', name: 'Progress', route: '/student/progress', icon: '📈' },
     { id: 'stu-4', name: 'Videos', route: '/student/videos', icon: '🎬' },
     { id: 'stu-5', name: 'Study Materials', route: '/student/materials', icon: '📚' },

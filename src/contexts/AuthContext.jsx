@@ -18,12 +18,14 @@ export function AuthProvider({ children }) {
       try {
         const storedRole = await SecureStore.getItemAsync('kcet_role');
         if (storedRole === 'admin') {
-          // Admin must log in every time
           await SecureStore.deleteItemAsync('kcet_token');
           await SecureStore.deleteItemAsync('kcet_role');
         } else {
           const storedToken = await SecureStore.getItemAsync('kcet_token');
-          if (storedToken) setToken(storedToken);
+          if (storedToken) {
+            setToken(storedToken);
+            await refreshMe(storedToken);
+          }
           if (storedRole) setRole(storedRole);
         }
       } catch {
@@ -101,7 +103,10 @@ export function AuthProvider({ children }) {
 
   async function loginAdmin({ email, password }) {
     const data = await authApi.adminLogin({ email, password });
-    // This will now return requiresOtp: true
+    if (!data.requiresOtp && data.token) {
+      await persist(data.token, 'admin');
+      setUser(data.user);
+    }
     return data;
   }
 
@@ -125,7 +130,7 @@ export function AuthProvider({ children }) {
 
   async function loginStudentWithOtp({ email, otp }) {
     const data = await apiFetch('/api/auth/student/otp-login/verify', { method: 'POST', body: { email, otp } });
-    await persist(data.token, 'student');
+    await persist(data.token, data.user?.role || 'student');
     setUser(data.user);
     return data;
   }

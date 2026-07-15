@@ -1,0 +1,299 @@
+<a id="keaid1261" class="home-text nav-link" href="indexnew.aspx">ಮುಖಪುಟ</a>
+<a href="#" class="home-text nav-link dropdown-toggle" id="navbarDropdownMenuLink1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span id="keaid1262">ಪ್ರವೇಶ</span></a>
+<a id="keaid1136285" class="dropdown-item" href="ugcet2026.aspx">ಯುಜಿ ಸಿಇಟಿ - 2026</a>
+<a id="keaid1136796" class="dropdown-item" href="ugneet2026.aspx">ಯುಜಿ ನೀಟ್-2026 (Medical/Dental/AYUSH) </a>
+<a id="keaid1136593" class="dropdown-item" href="dcet2026.aspx">ಡಿಪ್ಲೊಮಾ ಸಿಇಟಿ- 2026</a>
+<a id="keaid1136597" class="dropdown-item" href="pgcet2026.aspx">ಪಿಜಿಸಿಇಟಿ-2026 (ಎಂಬಿಎ/ಎಂಸಿಎ/ಎಂಟೆಕ್/ಎಂಆರ್ಚ್)</a>
+<a id="keaid1136228" class="dropdown-item" href="kreis2026.aspx">ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ (KREIS)/ ಏಕಲವ್ಯ ಮಾದರಿ ವಸತಿ ಶಾಲೆ (EMRS))  ಪ್ರವೇಶ  - 2026</a>
+<a id="keaid1134567" class="dropdown-item" href="ugneet2025.aspx">ಯುಜಿ ನೀಟ್-2025 (Medical/Dental/AYUSH) </a>
+<a id="keaid1135625" class="dropdown-item" href="pgayush2025.aspx">  ಪಿಜಿ ಆಯುಷ್ 2025</a>
+<a class="dropdown-item dropdown-toggle" href="#"><span id="keaid1135139">ಪಿಜಿಇಟಿ - 2025 (ವೈದ್ಯಕೀಯ/ದಂತ ಮತ್ತು DNB)</span></a>
+<a id="keaid1134518" class="dropdown-item" href="pget2025.aspx">ಪಿಜಿ-ದಂತ ವೈದ್ಯಕೀಯ</a>
+<a id="keaid1135142" class="dropdown-item" href="pgetmed2025.aspx">ಪಿಜಿ-ವೈದ್ಯಕೀಯ/DNB</a>
+<a id="keaid1135108" class="dropdown-item" href="pgnursing2025.aspx">M.Sc ನರ್ಸಿಂಗ್/MPT/M.Sc AHS/ಎಂ-ಫಾರ್ಮ್ ಮತ್ತು ಫಾರ್ಮಾ -ಡಿ (ಪೋಸ್ಟ್ ಬ್ಯಾಕಲೌರಿಯೇಟ್) ಕೋರ್ಸ್‌ಗಳು -2025</a>
+<a id="keaid1135966" class="dropdown-item" href="dippharmacy2025.aspx">ಡಿಪ್ಲೊಮಾ ಫಾರ್ಮಸಿ 2025</a>
+<a id="keaid1134949" class="dropdown-item" href="kset2025.aspx">ಕರ್ನಾಟಕ ರಾಜ್ಯ ಅರ್ಹತಾ ಪರೀಕ್ಷೆ (ಕೆ-ಸೆಟ್)-2025</a>
+<a id="keaid10933" class="dropdown-item" href="kset2024.aspx">ಕರ್ನಾಟಕ ರಾಜ್ಯ ಅರ್ಹತಾ ಪರೀಕ್ಷೆ (ಕೆ-ಸೆಟ್)-2024</a>
+<a id="keaid8665" class="dropdown-item" href="kset2023.aspx">ಕರ್ನಾಟಕ ರಾಜ್ಯ ಅರ್ಹತಾ ಪರೀಕ್ಷೆ (ಕೆ-ಸೆಟ್)-2023</a>
+<a class="dropdown-item dropdown-toggle" href="#">DCET (Diploma Common Entrance Test)</a>
+<a class="dropdown-item" href="#">Engineering</a>
+<a class="dropdown-item" href="#">Architecture</a>
+<a class="dropdown-item" href="#">CUTOFF ANALYSER</a>
+<a class="dropdown-item" href="cutoff.aspx">CUT-OFF RANKS</a>
+<a href="#" class="home-text nav-link dropdown-toggle" id="navbarDropdownMenuLink1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span id="keaid4980">ಹಿಂದಿನ ವರ್ಷದ ವಿವರಗಳು</span></a>
+<a id="keaid1133826" class="dropdown-item" href="kreis2025.aspx">ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ ಪ್ರವೇಶ / EMRS - 2025</a>
+<a id="keaid1133848" class="dropdown-item" href="ugcet2025.aspx">ಯುಜಿ ಸಿಇಟಿ - 2025</a>
+<a id="keaid1134227" class="dropdown-item" href="dcet2025.aspx">ಡಿಪ್ಲೊಮಾ ಸಿಇಟಿ 2025</a>
+<a id="keaid1134230" class="dropdown-item" href="pgcet2025.aspx">ಪಿಜಿಸಿಇಟಿ-2025 (ಎಂಬಿಎ/ಎಂಸಿಎ/ಎಂಟೆಕ್/ಎಂಆರ್ಚ್)</a>
+<a id="keaid1135233" class="dropdown-item" href="nursingltr2025.aspx">PB.B.sc,  B.P.T ಲ್ಯಾಟರಲ್, B.sc AHS ಲ್ಯಾಟರಲ್ - 2025</a>
+<a id="keaid9577" class="dropdown-item" href="kreis2024.aspx">ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ ಪ್ರವೇಶ 2024</a>
+<a id="keaid9745" class="dropdown-item" href="ugcet2024.aspx">ಯುಜಿ ಸಿಇಟಿ-2024</a>
+<a id="keaid1132758" class="dropdown-item" href="pgayush2024.aspx">  ಪಿಜಿ ಆಯುಷ್ 2024</a>
+<a id="keaid10725" class="dropdown-item" href="ugneet24.aspx">ಯುಜಿ ನೀಟ್- 2024</a>
+<a id="keaid10339" class="dropdown-item" href="dcet2024.aspx">ಡಿಪ್ಲೊಮಾ ಸಿಇಟಿ 2024</a>
+<a id="keaid10547" class="dropdown-item" href="gttc24.aspx">ಜಿಟಿಟಿಸಿ-ಡಿಪ್ಲೊಮಾ-2024</a>
+<a id="keaid10572" class="dropdown-item" href="pgcet24.aspx">ಪಿಜಿಸಿಇಟಿ-2024 (ಎಂಬಿಎ/ಎಂಸಿಎ/ಎಂಟೆಕ್/ಎಂಆರ್ಚ್)</a>
+<a id="keaid1133161" class="dropdown-item" href="mscmpt2024.aspx">ಎಂ.ಎಸ್ಸಿ  ನರ್ಸಿಂಗ್ /ಎಂ.ಪಿ .ಟಿ - 2024</a>
+<a id="keaid10847" class="dropdown-item" href="pget2024.aspx"> ಪಿಜಿಇಟಿ-2024 (ವೈದ್ಯಕೀಯ/ದಂತ ಮತ್ತು DNB)</a>
+<a id="keaid1133301" class="dropdown-item" href="MDPHARMA24.aspx">ಎಂ-ಫಾರ್ಮಾ ಮತ್ತು ಫಾರ್ಮಾ-ಡಿ (ಪೋಸ್ಟ್ ಬ್ಯಾಕಲೌರಿಟ್)</a>
+<a id="keaid8174" class="dropdown-item" href="dcet23.aspx">ಡಿಪ್ಲೊಮಾ ಸಿಇಟಿ 2023</a>
+<a id="keaid9241" class="dropdown-item" href="pgayush2023.aspx">ಪಿ.ಜಿ. ಆಯುಷ್ -2023</a>
+<a id="keaid8489" class="dropdown-item" href="pgcet2023.aspx">ಪಿಜಿಸಿಇಟಿ 2023 (ಎಂಬಿಎ/ಎಂಸಿಎ/ಎಂಟೆಕ್/ಎಂಆರ್ಚ್)</a>
+<a id="keaid8962" class="dropdown-item" href="mscmpt23.aspx">ಎಂ.ಎಸ್ಸಿ  ನರ್ಸಿಂಗ್ /ಎಂ.ಪಿ .ಟಿ -2023</a>
+<a id="keaid8965" class="dropdown-item" href="mscahs23.aspx">ಎಂ .ಎಸ್ಸಿ.ಎಹೆಚ್ಎಸ್-2023</a>
+<a id="keaid8968" class="dropdown-item" href="mpharm23.aspx">ಎಂ.ಫಾರ್ಮ -2023</a>
+<a id="keaid9066" class="dropdown-item" href="nursing2023.aspx">B.sc AHS,B.P.O,B.P.T -2023</a>
+<a id="keaid7382" class="dropdown-item" href="kreis23.aspx">ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ ಪ್ರವೇಶ 2023</a>
+<a id="keaid8300" class="dropdown-item" href="gttc23.aspx">ಜಿಟಿಟಿಸಿ-ಡಿಪ್ಲೊಮಾ-2023</a>
+<a id="keaid7907" class="dropdown-item" href="cet2023.aspx">ಯುಜಿ ಸಿಇಟಿ -  2023</a>
+<a id="keaid8380" class="dropdown-item" href="Neet2023.aspx">ಯುಜಿ ನೀಟ್-2023</a>
+<a id="keaid8435" class="dropdown-item" href="pget2023.aspx"> ಪಿಜಿಇಟಿ 2023 (ವೈದ್ಯಕೀಯ/ದಂತ ಮತ್ತು DNB)</a>
+<a id="keaid3747" class="dropdown-item" href="Qpaper.aspx">ಕೀ ಉತ್ತರಗಳೊಂದಿಗೆ ಹಿಂದಿನ ವರ್ಷದ ಪ್ರಶ್ನೆಪತ್ರಿಕೆ</a>
+<a id="keaid6926" class="dropdown-item" href="iaskasssc22.aspx">ಐಎಎಸ್ / ಕೆಎಎಸ್ / ಎಸ್‌ಎಸ್‌ಸಿ / ಬ್ಯಾಂಕಿಂಗ್ - 2022</a>
+<a id="keaid6879" class="dropdown-item" href="ugneet22.aspx">ಯುಜಿ ನೀಟ್-2022</a>
+<a id="keaid6314" class="dropdown-item" href="cet2022.aspx">ಯುಜಿ ಸಿಇಟಿ -  2022</a>
+<a id="keaid6876" class="dropdown-item" href="Pgcet22.aspx">ಪಿಜಿ ಸಿಇಟಿ-2022 - (ಎಂ ಬಿ ಎ, ಎಂಸಿಎ, ಎಮ್ ಟೆಕ್)</a>
+<a id="keaid6669" class="dropdown-item" href="bscbptahs22.aspx">ಬಿ.ಎಸ್ಸಿ . ನರ್ಸಿಂಗ್ / ಬಿಪಿಒ / ಬಿಪಿಟಿ ಮತ್ತು ಬಿ.ಎಸ್ಸಿ . ಅಲೈಡ್ ಹೆಲ್ತ್ ಸೈನ್ಸ್  ಪ್ರವೇಶ - 2022</a>
+<a id="keaid6721" class="dropdown-item" href="dcet22.aspx">ಡಿಪ್ಲೊಮಾ ಸಿಇಟಿ 2022</a>
+<a id="keaid6727" class="dropdown-item" href="pget2022.aspx">ಪಿಜಿಇಟಿ -2022 (ವೈದ್ಯಕೀಯ /ದಂತವೈದ್ಯಕೀಯ)</a>
+<a id="keaid6836" class="dropdown-item" href="MscMpt22.aspx">ಎಂ.ಎಸ್.ಸಿ ನರ್ಸಿಂಗ್, ಎಂಪಿಟಿ - 2022</a>
+<a id="keaid6833" class="dropdown-item" href="Mpharam22.aspx">ಎಂ ಫಾರ್ಮ್ ಮತ್ತು ಫಾರ್ಮ್ ಡಿ - 2022</a>
+<a id="keaid6848" class="dropdown-item" href="MscAhs22.aspx">ಎಂ.ಎಸ್ಸಿ ಅಲೈಡ್ ಹೆಲ್ತ್ ಸೈನ್ಸಸ್ ಕೋರ್ಸ್ - 2022</a>
+<a id="keaid6851" class="dropdown-item" href="BscLateral22.aspx">ಪಿಬಿ ಬಿಎಸ್ಸಿ ನರ್ಸಿಂಗ್ ಮತ್ತು ಬಿಪಿಒ, ಬಿಪಿಟಿ, ಬಿಎಸ್ಸಿ ಸಂಬಂಧಿತ ಆರೋಗ್ಯ ವಿಜ್ಞಾನಗಳ ಲ್ಯಾಟರಲ್ ಪ್ರವೇಶ</a>
+<a id="keaid3946" class="dropdown-item" href="https://dtetech.karnataka.gov.in/kartechnical/">ಪ್ರಥಮ ವರ್ಷದ ಡಿಪ್ಲೊಮಾ ಪ್ರವೇಶ 2022</a>
+<a id="keaid5911" class="dropdown-item" href="kreis22.aspx">ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ ಪ್ರವೇಶ 2022</a>
+<a id="keaid7894" class="dropdown-item" href="pgayush2022.aspx">ಪಿ.ಜಿ. ಆಯುಷ್ -2022</a>
+<a id="keaid6170" class="dropdown-item" href="pgayush2021.aspx">ಪಿ.ಜಿ. ಆಯುಷ್ -2021</a>
+<a id="keaid5541" class="dropdown-item" href="ugneet2021.aspx">ಯುಜಿ ನೀಟ್ 2021</a>
+<a id="keaid4784" class="dropdown-item" href="cet2021.aspx">ಯುಜಿ ಸಿಇಟಿ- 2021</a>
+<a id="keaid5214" class="dropdown-item" href="pget2021.aspx">ಪಿಜಿಇಟಿ -2021 (ವೈದ್ಯಕೀಯ /ದಂತವೈದ್ಯಕೀಯ)</a>
+<a id="keaid5568" class="dropdown-item" href="bscbpt21.aspx">ಬಿ.ಎಸ್ಸಿ . ನರ್ಸಿಂಗ್,ಬಿಪಿಟಿ, ಬಿಪಿಒ  ಮತ್ತು ಅಲೈಡ್ ಹೆಲ್ತ್ ಸೈನ್ಸ್  ಪ್ರವೇಶ -2021</a>
+<a id="keaid5858" class="dropdown-item" href="MscMpt21.aspx">ಎಂ.ಎಸ್.ಸಿ ನರ್ಸಿಂಗ್, ಎಂಪಿಟಿ -2021</a>
+<a id="keaid5855" class="dropdown-item" href="Mpharam21.aspx">ಎಂ ಫಾರ್ಮ್ ಮತ್ತು ಫಾರ್ಮ್ ಡಿ 2021</a>
+<a id="keaid5577" class="dropdown-item" href="pbbsclater21.aspx">ಪಿಬಿ. ಬಿ.ಎಸ್ಸಿ ನರ್ಸಿಂಗ್  (ಲ್ಯಾಟರಲ್) 2021  ಪ್ರವೇಶ</a>
+<a id="keaid5580" class="dropdown-item" href="ahslater21.aspx">ಬಿಎಸ್ಸಿ ಅಲೈಡ್ ಆರೋಗ್ಯ ವಿಜ್ಞಾನಗಳು - 2021 (ಲ್ಯಾಟರಲ್ ಎಂಟ್ರಿ)  ಪ್ರವೇಶ</a>
+<a id="keaid5585" class="dropdown-item" href="bptlater21.aspx"> ಬಿಪಿಟಿ ಲ್ಯಾಟರಲ್ 2021  ಪ್ರವೇಶ</a>
+<a id="keaid5070" class="dropdown-item" href="pgcet21.aspx">ಪಿಜಿ ಸಿಇಟಿ-2021 (ಎಂಬಿಎ , ಎಂಸಿಎ ,ಎಂ.ಟೆಕ್/ಎಂ ಆರ್ಕ್  )</a>
+<a id="keaid5064" class="dropdown-item" href="dcet21.aspx">ಡಿಪ್ಲೊಮಾ ಸಿಇಟಿ 2021</a>
+<a id="keaid4832" class="dropdown-item" href="mscahs20.aspx">ಎಂ.ಎಸ್ಸಿ. ಅಲೈಡ್ ಹೆಲ್ತ್ ಸೈನ್ಸ್ -2020</a>
+<a id="keaid4614" class="dropdown-item" href="pgayush2020.aspx">ಪಿ.ಜಿ. ಆಯುಷ್ -2020</a>
+<a id="keaid4093" class="dropdown-item" href="ugneet2020.aspx">ಯುಜಿ ನೀಟ್ 2020 </a>
+<a id="keaid4659" class="dropdown-item" href="bscbpt20.aspx">ಬಿ.ಎಸ್ಸಿ . ನರ್ಸಿಂಗ್ ಮತ್ತು ಅಲೈಡ್ ಹೆಲ್ತ್ ಸೈನ್ಸ್  ಪ್ರವೇಶ -2020</a>
+<a id="keaid3586" class="dropdown-item" href="cet2020.aspx">ಯುಜಿ ಸಿಇಟಿ -  2020</a>
+<a id="keaid4551" class="dropdown-item" href="ayush2020.aspx">  ಯುಜಿ ಆಯುಷ್  2020</a>
+<a id="keaid3641" class="dropdown-item" href="pget.aspx">ಪಿಜಿಇಟಿ 2020</a>
+<a id="keaid3748" class="dropdown-item" href="pgcet20.aspx">ಪಿಜಿ ಸಿಇಟಿ-2020 (ಎಮ್ ಬಿ ಎ, ಎಂಸಿಎ, ಎಮ್ ಟೆಕ್)</a>
+<a id="keaid3751" class="dropdown-item" href="dcet20.aspx">ಡಿಪ್ಲೊಮಾ ಸಿ ಇ ಟಿ 2020</a>
+<a id="keaid3873" class="dropdown-item" href="pgetdnb.aspx">ಪಿಜಿ ಡಿಎನ್‌ಬಿ 2020 - ವೈದ್ಯಕೀಯ ಡಿಎನ್‌ಬಿ ಕೋರ್ಸ್‌</a>
+<a href="#" class="home-text nav-link dropdown-toggle" id="navbarDropdownMenuLinkarchive2" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span id="keaid26"> ಪತ್ರಾಗಾರ</span></a>
+<a id="keaid27" class="dropdown-item" href="archive2018.aspx"> ಪತ್ರಾಗಾರ-2018</a>
+<a id="keaid28111" class="dropdown-item"></a>
+<a id="keaid20" class="dropdown-item" href="Qpaper.aspx">ಪ್ರಶ್ನೆ ಪತ್ರಿಕೆಗಳು</a>
+<a id="keaid2703" class="dropdown-item" href="cutoffanalyser.aspx"> ಕಟ್ ಆಫ್ ರಾೄಂಕ್ ಗಳ    ವಿಶ್ಲೇಷಣೆ </a>
+<a href="#" class="home-text nav-link dropdown-toggle" id="navbarDropdownMenuLinkpu3" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span id="keaid6">ನೇಮಕಾತಿ</span></a>
+<a class="dropdown-item dropdown-toggle" href="#"><span id="keaid1137379">KSRP , IRB  & KSISF ನೇಮಕಾತಿ - 2026</span></a>
+<a id="keaid1137382" class="dropdown-item" href="kisrpc2026.aspx">KSRP ನೇಮಕಾತಿ - 2026 (RPC)</a>
+<a id="keaid1137385" class="dropdown-item" href="kiskk2026.aspx">KSRP , IRB  & KSISF ನೇಮಕಾತಿ - 2026 (KK)</a>
+<a class="dropdown-item dropdown-toggle" href="#"><span id="keaid1137386">ಗ್ರಾಮ ಆಡಳಿತ ಅಧಿಕಾರಿ ನೇಮಕಾತಿ - 2026</span></a>
+<a id="keaid1137389" class="dropdown-item" href="vaorpc2026.aspx">ಗ್ರಾಮ ಆಡಳಿತ ಅಧಿಕಾರಿ ನೇಮಕಾತಿ - 2026 (RPC)</a>
+<a id="keaid1137392" class="dropdown-item" href="vaokk2026.aspx">ಗ್ರಾಮ ಆಡಳಿತ ಅಧಿಕಾರಿ ನೇಮಕಾತಿ - 2026 (KK)</a>
+<a class="dropdown-item dropdown-toggle" href="#"><span id="keaid1137393">ಭೂ ಮಾಪಕರ ನೇಮಕಾತಿ - 2026</span></a>
+<a id="keaid1137396" class="dropdown-item" href="landrpc2026.aspx">ಭೂ ಮಾಪಕರ ನೇಮಕಾತಿ - 2026 (RPC)</a>
+<a id="keaid1137399" class="dropdown-item" href="landkk2026.aspx">ಭೂ ಮಾಪಕರ ನೇಮಕಾತಿ - 2026 (KK)</a>
+<a class="dropdown-item dropdown-toggle" href="#"><span id="keaid1137400">KREIS ನೇಮಕಾತಿ - 2026</span></a>
+<a id="keaid1137403" class="dropdown-item" href="kreisrpc2026.aspx">KREIS ನೇಮಕಾತಿ - 2026 (RPC)</a>
+<a id="keaid1137406" class="dropdown-item" href="kreiskk2026.aspx">KREIS ನೇಮಕಾತಿ - 2026 (KK)</a>
+<a id="keaid1137348" class="dropdown-item" href="iaskas26.aspx">ಐಎಎಸ್/ ಕೆಎಎಸ್/ ಆರ್‌ಆರ್‌ಬಿ / ಬ್ಯಾಂಕಿಂಗ್/ ಗ್ರೂಪ್-ಸಿ ಮತ್ತು ಎಸ್‌ಎಸ್‌ಸಿ -2026</a>
+<a class="dropdown-item dropdown-toggle" href="#"><span id="keaid1137133">ಸಶಸ್ತ್ರ ಪೊಲೀಸ್ ಕಾನ್ಸ್‌ಟೇಬಲ್ (CAR/DAR) -2026</span></a>
+<a id="keaid1137136" class="dropdown-item" href="apcrpc.aspx">ಸಶಸ್ತ್ರ ಪೊಲೀಸ್ ಕಾನ್ಸ್‌ಟೇಬಲ್ (CAR/DAR)(RPC)</a>
+<a id="keaid1137139" class="dropdown-item" href="apckk.aspx">ಸಶಸ್ತ್ರ ಪೊಲೀಸ್ ಕಾನ್ಸ್‌ಟೇಬಲ್ (CAR/DAR) (KK)</a>
+<a class="dropdown-item dropdown-toggle" href="#"><span id="keaid1137018">ಸಿವಿಲ್  ಪೊಲೀಸ್ ಕಾನ್ಸ್‌ಟೇಬಲ್ ನೇಮಕಾತಿ - 2026</span></a>
+<a id="keaid1137021" class="dropdown-item" href="cpcrpc2026.aspx">ಸಿವಿಲ್  ಪೊಲೀಸ್ ಕಾನ್ಸ್‌ಟೇಬಲ್ ನೇಮಕಾತಿ (RPC) </a>
+<a id="keaid1137024" class="dropdown-item" href="cpckk2026.aspx">ಸಿವಿಲ್  ಪೊಲೀಸ್ ಕಾನ್ಸ್‌ಟೇಬಲ್ ನೇಮಕಾತಿ (KK)</a>
+<a id="keaid1136849" class="dropdown-item" href="kearpcrec2026.aspx">ಕೆಇಎ ನೇಮಕಾತಿ (RPC) - 2026</a>
+<a id="keaid1136694" class="dropdown-item" href="kslsark2026.aspx">KSLSA (SO) ನೇಮಕಾತಿ -2026 (RPC)</a>
+<a id="keaid1136290" class="dropdown-item" href="dipharmrec2026.aspx">ಡಿಪ್ಲೊಮಾ ಇನ್ ಫಾರ್ಮಸಿ ಅಪ್ರೆಂಟಿಸ್‌ಶಿಪ್ ತರಬೇತಿ - 2026</a>
+<a id="keaid1135348" class="dropdown-item" href="vdptrecnhk2025.aspx"> ವಿವಿಧ ಇಲಾಖೆಗಳ ನೇಮಕಾತಿ(NON-HK) - 2025</a>
+<a id="keaid1134507" class="dropdown-item" href="bcwd2025.aspx">ಐಎಎಸ್/ಕೆಎಎಸ್/ಗ್ರೂಪ್-ಸಿ ಮತ್ತು ಇತರೆ ಪರೀಕ್ಷೆಗಳು(BCWD) -2025</a>
+<a id="keaid1134275" class="dropdown-item" href="iaskashk.aspx">ಐಎಎಸ್/ ಕೆಎಎಸ್ ಸಾಮಾನ್ಯ ಪ್ರವೇಶ ಪರೀಕ್ಷೆ(ಕಲ್ಯಾಣ ಕರ್ನಾಟಕ) </a>
+<a id="keaid1133626" class="dropdown-item" href="iaskas24.aspx">ಐಎಎಸ್/ ಕೆಎಎಸ್/ ಆರ್‌ಆರ್‌ಬಿ / ಬ್ಯಾಂಕಿಂಗ್/ ಗ್ರೂಪ್-ಸಿ ಮತ್ತು ಎಸ್‌ಎಸ್‌ಸಿ -2024</a>
+<a id="keaid1133237" class="dropdown-item" href="klc2024.aspx">ಕರ್ನಾಟಕ ವಿಧಾನ ಪರಿಷತ್ತಿನ</a>
+<a id="keaid11038" class="dropdown-item" href="raichur2024.aspx">ರಾಯಚೂರು ವಿಶ್ವವಿದ್ಯಾಲಯ (ಸಹಾಯಕ ಪ್ರಾಧ್ಯಾಪಕ)- 2024</a>
+<a id="keaid10147" class="dropdown-item" href="GBOREC2024.aspx">ಜಿಟಿಟಿಸಿ/ಬಿಡಿಎ ಮತ್ತು ಇತರೆ ನೇಮಕಾತಿ -2024</a>
+<a id="keaid10144" class="dropdown-item" href="PSIREC2024.aspx">ಪಿಎಸ್‌ಐ ನೇಮಕಾತಿ-2024 </a>
+<a id="keaid10072" class="dropdown-item" href="vacrec24.aspx">ಗ್ರಾಮ ಆಡಳಿತ ಅಧಿಕಾರಿ ನೇಮಕಾತಿ -2024</a>
+<a id="keaid9711" class="dropdown-item" href="KSFC2023.aspx">ಕರ್ನಾಟಕ ರಾಜ್ಯ ಹಣಕಾಸು ನಿಗಮ-2023</a>
+<a id="keaid9401" class="dropdown-item" href="PSI2023.aspx">ಪಿಎಸ್‌ಐ ನೇಮಕಾತಿ (ಮರು ಪರೀಕ್ಷೆ)-2023</a>
+<a id="keaid8984" class="dropdown-item" href="kbknrk2023.aspx">KUWSB/BMTC/KKRTC/NWRTC/RGUHS/KSDL 2023 - ನೇಮಕಾತಿ</a>
+<a id="keaid8987" class="dropdown-item" href="sjmcrec2023.aspx">ಜಯದೇವ 2023 - ನೇಮಕಾತಿ</a>
+<a id="keaid8239" class="dropdown-item" href="bmrcl23.aspx">ಬಿಎಂಆರ್ ಸಿಎಲ್ - 2023</a>
+<a id="keaid8296" class="dropdown-item" href="hfw23.aspx">ಎಚ್ ಎಫ್ ಡಬ್ಲ್ಯೂ- 2023</a>
+<a id="keaid8271" class="dropdown-item" href="civil23.aspx">	ಸಿವಿಲ್ ನ್ಯಾಯಾಧೀಶರು-2023</a>
+<a id="keaid8291" class="dropdown-item"></a>
+<a id="keaid8290" class="dropdown-item" href="karrec23.aspx">ಕೆಎಸ್ಇಡಿಸಿ /ಕೆಎಫ್ ಸಿಎಸ್ ಸಿ /ಕೆ ಬಿ ಸಿ ಡಬ್ಲ್ಯೂಬಿ/ಎಂಎಸ್ಐಎಲ್-2023</a>
+<a id="keaid7285" class="dropdown-item" href="sainik22.aspx">ಸೈನಿಕ ಕಲ್ಯಾಣ ಮತ್ತು ಪುನರ್ವಸತಿ ಇಲಾಖೆ </a>
+<a id="keaid7269" class="dropdown-item" href="gfgcp22.aspx">ಸರ್ಕಾರಿ ಪ್ರಥಮ ದರ್ಜೆ ಕಾಲೇಜು - ಪ್ರಾಂಶುಪಾಲರು (ಯುಜಿ) - 2022</a>
+<a id="keaid7025" class="dropdown-item" href="klas2022.aspx">ಕರ್ನಾಟಕ ವಿಧಾನಸಭೆ ಸಚಿವಾಲಯ</a>
+<a id="keaid9665" class="dropdown-item" href="iaskasssc23.aspx">ಐಎಎಸ್ / ಕೆಎಎಸ್ / ಎಸ್‌ಎಸ್‌ಸಿ / ಬ್ಯಾಂಕಿಂಗ್ - 2023</a>
+<a id="keaid6738" class="dropdown-item" href="kahvs.aspx">ಪಶುಪಾಲನಾ ಮತ್ತು ಪಶುವೈದ್ಯ ಸೇವಾ ಇಲಾಖೆ</a>
+<a id="keaid6489" class="dropdown-item" href="kptcl2022.aspx">ಕೆಪಿಟಿಸಿಎಲ್ 2022</a>
+<a id="keaid6962" class="dropdown-item" href="vo2022.aspx">ಪಶುವೈದ್ಯ ಅಧಿಕಾರಿ -2022 - ಕನ್ನಡ ಪರೀಕ್ಷೆ ಫಲಿತಾಂಶ</a>
+<a id="keaid6482" class="dropdown-item" href="ksscl.aspx">ಕರ್ನಾಟಕ ರಾಜ್ಯ ಬೀಜ ನಿಗಮ ನಿಯಮಿತ - 2022</a>
+<a id="keaid6190" class="dropdown-item" href="kridl2022.aspx">ಕೆ.ಆರ್.ಐ.ಡಿ.ಎಲ್  ನೇಮಕಾತಿ  - 2022</a>
+<a id="keaid5172" class="dropdown-item" href="gfgc2021.aspx">ಸರ್ಕಾರಿ ಪ್ರಥಮ ದರ್ಜೆ ಕಾಲೇಜು (ಸಹಾಯಕ ಪ್ರಾಧ್ಯಾಪಕರು) -2021</a>
+<a id="keaid5255" class="dropdown-item" href="iaskasssc.aspx">ಐಎಎಸ್ / ಕೆಎಎಸ್ / ಎಸ್‌ಎಸ್‌ಸಿ / ಬ್ಯಾಂಕಿಂಗ್</a>
+<a id="keaid1475" class="dropdown-item dropdown-toggle" href="indexnew.aspx">ಉಪನ್ಯಾಸಕರ ನೇಮಕಾತಿ</a>
+<a id="keaid9" class="dropdown-item" href="Recruit.aspx">ಪಿಯು ಉಪನ್ಯಾಸಕರ ನೇಮಕಾತಿ</a>
+<a id="keaid1476" class="dropdown-item" href="Assprof.aspx">ಸಹಾಯಕ ಪ್ರಾಧ್ಯಾಪಕ</a>
+<a id="keaid68" class="dropdown-item" href="manpower.aspx">ಕೆಇಎ ನೇಮಕಾತಿ 2024</a>
+<a id="keaid7" class="dropdown-item" href="bwssb.aspx">ಬಿ ಡಬ್ಲ್ಯೂ ಎಸ್ ಎಸ್ ಬಿ</a>
+<a id="keaid2100" class="dropdown-item" href="bmrcl.aspx">ಬಿಎಂಆರ್ ಸಿಎಲ್ - 2019</a>
+<a id="keaid2098" class="dropdown-item" href="pdogps.aspx">ಪಿ ಡಿ ಒ & ಜಿಪಿಎಸ್ (ಜಿ -1)</a>
+<a id="keaid26571" class="dropdown-item"></a>
+<a id="keaid2659" class="dropdown-item" href="PWD2019.aspx">ಪಿ ಡಬ್ಲ್ಯೂ ಡಿ - 2019</a>
+<a id="keaid20212" class="dropdown-item"></a>
+<a id="keaid3343" class="dropdown-item" href="kptcl2019.aspx">ಕೆಪಿಟಿಸಿಎಲ್ 2019</a>
+<a id="keaid3430" class="dropdown-item" href="asstprosecutor.aspx">ಸಹಾಯಕ ಸರ್ಕಾರಿ  ಅಭಿಯೋಜಕರು - ವ -ಸಹಾಯಕ ಸರ್ಕಾರಿ  ವಕೀಲರು </a>
+<a id="keaid3578" class="dropdown-item" href="Ksrtc.aspx">ಕೆ ಎಸ್ ಆರ್ ಟಿಸಿ 2020</a>
+<a class="dropdown-item" href="#">BMRCL</a>
+<a class="dropdown-item dropdown-toggle" href="#">PWD</a>
+<a class="dropdown-item" href="#">Assistant Engineer</a>
+<a class="dropdown-item" href="#">Junior Engineer</a>
+<a class="dropdown-item" href="#">Metro</a>
+<a id="keaid22" class="home-text nav-link" href="RTI.aspx"> ಮಾಹಿತಿ ಹಕ್ಕು ಅಧಿನಿಯಮ</a>
+<a id="keaid21" class="home-text nav-link" href="Tenders.aspx">ಟೆಂಡರ್</a>
+<a href="#" class="home-text nav-link dropdown-toggle" id="navbarDropdownMenucollege" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span id="keaid5">ಕಾಲೇಜ್ ಪೋರ್ಟಲ್</span></a>
+<a id="keaid1136982" class="home-text nav-link" href="https://cetonline.karnataka.gov.in/ugcollegeportal2026/Login.aspx">UGCET - 2026 ಕಾಲೇಜ್ ಪೋರ್ಟಲ್  ಲಿಂಕ್.</a>
+<a id="keaid10771" class="home-text nav-link" href="https://cetonline.karnataka.gov.in/ugcetportal/Login.aspx">UGCET - 2025 ಕಾಲೇಜ್ ಪೋರ್ಟಲ್  ಲಿಂಕ್.</a>
+<a id="keaid1134427" class="home-text nav-link" href="https://164.100.133.71/UGCETCOLLEGERPT/FORMS/DOWNLOADDETAILS.ASPX">ಯುಜಿಸಿಇಟಿ - 2024 ಕಾಲೇಜು ವರದಿ ಡೌನ್‌ಲೋಡ್ ಲಿಂಕ್.</a>
+<a id="keaid1134570" class="home-text nav-link" href="https://cetonline.karnataka.gov.in/ugmed_clgrpt/forms/downloaddetails.aspx">UGNEET-2024 (ವೈದ್ಯಕೀಯ / ದಂತ ವೈದ್ಯಕೀಯ) ಕಾಲೇಜು ವರದಿ ಡೌನ್‌ಲೋಡ್ ಲಿಂಕ್.</a>
+<a id="keaid5453" class="home-text nav-link" href="https://keaonline.karnataka.gov.in/mpharma_col_cnf_2024/main/index.php">M-Pharma ಕಾಲೇಜು  ದೃಢೀಕರಣ -2024</a>
+<a id="keaid7618" class="home-text nav-link"></a>
+<a id="keaid3447" class="home-text nav-link">ಕಾಲೇಜು  ದೃಢೀಕರಣ </a>
+<a class="dropdown-item dropdown-toggle" href="#"><span id="keaid3561">ಆನ್‌ಲೈನ್  ಕಾಲೇಜು ಸಮನ್ವಯ  ಲಿಂಕ್ </span></a>
+<a id="keaid10162" class="dropdown-item">PGCET - 2024  ಕಾಲೇಜು ಸಮನ್ವಯ  ಲಿಂಕ್ (MBA/MCA/MTech)</a>
+<a id="keaid4670" class="dropdown-item" href="https://keaonline.karnataka.gov.in/dcet_2024_rec/main/index.php">DCET - 2024  ಕಾಲೇಜು ಸಮನ್ವಯ  ಲಿಂಕ್ (B.E/B.TECH LATERAL ENTRY)</a>
+<a id="keaid9776" class="dropdown-item" href="http://164.100.133.71/dcet_even_rec_2023/main/index.php">DCET-2023 ಕಾಲೇಜು ಸಮನ್ವಯ ಲಿಂಕ್ ಕೆಲಸ ಮಾಡುವ ವೃತ್ತಿಪರ ವಿದ್ಯಾರ್ಥಿಗಳಿಗೆ .</a>
+<a id="keaid9742" class="dropdown-item" href="http://164.100.133.71/UGAYUSH_REC_2023_COLLEGE/main/index.php">UGAYUSH-2023  ಕಾಲೇಜು ಸಮನ್ವಯ  ಲಿಂಕ್</a>
+<a id="keaid4669" class="dropdown-item" href="http://164.100.133.71/UGCET_REC_2023/main/index.php">UGCET-2023  ಕಾಲೇಜು ಸಮನ್ವಯ  ಲಿಂಕ್(Farm Science/Pharmacy and other courses) </a>
+<a id="keaid3374" class="dropdown-item" href="http://164.100.133.71/UGNEET_REC_2023/main/index.php">UGNEET-2023  ಕಾಲೇಜು ಸಮನ್ವಯ  ಲಿಂಕ್</a>
+<a id="keaid4971" class="dropdown-item" href="http://164.100.133.71/PGET_REC_2023/main/index.php">PGET-2023  ಕಾಲೇಜು ಸಮನ್ವಯ  ಲಿಂಕ್</a>
+<a id="keaid2840" class="home-text nav-link" href="https://cetonline.karnataka.gov.in/seatspg2025/">ಪಿಜಿಇಟಿ-2025(ವೈದ್ಯಕೀಯ/ದಂತ ವೈದ್ಯಕೀಯ) - ಕಾಲೇಜ್ ಪೋರ್ಟಲ್</a>
+<a id="keaid4691" class="home-text nav-link"></a>
+<a id="keaid4708" class="home-text nav-link" href="https://keaonline.karnataka.gov.in/pbbsc_coll_conf_2024/main/index.php">PB BSc ನರ್ಸಿಂಗ್ (ಲ್ಯಾಟರಲ್ ಎಂಟ್ರಿ)-ಕಾಲೇಜ್ ದೃಢೀಕರಣ ಲಿಂಕ್ - 2024</a>
+<a id="keaid4977" class="home-text nav-link" href="https://keaonline.karnataka.gov.in/ugayush_reconcile_2022/main/index.php">ಕಾಲೇಜು  ಬೋಧನಾ  ಶುಲ್ಕ  ಬಿಡುಗಡೆ  ಲಿಂಕ್ - ಯುಜಿ ಆಯುಷ್ 2022</a>
+<a id="keaid9650" class="home-text nav-link">GFGC ಪ್ರಾಂಶುಪಾಲರ ತಾತ್ಕಾಲಿಕ ಮೆರಿಟ್ ಪಟ್ಟಿ -2023</a>
+<a id="keaid4533" class="home-text nav-link" href="http://keaonline.karnataka.gov.in/bpharma_coll_conf_2024/">BPHARMA LATERAL-2024 ಕಾಲೇಜು  ದೃಢೀಕರಣ</a>
+<a id="keaid2996" class="home-text nav-link"></a>
+<a id="keaid3001" class="dropdown-item dropdown-toggle">ಕಾಲೇಜ್ ಪೋರ್ಟಲ್-ಯುಜಿ ನೀಟ್-2024 (ವೈದ್ಯಕೀಯ /ದಂತ ವೈದ್ಯಕೀಯ )</a>
+<a id="keaid2999" class="dropdown-item" href="https://cetonline.karnataka.gov.in/SEATSUG2024/">ಸೀಟ್ ಎಂಟ್ರಿ ಪೋರ್ಟಲ್(Fees Entry for NRI & Management Seats)-2024</a>
+<a id="keaid3000" class="dropdown-item" href="https://cetonline.karnataka.gov.in/SEATSUG2024/">UGNEET MBBS AND BDS)   ಕಾಲೇಜು  ದೃಢೀಕರಣ ಪ್ರವೇಶ- 2024</a>
+<a id="keaid3526" class="home-text nav-link" href="https://keaonline.karnataka.gov.in/msc_ahs_mpt_col_cnf_2024/main/index.php">ಎಂ.ಎಸ್ಸಿ ನರ್ಸಿಂಗ್ ಕಾಲೇಜು  ದೃಢೀಕರಣ (NON - Inservice) -2024</a>
+<a id="keaid4724" class="home-text nav-link" href="https://keaonline.karnataka.gov.in/ahs_bpt_bpo_regular_2024_college_confirm/main/index.php">AHS/BPT/BPO  (ರೆಗ್ಯುಲರ್ ) ಕಾಲೇಜು ದೃಢೀಕರಣ -2024</a>
+<a id="keaid10613" class="home-text nav-link" href="https://keaonline.karnataka.gov.in/msc_ahs_mpt_col_cnf_2024_inservice/main/index.php">M.Sc Nursing  College Confirmation ( Inservice) -2024</a>
+<a href="#" class="home-text nav-link dropdown-toggle" id="navbarDropdownMenuLinkpu3" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span id="keaid6023">ಶುಲ್ಕ ಮರುಪಾವತಿ</span></a>
+<a id="keaid10348" class="dropdown-item" href="https://keaonline.karnataka.gov.in/pgcet_2023_refund/main/index.php">PGCET- 2023 ಮರುಪಾವತಿ ಲಿಂಕ್</a>
+<a id="keaid9994" class="dropdown-item" href="http://164.100.133.71/dcet_2023_refund_link/main/index.php">DCET-2023 ಮರುಪಾವತಿ ಲಿಂಕ್.</a>
+<a id="keaid9699" class="dropdown-item" href="https://keaonline.karnataka.gov.in/ugcet_2023_bank_account_details/main/index.php">UG CET-2023 ಮರುಪಾವತಿ ಲಿಂಕ್.(Engineering/Architecture/B-pharma/Pharama-D/Farm Sciences/Yoga and Naturopathy)</a>
+<a id="keaid9673" class="dropdown-item" href="https://keaonline.karnataka.gov.in/ugneet_2023_bank_account_details/main/index.php">UG NEET-2023 ಮರುಪಾವತಿ ಲಿಂಕ್ (ಯಾರು ಮರುಪಾವತಿಗೆ ಅರ್ಹರು).(Medical/Dental/Ayush)</a>
+<a id="keaid9818" class="dropdown-item" href="http://164.100.133.71/pget_bank_acount_details_2023/main/index.php">PGET-2023 ಮರುಪಾವತಿ ಲಿಂಕ್ (ಯಾರು ಮರುಪಾವತಿಗೆ ಅರ್ಹರು).(Medical/ Dental/DNB)</a>
+<a id="keaid6024" class="dropdown-item" href="https://cetonline.karnataka.gov.in/keawebentry456/pget2021/pget_cancellation.pdf">ಶುಲ್ಕ ಮರುಪಾವತಿ - ಪಿಜಿಇಟಿ -2021 (ವೈದ್ಯಕೀಯ /ದಂತವೈದ್ಯಕೀಯ)</a>
+<a id="keaid6025" class="dropdown-item">ಶುಲ್ಕ ಮರುಪಾವತಿ - ಸಿಇಟಿ -2021 (ಇಂಜಿನಿಯರಿಂಗ್ ಮತ್ತು ಇತರೆ ಕೋರ್ಸ್‌ಗಳ )</a>
+<a id="keaid6026" class="dropdown-item">ಶುಲ್ಕ ಮರುಪಾವತಿ - ಡಿಸಿಇಟಿ -2021 (ಇಂಜಿನಿಯರಿಂಗ್)</a>
+<a id="keaid6027" class="dropdown-item">ಶುಲ್ಕ ಮರುಪಾವತಿ - ಪಿಜಿಸಿಇಟಿ -2021 (ಎಂಬಿಎ, ಎಂಸಿಎ, ಎಂಟಿಕ್)</a>
+<a href="#" class="home-text nav-link dropdown-toggle" id="navbarDropdownMenuLinkpu3" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span id="keaid8">ಪರೀಕ್ಷೆ ಕೇಂದ್ರ ಪೋರ್ಟಲ್ (ಕಾಲೇಜುಗಳಿಗೆ)</span></a>
+<a id="keaid1136413" class="dropdown-item" href="https://www.cetonline.karnataka.gov.in/KEA_EXAM_PORTAL/Forms/College/Login.aspx">ಪರೀಕ್ಷೆಯ ನಾಮಿನಲ್  ರೋಲ್/ಅಕ್ವಿಟ್ಟನ್ಸ್/ರೂಮ್ ಚಾರ್ಟ್ ಡೌನ್‌ಲೋಡ್ ಲಿಂಕ್</a>
+<a id="keaid1136414" class="dropdown-item" href="https://www.cetonline.karnataka.gov.in/keaPReg/admindash.aspx">ಪರೀಕ್ಷಾ ಕೇಂದ್ರದ  Principal/ Center Chief ನೋಂದಣಿ ಲಿಂಕ್</a>
+<a id="keaid1136415" class="dropdown-item" href="https://cetonline.karnataka.gov.in/keapa/forms/login.aspx">ಪರೀಕ್ಷಾ ಕೇಂದ್ರವಾರು ಹಾಜರಾತಿ ಡೌನ್‌ಲೋಡ್ ಲಿಂಕ್</a>
+<a href="#" class="home-text nav-link dropdown-toggle" id="navbarDropdownMenuLinkpu3" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span id="keaid1133348">ಪ್ರಶ್ನೆ ಪತ್ರಿಕೆಗಳು</span></a>
+<a id="keaid1137110" class="dropdown-item" href="QP2023.aspx">2023</a>
+<a id="keaid1133393" class="dropdown-item" href="QP2024.aspx">2024</a>
+<a id="keaid1134233" class="dropdown-item" href="QP2025.aspx">2025</a>
+<a id="keaid1137107" class="dropdown-item" href="QP2026.aspx">2026</a>
+<a id="keaid1137113" class="home-text nav-link" href="AOC.aspx">ಪ್ರವೇಶ ಮೇಲ್ವಿಚಾರಣಾ ಸಮಿತಿ</a>
+<a class="dropdown-item dropdown-toggle" href="#"><span id="keaid1133774">ಶುಲ್ಕ ನಿಗದಿಗೆ ಪರಿಗಣನೆ </span></a>
+<a id="keaid1133777" class="dropdown-item" href="noticeremder.aspx">ಸೂಚನೆಗಳು/ಜ್ಞಾಪನೆಗಳು</a>
+<a id="keaid1133780" class="dropdown-item" href="circular.aspx">ಸುತ್ತೋಲೆ</a>
+<a class="dropdown-item dropdown-toggle" href="#"><span id="keaid1133794">ದೂರುಗಳು</span></a>
+<a id="keaid1133797" class="dropdown-item" href="compformat.aspx">ದೂರು ಸ್ವರೂಪ</a>
+<a id="keaid1133806" class="dropdown-item" href="regfees.aspx">ಶುಲ್ಕದ  ಪರಿಗಣನೆ  ಬಗ್ಗೆ </a>
+<a id="keaid1133809" class="dropdown-item" href="subcomplaints.aspx">ದೂರುಗಳು</a>
+<a id="keaid1133812" class="dropdown-item" href="othermatter.aspx">ಯಾವುದೇ ಇತರ ಸಂಬಂಧಿತ ವಿಷಯಗಳು</a>
+<a id="keaid1133997" class="home-text nav-link" href="keanewbuilding.aspx">ಕೆ ಇ  ಎ ನೂತನ  ಕಟ್ಟಡ ಕಾಮಗಾರಿ </a>
+<a id="keaid1137295" class="home-text nav-link" href="https://cetonline.karnataka.gov.in/keaomrs/kries.aspx">ಕೇಂದ್ರವಾರು OMR ಲಿಂಕ್</a>
+<a id="ContentPlaceHolder1_keaid2179" class="text-decoration-none" href="indexnew.aspx" style="color:white;">ಮುಖಪುಟ</a>
+<a href="#" class="text-decoration-none"><i class="fas fa-angle-right text-white mx-1"></i></a>
+<a id="ContentPlaceHolder1_keaid4981" class="text-decoration-none" href="indexnew.aspx" style="color:white;"> ಪ್ರವೇಶಗಳು </a>
+<a href="#" class="text-decoration-none"><i class="fas fa-angle-right text-white mx-1"></i></a>
+<a id="ContentPlaceHolder1_keaid1136284" class="text-decoration-none" style="color:white;">ಯುಜಿ ಸಿಇಟಿ - 2026</a>
+<a id='lnk1137408' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/ugcet_2026_feesbreakupkannada.pdf' style='color:black'>UGCET PROVISIONAL FEES STRUCTURE – 2026-27</a>
+<a id='lnk1137407' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/ahskannada.pdf' style='color:black'>Eligiblity Criteria, Nomenclature and Course Duration of Allied Health Science Course in KEA Portal - reg</a>
+<a id='lnk1137193' href='https://keaonline.karnataka.gov.in/main/index.php' style='color:black'>UGCET - 2026 OPTION ENTRY LINK</a>
+<a id='1137094' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/onlineapp2026_appointment/forms/login.aspx' Target='_blank'> UGCET 2026  ಪರಿಶೀಲಿಸದ ಅಭ್ಯರ್ಥಿಗಳಿಗೆ ಸ್ಲಾಟ್ ಬುಕಿಂಗ್ ಲಿಂಕ್</a>
+<a id='1136833' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/onlineapp2026/forms/login.aspx' Target='_blank'> UGCET - 2026 ಆನ್‌ಲೈನ್ ಅರ್ಜಿ ಎಡಿಟ್ ಲಿಂಕ್.</a>
+<a id='1136823' class='note-text font-weight-bold' href='https://www.cetonline.karnataka.gov.in/KEA_EXAM_PORTAL/Forms/Candidates/Login' Target='_blank'> ಯುಜಿಸಿಇಟಿ ಕೃಷಿ 2026 ಪ್ರಾಯೋಗಿಕ ಕೋಟಾ ಪ್ರವೇಶ ಟಿಕೆಟ್ ಡೌನ್‌ಲೋಡ್ ಲಿಂಕ್-2</a>
+<a id='1136814' class='note-text font-weight-bold' href='https://www.uasbangalore.edu.in/eligible-and-not-eligible-list-for-practical-test-2026-as-on-7-5-2026/' Target='_blank'> ಕೃಷಿ ಕೋಟಾಕ್ಕೆ ಅರ್ಹ ಮತ್ತು ಅನರ್ಹ ಅಭ್ಯರ್ಥಿಗಳ ಪಟ್ಟಿ</a>
+<a id='1136813' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/UGCET_Admit_Card_2026/Forms/Login.aspx' Target='_blank'> ಯುಜಿಸಿಇಟಿ ಕೃಷಿ 2026 ಪ್ರಾಯೋಗಿಕ ಕೋಟಾ ಪ್ರವೇಶ ಟಿಕೆಟ್ ಡೌನ್‌ಲೋಡ್ ಲಿಂಕ್</a>
+<a id='1136812' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/onlineapp2026_appointment/forms/login.aspx' Target='_blank'> UGCET – 2026 ದಾಖಲಾತಿ ಪರಿಶೀಲನೆಗಾಗಿ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಲಿಂಕ್ (Eligibility Clause B ರಿಂದ Clause O ವರೆಗೆ ಅರ್ಹತಾ ಷರತ್ತುಗಳನ್ನು ಆಯ್ಕೆ ಮಾಡಿದ ಅಭ್ಯರ್ಥಿಗಳಿಗಾಗಿ)</a>
+<a id='1136793' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/onlineapp2026_print/forms/login.aspx' Target='_blank'> ಯುಜಿಸಿಇಟಿ 2026 ಆನ್‌ಲೈನ್ ಅರ್ಜಿ ಮುದ್ರಣ ಲಿಂಕ್.</a>
+<a id='1137096' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/UGCET_PWD_REPORT_2026kannada.pdf' Target='_blank'> ದೈಹಿಕ ಅಂಗವಿಕಲ ಅಭ್ಯರ್ಥಿಗಳ ಅರ್ಹತಾ ಪಟ್ಟಿ</a>
+<a id='1136843' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/CBSEICSE_2026kannada.pdf' Target='_blank'> ಪ್ರಕಟಣೆ- CBSE / CISCE ಮತ್ತು ಇತರ ರಾಜ್ಯ ಮಂಡಳಿಯ ಅಭ್ಯರ್ಥಿಗಳ 10+2 ಅಂಕಗಳ ನವೀಕರಣ.</a>
+<a id='1137164' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_BPTkannada.pdf' Target='_blank'> ಬಿಪಿಟಿಯ ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್ (ಭೌತಚಿಕಿತ್ಸೆ) -2026</a>
+<a id='1137163' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_AHS_BPOkannada.pdf' Target='_blank'> ಬಿ. ಎಸ್ಸಿ ಎಎಚ್‌ಎಸ್ ಕೋರ್ಸ್‌ಗಳ ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್ - 2026</a>
+<a id='1137132' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_Agri_Practical_CompleteLogReportkannada.pdf' Target='_blank'> ಬಿ.ಎಸ್ಸಿ. ಕೃಷಿ ಮತ್ತು ಇತರ ಕೃಷಿ ವಿಜ್ಞಾನ ಕೋರ್ಸ್‌ಗಳ ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್ - (Agriculturist Quota).</a>
+<a id='1137131' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_Agriculture_CompleteLogReportkannada.pdf' Target='_blank'> ಬಿ.ಎಸ್ಸಿ. ಕೃಷಿ ಮತ್ತು ಇತರ ಕೃಷಿ ವಿಜ್ಞಾನ ಕೋರ್ಸ್‌ಗಳ ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್ - (Regular Quota).</a>
+<a id='1137130' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_Veterkannada.pdf' Target='_blank'> ಪಶುವೈದ್ಯಕೀಯ  ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್(B.V. Sc & AH)-(Agriculturist Quota).</a>
+<a id='1137129' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_Veter_CompleteLogReportkannada.pdf' Target='_blank'> ಪಶುವೈದ್ಯಕೀಯ  ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್(B.V. Sc & AH)-(Regular Quota).</a>
+<a id='1137128' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KEA_Nursingkannada.pdf' Target='_blank'> ಬಿ.ಎಸ್ಸಿ. ನರ್ಸಿಂಗ್‌ನ ತಾತ್ಕಾಲಿಕ ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್.</a>
+<a id='1136679' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/YADGIR__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಯಾದಗಿರಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136678' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/VIJAYAPURA__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ವಿಜಯಪುರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136677' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/VIJAYANAGARA__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ವಿಜಯನಗರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136676' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/UTTARA_KANNADA__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಉತ್ತರ ಕನ್ನಡ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136675' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/UDUPI__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಉಡುಪಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136674' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/TUMKUR__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ತುಮಕೂರು ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136673' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/SHIMOGA__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಶಿವಮೊಗ್ಗ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136672' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/RAMANAGARA__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ರಾಮನಗರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136671' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/RAICHUR__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ರಾಯಚೂರು ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136670' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/MYSURU__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಮೈಸೂರು ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136669' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/MANDYA__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಮಂಡ್ಯ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136668' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KOPPAL__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಕೊಪ್ಪಳ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136667' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KOLAR__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಕೋಲಾರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136666' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KODAGU__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಕೊಡಗು PH ಪಟ್ಟಿ</a>
+<a id='1136665' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/KALABURAGI__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಕಲಬುರ್ಗಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136664' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/HAVAERI__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಹಾವೇರಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136663' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/HASSAN__PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಹಾಸನ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136662' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/GADAG_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಗದಗ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136661' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/DHARWAD_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಧಾರವಾಡ PH ಪಟ್ಟಿ</a>
+<a id='1136660' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/DAVANAGERE_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ದಾವಣಗೆರೆ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136659' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/DHARWAD_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಧಾರವಾಡ PH ಪಟ್ಟಿ</a>
+<a id='1136658' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/DAVANAGERE_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ದಾವಣಗೆರೆ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136657' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/DAKSHINA_KANNADA_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ದಕ್ಷಿಣ ಕನ್ನಡ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136656' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/CHIKKAMAGALURU_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಚಿಕ್ಕಮಗಳೂರು ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136655' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/CHITRADURGA_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಚಿತ್ರದುರ್ಗ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136654' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/CHIKODI(_BELAGAVI)_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಚಿಕ್ಕೋಡಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136653' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/CHIKBALLAPUR__PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಚಿಕ್ಕಬಳ್ಳಾಪುರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136652' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/CHAMARAJANAGARA__PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಚಾಮರಾಜನಗರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136651' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BIDAR_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಬೀದರ್ PH ಪಟ್ಟಿ</a>
+<a id='1136650' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BENGALURU_RURAL_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಬೆಂಗಳೂರು ಗ್ರಾಮಾಂತರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136649' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BENGALURU_NORTH_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಬೆಂಗಳೂರು ಉತ್ತರ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136648' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BENGALURU_SOUTH_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಬೆಂಗಳೂರು ದಕ್ಷಿಣ PH ಪಟ್ಟಿ</a>
+<a id='1136647' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BELAGAVI_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಬೆಳಗಾವಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136646' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BALLARI_PH_CANDIDATES_UGCET_2026kannada.pdf' Target='_blank'> ಬಳ್ಳಾರಿ ಪಿಎಚ್ ಪಟ್ಟಿ</a>
+<a id='1136645' class='note-text font-weight-bold' href='https://cetonline.karnataka.gov.in/keawebentry456/ugcet2026/BAGALKOTE_PH_CANDIDATES__UGCET_2026kannada.pdf' Target='_blank'> ಬಾಗಲಕೋಟೆಯ pH ಪಟ್ಟಿ</a>
+<a href="mailto:keauthority-ka@nic.in" class="text-white text-decoration-none"><span id="keaid1285">ಇ ಮೇಲ್:keauthority-ka@nic.in</span></a>
+<a id="keaid1286" class="text-white text-decoration-none" href="indexnew.aspx">ವೆಬ್ ಸೈಟ್ </a>
+<a href="https://www.youtube.com/@keavikasana5543" target="_blank" >Follow us on You Tube</a>
+<a href="privacy.html" target="_blank" ><span id="keaid10869">Privacy Policy</span></a>
+<a href="refund.html" target="_blank" ><span id="keaid10870">Refund and Cancellation Policy</span></a>
+<a href="Terms.html" target="_blank" ><span id="keaid10871">Product / Service Details</span></a>
+<a href="Terms.html" target="_blank" ><span id="keaid10873">Terms & Conditions</span></a>
+<a id="keaid1289" class="selected text-decoration-none" href="indexnew.aspx">ಮುಖಪುಟ</a>
+<a id="keaid2102" class="selected text-decoration-none">ಪ್ರವೇಶಗಳು </a>
+<a id="keaid2177" class="selected text-decoration-none" href="https://cetonline.karnataka.gov.in/keawebentry456/archive.pdf"> ಪತ್ರಾಗಾರ</a>
+<a id="keaid2178" class="selected text-decoration-none" href="indexnew.aspx">ನೇಮಕಾತಿ</a>
+<a id="keaid2074" class="selected text-decoration-none" href="RTI.aspx"> ಮಾಹಿತಿ ಹಕ್ಕು ಅಧಿನಿಯಮ</a>
+<a id="keaid2075" class="selected text-decoration-none" href="Tenders.aspx">ಟೆಂಡರ್</a>
+<a id="keaid2118" class="selected text-decoration-none" href="https://cetonline.karnataka.gov.in/keawebentry456/cet2020/vikasana_timetable.pdf">ವಿಕಸನ</a>
+<a id="keaid8362" class="selected text-decoration-none" href="vidhyartimitra.aspx">ವಿದ್ಯಾರ್ಥಿ ಮಿತ್ರ</a>
+<a id="button"><i class="fas fa-chevron-up"></i></a>
+<a href="#" class="foot-color">NIC</a>
