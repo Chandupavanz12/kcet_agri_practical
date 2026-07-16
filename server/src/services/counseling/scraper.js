@@ -25,6 +25,8 @@ const rejectKeywords = [
 ];
 
 function isRelevant(text, href) {
+    if (!text || text.trim().length === 0) return false;
+
     const t = text.toLowerCase();
     const u = href ? href.toLowerCase() : '';
     for (let reject of rejectKeywords) {
