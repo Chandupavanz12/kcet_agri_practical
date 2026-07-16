@@ -17,7 +17,17 @@ export async function parsePdfContent(pdfUrl) {
 
         // AI Summary logic or basic regex extraction for dates
         const dateRegex = /\b(\d{1,2}(?:st|nd|rd|th)?[\s-]*(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[a-zA-Z]*[\s-]*\d{4}|\d{1,2}[-./]\d{1,2}[-./]\d{2,4})\b/ig;
-        const extractedDates = [...new Set(text.match(dateRegex))];
+        let extractedDates = [...new Set(text.match(dateRegex) || [])];
+        extractedDates.sort((a, b) => {
+            const pa = a.match(/(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})/);
+            const pb = b.match(/(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})/);
+            if (pa && pb) {
+                const da = new Date(`${pa[3]}-${pa[2]}-${pa[1]}`);
+                const db = new Date(`${pb[3]}-${pb[2]}-${pb[1]}`);
+                return da - db;
+            }
+            return 0;
+        });
 
         // Fallback simple summary based on initial paragraphs
         let summary = text.split('\n').map(t => t.trim()).filter(t => t.length > 20).slice(0, 3).join(' ');

@@ -184,10 +184,15 @@ async function processPdfLink(title, pdfUrl, sourceUrl) {
     }
 
     if (pdfData && pdfData.dates && pdfData.dates.length > 0) {
-        const dts = pdfData.dates.slice(0, 3).join(', ');
-        body = `📌 DEADLINES DETECTED: [${dts}]. ${body}`;
+        let dts;
+        if (pdfData.dates.length === 1) {
+            dts = `Closing Date: ${pdfData.dates[0]}`;
+        } else {
+            dts = `Starts: ${pdfData.dates[0]} | Closing Date: ${pdfData.dates[pdfData.dates.length - 1]}`;
+        }
+        body = `📌 ${dts}. ${body}`;
     }
-    if (body.length > 120) body = body.substring(0, 120) + '...';
+    if (body.length > 130) body = body.substring(0, 130) + '...';
 
     let pushTitle = priority === 'HIGH PRIORITY' ? '🚨 KEA ALERT' : 'ℹ️ KEA UPDATE';
     if (priority === 'HIGH PRIORITY') {
