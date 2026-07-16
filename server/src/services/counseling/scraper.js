@@ -22,7 +22,8 @@ const rejectKeywords = [
     '2022', '2023', '2024', '2025',
     'Home', 'About Us', 'Contact', 'RTI', 'Sitemap', 'Tenders', 'Gallery', 'Acts',
     'Rules', 'Policies', 'Feedback', 'Help', 'Disclaimer',
-    'nic', 'ಮುಖಪುಟ', 'ಪ್ರವೇಶಗಳು', 'ಪತ್ರಾಗಾರ', 'ನೇಮಕಾತಿ', 'ವಿಕಸನ', 'ವಿದ್ಯಾರ್ಥಿ ಮಿತ್ರ', 'privacy', 'refund', 'terms'
+    'nic', 'ಮುಖಪುಟ', 'ಪ್ರವೇಶಗಳು', 'ಪತ್ರಾಗಾರ', 'ನೇಮಕಾತಿ', 'ವಿಕಸನ', 'ವಿದ್ಯಾರ್ಥಿ ಮಿತ್ರ', 'privacy', 'refund', 'terms',
+    'ph_candidates', 'ph candidates', 'ಪಿಎಚ್ ಪಟ್ಟಿ', 'ph ಪಟ್ಟಿ', 'physically handicapped'
 ];
 
 function isRelevant(text, href) {
