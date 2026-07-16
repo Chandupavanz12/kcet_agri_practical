@@ -5,7 +5,13 @@ const pdfParse = require('pdf-parse');
 
 export async function parsePdfContent(pdfUrl) {
     try {
-        const response = await axios.get(pdfUrl, { responseType: 'arraybuffer', timeout: 10000 });
+        const response = await axios.get(pdfUrl, {
+            responseType: 'arraybuffer',
+            timeout: 45000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (HTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        });
         const data = await pdfParse(response.data);
         const text = data.text;
 
@@ -16,9 +22,13 @@ export async function parsePdfContent(pdfUrl) {
         // Fallback simple summary based on initial paragraphs
         let summary = text.split('\n').map(t => t.trim()).filter(t => t.length > 20).slice(0, 3).join(' ');
 
+        const tLower = text.toLowerCase();
+        const hasOptionEntry = tLower.includes('option') || tLower.includes('choice') || tLower.includes('ಆಯ್ಕೆ') || tLower.includes('ದಾಖಲು');
+
         return {
             text,
             dates: extractedDates,
+            hasOptionEntry,
             summary: summary.substring(0, 300) + (summary.length > 300 ? '...' : '')
         };
     } catch (err) {

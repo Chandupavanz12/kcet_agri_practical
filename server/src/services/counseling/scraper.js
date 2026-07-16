@@ -169,16 +169,25 @@ async function processPdfLink(title, pdfUrl, sourceUrl) {
         documentHash
     }).save();
 
-    // Determine priority
     let priority = 'NORMAL PRIORITY';
     if (['Result', 'Mock Allotment', 'Seat Matrix', 'Cutoff'].includes(notificationType) ||
-        t.includes('fee payment') || t.includes('option entry') || t.includes('reporting')) {
+        t.includes('fee payment') || t.includes('option entry') || t.includes('choice entry') || t.includes('option') || t.includes('choice') || t.includes('ಆಯ್ಕೆ') || t.includes('ದಾಖಲು') || t.includes('reporting') ||
+        (pdfData && pdfData.hasOptionEntry)) {
         priority = 'HIGH PRIORITY';
     }
 
     // Send push notification
     let body = summary.substring(0, 100);
-    if (body.length === 100) body += '...';
+
+    if (pdfData && pdfData.hasOptionEntry) {
+        body = `⚠️ OPTION/CHOICE ENTRY ALERT! Please check immediately. ${body}`;
+    }
+
+    if (pdfData && pdfData.dates && pdfData.dates.length > 0) {
+        const dts = pdfData.dates.slice(0, 3).join(', ');
+        body = `📌 DEADLINES DETECTED: [${dts}]. ${body}`;
+    }
+    if (body.length > 120) body = body.substring(0, 120) + '...';
 
     let pushTitle = priority === 'HIGH PRIORITY' ? '🚨 KEA ALERT' : 'ℹ️ KEA UPDATE';
     if (priority === 'HIGH PRIORITY') {
