@@ -20,14 +20,15 @@ export default function StudentNotificationsScreen() {
       if (opts.showLoading) setLoading(true);
 
       let endpoint = '/api/counseling/notifications';
-      const params = new URLSearchParams();
+      const params = [];
       if (activeCategory !== 'All') {
-        if (['UGCET', 'UGNEET'].includes(activeCategory)) params.append('category', activeCategory);
-        else params.append('type', activeCategory);
+        if (['UGCET', 'UGNEET'].includes(activeCategory)) params.push(`category=${encodeURIComponent(activeCategory)}`);
+        else params.push(`type=${encodeURIComponent(activeCategory)}`);
       }
 
-      const queryString = params.toString();
-      if (queryString) endpoint += '?' + queryString;
+      if (params.length > 0) {
+        endpoint += '?' + params.join('&');
+      }
 
       const res = await apiFetch(endpoint, { token });
       setNotifications(res?.notifications || []);

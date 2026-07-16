@@ -1,9 +1,9 @@
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Linking } from 'react-native';
-import { usePathname, useRouter, useLocalSearchParams } from 'expo-router';
-import { useAuth } from '../contexts/AuthContext.jsx';
 import { apiFetch, clearApiCache } from '../api/client.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 function formatINR(paise) {
   const n = Number(paise || 0) / 100;
@@ -11,15 +11,15 @@ function formatINR(paise) {
 }
 
 const PLAN_META = {
-  pyq:       { icon: '📄', color: '#0284c7', badge: 'PYQ Access',  highlight: false },
-  materials: { icon: '📚', color: '#059669', badge: 'Study PDFs',  highlight: false },
-  combo:     { icon: '⭐', color: '#d97706', badge: 'Best Value',  highlight: true  },
+  pyq: { icon: '📄', color: '#0284c7', badge: 'PYQ Access', highlight: false },
+  materials: { icon: '📚', color: '#059669', badge: 'Study PDFs', highlight: false },
+  combo: { icon: '⭐', color: '#d97706', badge: 'Best Value', highlight: true },
 };
 
 const PLAN_BULLETS = {
-  pyq:       ['All centres PYQ', 'Agri practical exam guidance', 'KCET counselling guidance', 'Mobile and desktop friendly and 365 days validity'],
+  pyq: ['All centres PYQ', 'Agri practical exam guidance', 'KCET counselling guidance', 'Mobile and desktop friendly and 365 days validity'],
   materials: ['20+ Chapter study materials', 'Agri practical exam guidance', 'KCET counselling guidance', 'Doubts clarification in WhatsApp (limited messages)', 'New uploads unlock automatically', '365 days validity'],
-  combo:     ['All centres PYQ & 20+ chapters study materials', 'Agri practical exam guidance', 'KCET counselling guidance', 'Doubts clarification through call and WhatsApp', 'New uploads unlock automatically', '365 days validity'],
+  combo: ['All centres PYQ & 20+ chapters study materials', 'Agri practical exam guidance', 'KCET counselling guidance', 'Doubts clarification through call and WhatsApp', 'New uploads unlock automatically', '365 days validity'],
 };
 
 export default function PremiumAccessScreen() {
@@ -40,7 +40,7 @@ export default function PremiumAccessScreen() {
     clearApiCache('/api/student/materials');
     clearApiCache('/api/student/dashboard');
     const [p, s] = await Promise.all([
-      apiFetch('/api/student/premium/plans',  { token }),
+      apiFetch('/api/student/premium/plans', { token }),
       apiFetch('/api/student/premium/status', { token }),
     ]);
     setPlans(Array.isArray(p?.plans) ? p.plans : []);
@@ -66,7 +66,7 @@ export default function PremiumAccessScreen() {
           if (alive && payCheck?.activated) {
             setMessage(`🎉 Your payment was found! ${payCheck.planName} is now active.`);
           }
-        } catch (_) {} finally {
+        } catch (_) { } finally {
           if (alive) setCheckingPayment(false);
         }
 
@@ -103,16 +103,14 @@ export default function PremiumAccessScreen() {
         return;
       }
 
-      if (orderRes?.pendingOrderReused) {
-        setMessage('ℹ️ We found an existing payment session for this plan. Reopening it — no new charge will be created.');
-      }
+      // Open Hosted Web Checkout for Razorpay without requiring react-native SDK
+      const { orderId, amountPaise, user, plan } = orderRes;
+      const checkoutUrl = `https://kcet-agri-practical.onrender.com/api/student/premium/checkout?orderId=${orderId}&amount=${amountPaise}&name=${encodeURIComponent(user?.name || '')}&email=${encodeURIComponent(user?.email || '')}&planId=${plan?.code || ''}`;
 
-      // Native Razorpay handling
-      Alert.alert(
-        'Payment Checkout',
-        'In a full production React Native app, this will open the Razorpay SDK modal using react-native-razorpay. Please configure the SDK or pay on the web version.',
-        [{ text: 'OK' }]
-      );
+      await Linking.openURL(checkoutUrl);
+
+      // We explicitly leave the checking logic to be triggered manually via a "Check Status" button 
+      // or deep-link callback since Linking.openURL jumps out of the app.
 
     } catch (e) {
       setError(e?.message || 'Payment failed. Please try again.');
