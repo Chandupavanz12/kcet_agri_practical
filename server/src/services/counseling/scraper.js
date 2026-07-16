@@ -145,7 +145,7 @@ async function processPdfLink(title, pdfUrl, sourceUrl) {
     if (t.includes('neet')) category = 'UGNEET';
 
     if (t.includes('result') || t.includes('ಫಲಿತಾಂಶ')) notificationType = 'Result';
-    else if (t.includes('mock') || t.includes('ಅಣಕು')) notificationType = 'Mock Allotment';
+    else if (t.includes('mock allotment') || t.includes('ಅಣಕು')) notificationType = 'Mock Allotment';
     else if (t.includes('seat matrix') || t.includes('ಸೀಟು ಹಂಚಿಕೆ')) notificationType = 'Seat Matrix';
     else if (t.includes('cutoff') || t.includes('ಕಟ್-ಆಫ್')) notificationType = 'Cutoff';
     else if (t.includes('1st round') || t.includes('1 ನೇ ಸುತ್ತಿನ') || t.includes('ಮೊದಲ ಸುತ್ತಿನ')) notificationType = '1st Round';
@@ -154,6 +154,13 @@ async function processPdfLink(title, pdfUrl, sourceUrl) {
 
     // Read PDF asynchronously
     const pdfData = await parsePdfContent(pdfUrl);
+
+    // Fallback extract dates from Title if PDF font is corrupted/image
+    let finalDates = pdfData?.dates || [];
+    if (finalDates.length === 0) {
+        const titleRegex = /\b(\d{1,2}[-./]\d{1,2}[-./]\d{2,4})\b/ig;
+        finalDates = [...new Set(title.match(titleRegex) || [])];
+    }
 
     let summary = pdfData?.summary || `New update released on KEA: ${title}`;
 
@@ -179,16 +186,17 @@ async function processPdfLink(title, pdfUrl, sourceUrl) {
     // Send push notification
     let body = summary.substring(0, 100);
 
-    if (pdfData && pdfData.hasOptionEntry) {
+    const titleHasOption = t.includes('option') || t.includes('choice') || t.includes('ಆಯ್ಕೆ') || t.includes('ದಾಖಲು');
+    if ((pdfData && pdfData.hasOptionEntry) || titleHasOption) {
         body = `⚠️ OPTION/CHOICE ENTRY ALERT! Please check immediately. ${body}`;
     }
 
-    if (pdfData && pdfData.dates && pdfData.dates.length > 0) {
+    if (finalDates && finalDates.length > 0) {
         let dts;
-        if (pdfData.dates.length === 1) {
-            dts = `Closing Date: ${pdfData.dates[0]}`;
+        if (finalDates.length === 1) {
+            dts = `Closing Date: ${finalDates[0]}`;
         } else {
-            dts = `Starts: ${pdfData.dates[0]} | Closing Date: ${pdfData.dates[pdfData.dates.length - 1]}`;
+            dts = `Starts: ${finalDates[0]} | Closing Date: ${finalDates[finalDates.length - 1]}`;
         }
         body = `📌 ${dts}. ${body}`;
     }
