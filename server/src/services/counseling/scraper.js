@@ -21,7 +21,8 @@ const rejectKeywords = [
     'Recruitment', 'Vacancy', 'Tender', 'Railway', 'Job', 'Employment', 'KPSC', 'Other Exam',
     '2022', '2023', '2024', '2025',
     'Home', 'About Us', 'Contact', 'RTI', 'Sitemap', 'Tenders', 'Gallery', 'Acts',
-    'Rules', 'Policies', 'Feedback', 'Help', 'Disclaimer'
+    'Rules', 'Policies', 'Feedback', 'Help', 'Disclaimer',
+    'nic', 'ಮುಖಪುಟ', 'ಪ್ರವೇಶಗಳು', 'ಪತ್ರಾಗಾರ', 'ನೇಮಕಾತಿ', 'ವಿಕಸನ', 'ವಿದ್ಯಾರ್ಥಿ ಮಿತ್ರ', 'privacy', 'refund', 'terms'
 ];
 
 function isRelevant(text, href) {
@@ -47,6 +48,8 @@ function isRelevant(text, href) {
         }
     }
 
+    // Because KEA strings are highly unstandardized, we must allow all 2026 content
+    // to pass natively through, as long as it hasn't violated any strict reject logic.
     return true;
 }
 
