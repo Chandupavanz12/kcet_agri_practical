@@ -1,10 +1,40 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator, FlatList, Linking, ScrollView,
+  StyleSheet, Text, TouchableOpacity, View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
-const CATEGORIES = ['All', 'UGCET', 'UGNEET', 'Result', 'Seat Matrix', 'Mock Allotment', 'Cutoff', '1st Round', '2nd Round', 'Extended Round'];
+const CATEGORIES = [
+  'All', 'UGCET', 'UGNEET', 'Result', 'Seat Matrix',
+  'Mock Allotment', 'Cutoff', '1st Round', '2nd Round', 'Extended Round',
+];
+
+// Determine the type-tag label and color for a notification card
+function getTypeTag(n) {
+  const url = (n.pdfUrl || '').toLowerCase();
+  if (url.endsWith('.pdf')) return { label: '📄 PDF', color: '#7c3aed', bg: '#ede9fe' };
+  if (url.length > 0) return { label: '🔗 Link', color: '#0369a1', bg: '#e0f2fe' };
+  return { label: '📢 Alert', color: '#b45309', bg: '#fef9c3' };
+}
+
+// Best display date: prefer uploadDate, fall back to created_at
+function bestDate(n) {
+  const d = n.uploadDate ? new Date(n.uploadDate) : new Date(n.created_at);
+  if (isNaN(d)) return '';
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+// Client-side sort: newest uploadDate / created_at first
+function sortByNewest(list) {
+  return [...list].sort((a, b) => {
+    const da = new Date(a.uploadDate || a.created_at || 0);
+    const db = new Date(b.uploadDate || b.created_at || 0);
+    return db - da;
+  });
+}
 
 export default function StudentNotificationsScreen() {
   const { token } = useAuth();
@@ -22,16 +52,17 @@ export default function StudentNotificationsScreen() {
       let endpoint = '/api/counseling/notifications';
       const params = [];
       if (activeCategory !== 'All') {
-        if (['UGCET', 'UGNEET'].includes(activeCategory)) params.push(`category=${encodeURIComponent(activeCategory)}`);
-        else params.push(`type=${encodeURIComponent(activeCategory)}`);
+        if (['UGCET', 'UGNEET'].includes(activeCategory)) {
+          params.push(`category=${encodeURIComponent(activeCategory)}`);
+        } else {
+          params.push(`type=${encodeURIComponent(activeCategory)}`);
+        }
       }
-
-      if (params.length > 0) {
-        endpoint += '?' + params.join('&');
-      }
+      if (params.length > 0) endpoint += '?' + params.join('&');
 
       const res = await apiFetch(endpoint, { token });
-      setNotifications(res?.notifications || []);
+      // Sort newest first on the client too (belt-and-suspenders)
+      setNotifications(sortByNewest(res?.notifications || []));
     } catch (e) {
       setError(e?.message || 'Failed to load notifications');
     } finally {
@@ -51,29 +82,10 @@ export default function StudentNotificationsScreen() {
     } catch (e) { console.error('Failed to mark read', e); }
   };
 
-  const handleOpenPdf = (pdfUrl, id) => {
+  const handleOpenLink = (url, id) => {
     if (id) markAsRead(id);
-    if (pdfUrl) Linking.openURL(pdfUrl);
+    if (url) Linking.openURL(url);
   };
-
-  const renderFilterChips = () => (
-    <View style={styles.chipScroll}>
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={CATEGORIES}
-        keyExtractor={item => item}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.chip, activeCategory === item && styles.chipActive]}
-            onPress={() => setActiveCategory(item)}
-          >
-            <Text style={[styles.chipText, activeCategory === item && styles.chipTextActive]}>{item}</Text>
-          </TouchableOpacity>
-        )}
-      />
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -82,7 +94,20 @@ export default function StudentNotificationsScreen() {
         <Text style={styles.headerSubtitle}>Real-time Counselling Assistant</Text>
       </View>
 
-      {renderFilterChips()}
+      {/* Filter chips */}
+      <View style={styles.chipRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipContent}>
+          {CATEGORIES.map(cat => (
+            <TouchableOpacity
+              key={cat}
+              style={[styles.chip, activeCategory === cat && styles.chipActive]}
+              onPress={() => setActiveCategory(cat)}
+            >
+              <Text style={[styles.chipText, activeCategory === cat && styles.chipTextActive]}>{cat}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       {!!error && (
         <View style={styles.errorBox}>
@@ -93,6 +118,7 @@ export default function StudentNotificationsScreen() {
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4f46e5" />
+          <Text style={styles.loadingText}>Loading KEA updates…</Text>
         </View>
       ) : (
         <FlatList
@@ -105,34 +131,74 @@ export default function StudentNotificationsScreen() {
             setRefreshing(true);
             loadNotifications({ showLoading: false });
           }}
-          ListEmptyComponent={<Text style={styles.emptyText}>No notifications found for {activeCategory}.</Text>}
-          renderItem={({ item: n }) => (
-            <View style={[styles.card, !n.isRead && styles.cardUnread]}>
-              <View style={styles.cardHeader}>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{n.category} | {n.notificationType}</Text>
-                </View>
-                {!n.isRead && <View style={styles.unreadDot} />}
-              </View>
-              <Text style={styles.title}>{n.title}</Text>
-              <Text style={styles.summary}>{n.summary}</Text>
-
-              <View style={styles.cardFooter}>
-                <Text style={styles.dateText}>{new Date(n.created_at).toLocaleString()}</Text>
-                {n.pdfUrl ? (
-                  <TouchableOpacity style={styles.btnAction} onPress={() => handleOpenPdf(n.pdfUrl, n._id)}>
-                    <Text style={styles.btnActionText}>
-                      {String(n.pdfUrl).toLowerCase().endsWith('.pdf') ? 'Open PDF' : 'Open Link'}
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity style={styles.btnActionOutlined} onPress={() => markAsRead(n._id)}>
-                    <Text style={styles.btnActionTextOutlined}>Mark Read</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>🔔</Text>
+              <Text style={styles.emptyText}>No notifications found</Text>
+              <Text style={styles.emptySubText}>Pull down to refresh</Text>
             </View>
-          )}
+          }
+          renderItem={({ item: n }) => {
+            const tag = getTypeTag(n);
+            const displayDate = bestDate(n);
+            const isPdf = (n.pdfUrl || '').toLowerCase().endsWith('.pdf');
+            const isLink = (n.pdfUrl || '').length > 0 && !isPdf;
+
+            return (
+              <View style={[styles.card, !n.isRead && styles.cardUnread]}>
+                {/* Header row: category badge + type tag + unread dot */}
+                <View style={styles.cardHeader}>
+                  <View style={styles.badgeRow}>
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>
+                        {n.category} · {n.notificationType}
+                      </Text>
+                    </View>
+                    <View style={[styles.typeBadge, { backgroundColor: tag.bg }]}>
+                      <Text style={[styles.typeBadgeText, { color: tag.color }]}>{tag.label}</Text>
+                    </View>
+                  </View>
+                  {!n.isRead && <View style={styles.unreadDot} />}
+                </View>
+
+                {/* Title */}
+                <Text style={styles.title}>{n.title}</Text>
+
+                {/* Summary / description — only show if different from title */}
+                {n.summary && n.summary !== n.title && (
+                  <Text style={styles.summary}>{n.summary}</Text>
+                )}
+
+                {/* Footer: date + action */}
+                <View style={styles.cardFooter}>
+                  <Text style={styles.dateText}>🗓 {displayDate}</Text>
+
+                  {isPdf ? (
+                    <TouchableOpacity
+                      style={styles.btnPdf}
+                      onPress={() => handleOpenLink(n.pdfUrl, n._id)}
+                    >
+                      <Text style={styles.btnActionText}>Open PDF</Text>
+                    </TouchableOpacity>
+                  ) : isLink ? (
+                    <TouchableOpacity
+                      style={styles.btnLink}
+                      onPress={() => handleOpenLink(n.pdfUrl, n._id)}
+                    >
+                      <Text style={styles.btnActionText}>Open Link</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.btnMark}
+                      onPress={() => markAsRead(n._id)}
+                    >
+                      <Text style={styles.btnMarkText}>{n.isRead ? '✓ Read' : 'Mark Read'}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            );
+          }}
         />
       )}
     </SafeAreaView>
@@ -144,28 +210,47 @@ const styles = StyleSheet.create({
   header: { padding: 20, backgroundColor: '#4f46e5', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
   headerSubtitle: { fontSize: 14, color: '#e0e7ff', marginTop: 4 },
-  chipScroll: { paddingHorizontal: 16, marginTop: 16, paddingBottom: 16 },
+
+  chipRow: { paddingTop: 14, paddingBottom: 8 },
+  chipContent: { paddingHorizontal: 16 },
   chip: { backgroundColor: '#e2e8f0', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8 },
   chipActive: { backgroundColor: '#4f46e5' },
   chipText: { fontSize: 13, color: '#475569', fontWeight: '600' },
   chipTextActive: { color: '#ffffff' },
+
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  errorBox: { marginHorizontal: 16, backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1, borderRadius: 8, padding: 12 },
+  loadingText: { marginTop: 12, color: '#64748b', fontSize: 14 },
+
+  errorBox: { marginHorizontal: 16, marginTop: 8, backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1, borderRadius: 8, padding: 12 },
   errorText: { color: '#b91c1c', fontSize: 14 },
+
   list: { flex: 1 },
-  emptyText: { textAlign: 'center', fontSize: 15, color: '#64748b', marginTop: 32 },
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, elevation: 2, shadowColor: '#0f172a', shadowOpacity: 0.05, shadowRadius: 10 },
-  cardUnread: { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', borderWidth: 1 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  badge: { backgroundColor: '#ede9fe', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  badgeText: { fontSize: 11, color: '#6d28d9', fontWeight: 'bold', textTransform: 'uppercase' },
-  unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#22c55e', marginTop: 4 },
-  title: { fontSize: 16, fontWeight: 'bold', color: '#0f172a', marginBottom: 8, lineHeight: 22 },
-  summary: { fontSize: 14, color: '#475569', lineHeight: 20, marginBottom: 16 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12 },
-  dateText: { fontSize: 12, color: '#94a3b8' },
-  btnAction: { backgroundColor: '#4f46e5', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  btnActionText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  btnActionOutlined: { borderColor: '#4f46e5', borderWidth: 1, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  btnActionTextOutlined: { color: '#4f46e5', fontSize: 13, fontWeight: '600' },
+
+  emptyContainer: { alignItems: 'center', marginTop: 60 },
+  emptyIcon: { fontSize: 48 },
+  emptyText: { textAlign: 'center', fontSize: 16, color: '#475569', fontWeight: '600', marginTop: 12 },
+  emptySubText: { textAlign: 'center', fontSize: 13, color: '#94a3b8', marginTop: 4 },
+
+  card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, elevation: 2, shadowColor: '#0f172a', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 } },
+  cardUnread: { backgroundColor: '#f5f3ff', borderColor: '#c4b5fd', borderWidth: 1 },
+
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, flex: 1 },
+  badge: { backgroundColor: '#ede9fe', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 },
+  badgeText: { fontSize: 10, color: '#6d28d9', fontWeight: 'bold', textTransform: 'uppercase' },
+  typeBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 },
+  typeBadgeText: { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
+  unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#7c3aed', marginTop: 3, marginLeft: 6 },
+
+  title: { fontSize: 15, fontWeight: 'bold', color: '#0f172a', lineHeight: 22, marginBottom: 6 },
+  summary: { fontSize: 13, color: '#475569', lineHeight: 19, marginBottom: 12 },
+
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10, marginTop: 6 },
+  dateText: { fontSize: 11, color: '#94a3b8', flex: 1 },
+
+  btnPdf: { backgroundColor: '#7c3aed', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
+  btnLink: { backgroundColor: '#0369a1', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
+  btnActionText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  btnMark: { borderColor: '#4f46e5', borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
+  btnMarkText: { color: '#4f46e5', fontSize: 12, fontWeight: '600' },
 });

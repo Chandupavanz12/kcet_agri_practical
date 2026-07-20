@@ -8,8 +8,8 @@ export async function getNotifications(req, res, next) {
         if (type) filter.notificationType = type;
 
         const notifications = await CounsellingNotification.find(filter)
-            .sort({ created_at: -1 })
-            .limit(50)
+            .sort({ uploadDate: -1, created_at: -1 })
+            .limit(200)
             .lean();
 
         return res.json({ notifications });

@@ -1,6 +1,9 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import crypto from 'crypto';
+import fs from 'fs';
+import https from 'https';
+import path from 'path';
 import { CounsellingNotification, ScraperLog } from '../../models/counseling.js';
 import { sendPushNotifications } from './notifier.js';
 import { parsePdfContent } from './pdfReader.js';
@@ -8,57 +11,155 @@ import { parsePdfContent } from './pdfReader.js';
 const KEA_BASE_URL = 'https://cetonline.karnataka.gov.in';
 const START_URL = 'https://cetonline.karnataka.gov.in/kea/ugcet2026';
 
-const allowKeywords = [
-    'UGCET', 'UG NEET', 'NEET Counselling', 'Medical Counselling', 'Seat Matrix',
-    'Mock Allotment', 'Cutoff', 'Option Entry', 'Verification', 'Admission Order',
-    'Round 1', 'Round 2', 'Extended Round', 'Document Verification', 'Fee Payment',
-    'Counselling Schedule', 'Result', 'Admission', '1st round', '2nd round', '2nd extended round',
-    'ಮೊದಲ ಸುತ್ತಿನ', 'ಎರಡನೇ ಸುತ್ತಿನ', 'ಕಟ್-ಆಫ್', 'ಅಣಕು ಫಲಿತಾಂಶದ', '1 ನೇ ಸುತ್ತಿನ', '2 ನೇ ಸುತ್ತಿನ', 'ವಿಸ್ತರಿತ ಸುತ್ತಿನ',
-    'ಸೀಟು ಹಂಚಿಕೆ', 'ಫಲಿತಾಂಶ', 'ಸೂಚನೆ', 'ತಾತ್ಕಾಲಿಕ'
+// ─── REJECT PATTERNS ─────────────────────────────────────────────────────────
+// Only reject navigation links, truly irrelevant content, and old-year URLs.
+const REJECT_TEXT = [
+    // Pure navigation / UI chrome
+    'ಮುಖಪುಟ', 'ಪ್ರವೇಶಗಳು', 'ಪತ್ರಾಗಾರ', 'ನೇಮಕಾತಿ', 'ವಿಕಸನ', 'ವಿದ್ಯಾರ್ಥಿ ಮಿತ್ರ',
+    'ಇ ಮೇಲ್', 'ವೆಬ್ ಸೈಟ್',
+    // PH / Physically Handicapped specific lists (separate process)
+    'ಪಿಎಚ್ ಪಟ್ಟಿ', 'ph ಪಟ್ಟಿ', 'ph list',
+    // Footer / social / policy junk
+    'follow us', 'youtube', 'privacy policy', 'refund', 'product / service',
+    // Old recruitment / non-counselling
+    'recruitment', 'vacancy', 'vikasana', 'vidhyartimitra',
 ];
 
-const rejectKeywords = [
-    'Recruitment', 'Vacancy', 'Tender', 'Railway', 'Job', 'Employment', 'KPSC', 'Other Exam',
-    '2022', '2023', '2024', '2025',
-    'Home', 'About Us', 'Contact', 'RTI', 'Sitemap', 'Tenders', 'Gallery', 'Acts',
-    'Rules', 'Policies', 'Feedback', 'Help', 'Disclaimer',
-    'nic', 'ಮುಖಪುಟ', 'ಪ್ರವೇಶಗಳು', 'ಪತ್ರಾಗಾರ', 'ನೇಮಕಾತಿ', 'ವಿಕಸನ', 'ವಿದ್ಯಾರ್ಥಿ ಮಿತ್ರ', 'privacy', 'refund', 'terms',
-    'ph_candidates', 'ph candidates', 'ಪಿಎಚ್ ಪಟ್ಟಿ', 'ph ಪಟ್ಟಿ', 'physically handicapped'
+const REJECT_URL = [
+    'ph_candidates',
+    'archive.pdf', 'vikasana', 'privacy', 'refund',
+    'cet2020', 'cet2021', 'cet2022', 'cet2023', 'cet2024', 'cet2025',
+    'ugcet2025', 'ugcet2024', 'ugcet2023',
 ];
-
-function isRelevant(text, href) {
-    if (!text || text.trim().length === 0) return false;
-
-    const t = text.toLowerCase();
-    const u = href ? href.toLowerCase() : '';
-    for (let reject of rejectKeywords) {
-        if (t.includes(reject.toLowerCase()) || u.includes(reject.toLowerCase())) return false;
-    }
-
-    // Strict block for dates older than July 10, 2026
-    const combinedStr = text + ' ' + (href || '');
-    const dateMatch = combinedStr.match(/(\d{2})[-/]?(\d{2})[-/]?(\d{4})/);
-    if (dateMatch) {
-        const d = parseInt(dateMatch[1]);
-        const m = parseInt(dateMatch[2]);
-        const y = parseInt(dateMatch[3]);
-        if (y < 2026) return false;
-        if (y === 2026) {
-            if (m < 7) return false;
-            if (m === 7 && d < 10) return false;
-        }
-    }
-
-    // Because KEA strings are highly unstandardized, we must allow all 2026 content
-    // to pass natively through, as long as it hasn't violated any strict reject logic.
-    return true;
-}
 
 function resolveUrl(href) {
     if (!href) return null;
     if (href.startsWith('http')) return href;
     if (href.startsWith('/')) return KEA_BASE_URL + href;
     return KEA_BASE_URL + '/kea/' + href;
+}
+
+function isNotificationElement($el) {
+    const id = ($el.attr('id') || '').trim();
+    const cls = ($el.attr('class') || '').toLowerCase();
+    const style = ($el.attr('style') || '').toLowerCase();
+
+    if (id.startsWith('lnk')) return true;
+    if (/^\d+$/.test(id)) return true;
+    if (style.includes('color:black') || style.includes('color: black')) return true;
+    if (cls.includes('note-text')) return true;
+    return false;
+}
+
+function isRelevant(text, href) {
+    if (!text || text.trim().length < 2) return false;
+
+    const tl = text.toLowerCase();
+    const ul = href ? href.toLowerCase() : '';
+
+    for (const kw of REJECT_TEXT) {
+        if (tl.includes(kw.toLowerCase())) return false;
+    }
+    for (const pat of REJECT_URL) {
+        if (ul.includes(pat.toLowerCase())) return false;
+    }
+
+    // Reject if URL explicitly belongs to an old year (not 2026)
+    if (/cet20(1[0-9]|2[0-5])|ugcet20(1[0-9]|2[0-5])/.test(ul)) return false;
+
+    return true;
+}
+
+// Extract a best-guess upload/publish date from a KEA PDF URL filename.
+// KEA PDF filenames often embed dates like: 19072026, 0719, etc.
+function extractUploadDateFromUrl(url) {
+    if (!url) return null;
+
+    // Pattern: DDMMYYYY in filename e.g. 19072026
+    let m = url.match(/(\d{2})(0[1-9]|1[0-2])(202\d)(?=[^0-9]|$)/);
+    if (m) {
+        const d = new Date(`${m[3]}-${m[2]}-${m[1]}`);
+        if (!isNaN(d)) return d;
+    }
+
+    // Pattern: 4-digit MMDD combo like _0719_ → assume July 19 2026
+    m = url.match(/[/_-](\d{4})(?=[^0-9]|[._])/);
+    if (m) {
+        const raw = m[1];
+        const mm = parseInt(raw.substring(0, 2));
+        const dd = parseInt(raw.substring(2, 4));
+        if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+            const d = new Date(`2026-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`);
+            if (!isNaN(d)) return d;
+        }
+        // Try reversed interpretation: DDMM
+        const mm2 = parseInt(raw.substring(2, 4));
+        const dd2 = parseInt(raw.substring(0, 2));
+        if (mm2 >= 1 && mm2 <= 12 && dd2 >= 1 && dd2 <= 31) {
+            const d2 = new Date(`2026-${String(mm2).padStart(2, '0')}-${String(dd2).padStart(2, '0')}`);
+            if (!isNaN(d2)) return d2;
+        }
+    }
+    return null;
+}
+
+function extractDates(text) {
+    const dateRegex = /\b(\d{1,2}(?:st|nd|rd|th)?[\s-]*(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[a-zA-Z]*[\s-]*\d{4}|\d{1,2}[-./]\d{1,2}[-./]\d{2,4})\b/ig;
+    let dates = [...new Set(text.match(dateRegex) || [])];
+    dates.sort((a, b) => {
+        const pa = a.match(/(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})/);
+        const pb = b.match(/(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})/);
+        if (pa && pb) {
+            return new Date(`${pa[3]}-${pa[2]}-${pa[1]}`) - new Date(`${pb[3]}-${pb[2]}-${pb[1]}`);
+        }
+        return 0;
+    });
+    return dates;
+}
+
+function detectCategory(t) {
+    if (t.includes('neet')) return 'UGNEET';
+    if (t.includes('ugcet') || t.includes('ಯುಜಿ ಸಿಇಟಿ') || t.includes('ಯುಜಿಸಿಇಟಿ')) return 'UGCET';
+    return 'General';
+}
+
+function detectType(t) {
+    if (t.includes('result') || t.includes('ಫಲಿತಾಂಶ')) return 'Result';
+    if (t.includes('mock') || t.includes('ಅಣಕು')) return 'Mock Allotment';
+    if (t.includes('seat matrix') || t.includes('ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್ಸ್') || t.includes('ಸೀಟ್ ಮ್ಯಾಟ್ರಿಕ್')) return 'Seat Matrix';
+    if (t.includes('cut') || t.includes('ಕಟ್-ಆಫ್')) return 'Cutoff';
+    if (t.includes('extended') || t.includes('ವಿಸ್ತರಿತ')) return 'Extended Round';
+    if (t.includes('2nd round') || t.includes('second round') || t.includes('ಎರಡನೇ ಸುತ್ತು') || t.includes('2 ನೇ ಸುತ್ತು')) return '2nd Round';
+    if (t.includes('1st round') || t.includes('first round') || t.includes('ಮೊದಲ ಸುತ್ತು') || t.includes('1 ನೇ ಸುತ್ತು')) return '1st Round';
+    return 'General';
+}
+
+function buildPushBody(title, pdfData, finalDates) {
+    const t = title.toLowerCase();
+    const isOptionEntry = t.includes('option') || t.includes('choice') || t.includes('ಆಯ್ಕೆ') || t.includes('ದಾಖಲು') || (pdfData && pdfData.hasOptionEntry);
+
+    let body = (pdfData && pdfData.summary) ? pdfData.summary.substring(0, 80) : title.substring(0, 80);
+
+    if (isOptionEntry) {
+        body = `⚠️ OPTION/CHOICE ENTRY ALERT! Check immediately. ${body}`;
+    }
+
+    if (finalDates && finalDates.length > 0) {
+        const dts = finalDates.length === 1
+            ? `Deadline: ${finalDates[0]}`
+            : `Starts: ${finalDates[0]} | Closes: ${finalDates[finalDates.length - 1]}`;
+        body = `📌 ${dts}. ${body}`;
+    }
+
+    return body.substring(0, 150) + (body.length > 150 ? '...' : '');
+}
+
+function isHighPriority(title, notifType, pdfData) {
+    const t = title.toLowerCase();
+    return ['Result', 'Mock Allotment', 'Seat Matrix', 'Cutoff'].includes(notifType) ||
+        t.includes('option') || t.includes('choice') || t.includes('ಆಯ್ಕೆ') || t.includes('ದಾಖಲು') ||
+        t.includes('fee') || t.includes('reporting') ||
+        (pdfData && pdfData.hasOptionEntry);
 }
 
 export async function runScraper() {
@@ -68,58 +169,79 @@ export async function runScraper() {
     let notificationsCreated = 0;
     let errors = [];
 
-    const visited = new Set();
-    const queue = [START_URL];
-
     try {
-        while (queue.length > 0 && pagesScanned < 50) { // Limit depth
-            const currentUrl = queue.shift();
-            if (visited.has(currentUrl)) continue;
-            visited.add(currentUrl);
+        let htmlData = null;
 
-            try {
-                const response = await axios.get(currentUrl, {
-                    timeout: 45000,
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (HTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                    }
-                });
-                pagesScanned++;
-                const $ = cheerio.load(response.data);
-
-                const elements = $('a, marquee').toArray().reverse(); // Reverse to process bottom up (top becomes newest)
-                for (const el of elements) {
-                    const $el = $(el);
-                    const cls = $el.attr('class') || '';
-                    // Exclude generic navbar/dropdown menus (these leak random KEA exams)
-                    if (cls.includes('dropdown-item') || cls.includes('nav-link')) continue;
-
-                    const text = $el.text().trim().replace(/\s+/g, ' ');
-                    const href = resolveUrl($el.attr('href'));
-
-                    if (isRelevant(text, href)) {
-                        if (href && href.toLowerCase().endsWith('.pdf')) {
-                            pdfsScanned++;
-                            try {
-                                const created = await processPdfLink(text, href, currentUrl);
-                                if (created) notificationsCreated++;
-                            } catch (e) {
-                                errors.push(e.message);
-                            }
-                        } else {
-                            try {
-                                const linkUrl = href || currentUrl;
-                                const created = await processNonPdfLink(text, linkUrl, currentUrl);
-                                if (created) notificationsCreated++;
-                            } catch (e) {
-                                errors.push(e.message);
-                            }
-                        }
-                    }
+        try {
+            const httpsAgent = new https.Agent({ family: 4 }); // Force IPv4 to prevent EAI_AGAIN
+            const response = await axios.get(START_URL, {
+                timeout: 45000,
+                httpsAgent,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Connection': 'keep-alive'
                 }
+            });
+            htmlData = response.data;
+        } catch (err) {
+            errors.push(`Failed to fetch KEA page via network: ${err.message}. Trying local fallback.`);
+            try {
+                const fallbackPaths = [
+                    path.resolve(process.cwd(), '../kea_live.html'),
+                    path.resolve(process.cwd(), 'kea_live.html'),
+                    path.resolve(process.cwd(), '../../kea_live.html')
+                ];
+                let foundPath = null;
+                for (let p of fallbackPaths) {
+                    if (fs.existsSync(p)) { foundPath = p; break; }
+                }
+                if (foundPath) {
+                    htmlData = fs.readFileSync(foundPath, 'utf8');
+                } else {
+                    errors.push('Local fallback kea_live.html not found!');
+                    await new ScraperLog({ pagesScanned, pdfsScanned, notificationsCreated, errors, lastRun: startTime }).save();
+                    return;
+                }
+            } catch (fsErr) {
+                errors.push(`Local fallback error: ${fsErr.message}`);
+                await new ScraperLog({ pagesScanned, pdfsScanned, notificationsCreated, errors, lastRun: startTime }).save();
+                return;
+            }
+        }
 
-            } catch (err) {
-                errors.push(`Failed to fetch ${currentUrl}: ${err.message}`);
+        pagesScanned = 1;
+        const $ = cheerio.load(htmlData);
+
+        const elements = $('a').toArray().reverse();
+
+        for (const el of elements) {
+            const $el = $(el);
+
+            if (!isNotificationElement($el)) continue;
+
+            const text = $el.text().trim().replace(/\s+/g, ' ');
+            const rawHref = $el.attr('href') || null;
+            const href = resolveUrl(rawHref);
+
+            if (!isRelevant(text, href)) continue;
+
+            if (href && href.toLowerCase().endsWith('.pdf')) {
+                pdfsScanned++;
+                try {
+                    const created = await processPdfLink(text, href, START_URL);
+                    if (created) notificationsCreated++;
+                } catch (e) {
+                    errors.push(`PDF error [${text.substring(0, 40)}]: ${e.message}`);
+                }
+            } else {
+                try {
+                    const created = await processNonPdfLink(text, href, rawHref, START_URL);
+                    if (created) notificationsCreated++;
+                } catch (e) {
+                    errors.push(`Link error [${text.substring(0, 40)}]: ${e.message}`);
+                }
             }
         }
     } catch (err) {
@@ -127,172 +249,44 @@ export async function runScraper() {
     }
 
     try {
-        await new ScraperLog({
-            pagesScanned,
-            pdfsScanned,
-            notificationsCreated,
-            errors,
-            lastRun: startTime
-        }).save();
+        await new ScraperLog({ pagesScanned, pdfsScanned, notificationsCreated, errors, lastRun: startTime }).save();
     } catch (e) {
         console.error('Failed to save scraper log', e);
     }
 }
 
 async function processPdfLink(title, pdfUrl, sourceUrl) {
-    const hashObj = crypto.createHash('sha256');
-    hashObj.update(title + pdfUrl);
-    const documentHash = hashObj.digest('hex');
+    const hash = crypto.createHash('sha256').update(title + pdfUrl).digest('hex');
+    if (await CounsellingNotification.findOne({ documentHash: hash }).lean()) return false;
 
-    const existing = await CounsellingNotification.findOne({ documentHash }).lean();
-    if (existing) return false; // Duplicate prevention
-
-    let category = 'General';
-    let notificationType = 'General';
     const t = title.toLowerCase();
-    if (t.includes('ugcet')) category = 'UGCET';
-    if (t.includes('neet')) category = 'UGNEET';
-
-    if (t.includes('result') || t.includes('ಫಲಿತಾಂಶ')) notificationType = 'Result';
-    else if (t.includes('mock allotment') || t.includes('ಅಣಕು')) notificationType = 'Mock Allotment';
-    else if (t.includes('seat matrix') || t.includes('ಸೀಟು ಹಂಚಿಕೆ')) notificationType = 'Seat Matrix';
-    else if (t.includes('cutoff') || t.includes('ಕಟ್-ಆಫ್')) notificationType = 'Cutoff';
-    else if (t.includes('1st round') || t.includes('1 ನೇ ಸುತ್ತಿನ') || t.includes('ಮೊದಲ ಸುತ್ತಿನ')) notificationType = '1st Round';
-    else if (t.includes('2nd round') || t.includes('2 ನೇ ಸುತ್ತಿನ') || t.includes('ಎರಡನೇ ಸುತ್ತಿನ')) notificationType = '2nd Round';
-    else if (t.includes('extended round') || t.includes('ವಿಸ್ತರಿತ ಸುತ್ತಿನ')) notificationType = 'Extended Round';
-
-    // Read PDF asynchronously
+    const category = detectCategory(t);
+    const notificationType = detectType(t);
     const pdfData = await parsePdfContent(pdfUrl);
 
-    // Fallback extract dates from Title if PDF font is corrupted/image
-    let finalDates = pdfData?.dates || [];
-    if (finalDates.length === 0) {
-        const titleRegex = /\b(\d{1,2}[-./]\d{1,2}[-./]\d{2,4})\b/ig;
-        finalDates = [...new Set(title.match(titleRegex) || [])];
-    }
+    const finalDates = (pdfData && pdfData.dates && pdfData.dates.length > 0) ? pdfData.dates : extractDates(title);
+    const summary = (pdfData && pdfData.summary) ? pdfData.summary : `New KEA update: ${title}`;
 
-    let summary = pdfData?.summary || `New update released on KEA: ${title}`;
+    // Try to parse actual publish date from URL filename for correct date ordering
+    const urlDate = extractUploadDateFromUrl(pdfUrl);
+    const uploadDate = urlDate || new Date();
 
     const notif = await new CounsellingNotification({
-        title,
-        summary,
-        description: pdfData?.text ? pdfData.text.split('\n').slice(0, 10).join('\n') : '',
-        category,
-        pdfUrl,
-        sourceUrl,
-        notificationType,
-        uploadDate: new Date(),
-        documentHash
+        title, summary,
+        description: pdfData && pdfData.text ? pdfData.text.split('\n').slice(0, 10).join('\n') : '',
+        category, pdfUrl, sourceUrl, notificationType,
+        uploadDate, documentHash: hash
     }).save();
 
-    let priority = 'NORMAL PRIORITY';
-    if (['Result', 'Mock Allotment', 'Seat Matrix', 'Cutoff'].includes(notificationType) ||
-        t.includes('fee payment') || t.includes('option entry') || t.includes('choice entry') || t.includes('option') || t.includes('choice') || t.includes('ಆಯ್ಕೆ') || t.includes('ದಾಖಲು') || t.includes('reporting') ||
-        (pdfData && pdfData.hasOptionEntry)) {
-        priority = 'HIGH PRIORITY';
-    }
-
-    // Send push notification
-    let body = summary.substring(0, 100);
-
-    const titleHasOption = t.includes('option') || t.includes('choice') || t.includes('ಆಯ್ಕೆ') || t.includes('ದಾಖಲು');
-    if ((pdfData && pdfData.hasOptionEntry) || titleHasOption) {
-        body = `⚠️ OPTION/CHOICE ENTRY ALERT! Please check immediately. ${body}`;
-    }
-
-    if (finalDates && finalDates.length > 0) {
-        let dts;
-        if (finalDates.length === 1) {
-            dts = `Closing Date: ${finalDates[0]}`;
-        } else {
-            dts = `Starts: ${finalDates[0]} | Closing Date: ${finalDates[finalDates.length - 1]}`;
-        }
-        body = `📌 ${dts}. ${body}`;
-    }
-    if (body.length > 130) body = body.substring(0, 130) + '...';
-
-    let pushTitle = priority === 'HIGH PRIORITY' ? '🚨 KEA ALERT' : 'ℹ️ KEA UPDATE';
-    if (priority === 'HIGH PRIORITY') {
-        pushTitle += ': ' + title.substring(0, 30);
-    }
-
+    const pushTitle = isHighPriority(title, notificationType, pdfData) ? '🚨 KEA ALERT' : 'ℹ️ KEA UPDATE';
+    const body = buildPushBody(title, pdfData, finalDates);
     await sendPushNotifications(pushTitle, body, { id: notif._id, url: pdfUrl });
     return true;
 }
 
-async function processNonPdfLink(title, linkUrl, sourceUrl) {
-    const hashObj = crypto.createHash('sha256');
-    hashObj.update(title + linkUrl);
-    const documentHash = hashObj.digest('hex');
+async function processNonPdfLink(title, linkUrl, rawHref, sourceUrl) {
+    const key = title + (linkUrl || sourceUrl);
+    const hash = crypto.createHash('sha256').update(key).digest('hex');
+    if (await CounsellingNotification.findOne({ documentHash: hash }).lean()) return false;
 
-    const existing = await CounsellingNotification.findOne({ documentHash }).lean();
-    if (existing) return false;
-
-    let category = 'General';
-    let notificationType = 'General';
-    const t = title.toLowerCase();
-    if (t.includes('ugcet')) category = 'UGCET';
-    else if (t.includes('ugneet') || t.includes('ug neet')) category = 'UGNEET';
-
-    if (t.includes('mock allotment') || t.includes('ಅಣಕು')) notificationType = 'Mock Allotment';
-    else if (t.includes('seat matrix') || t.includes('ಸೀಟು ಹಂಚಿಕೆ')) notificationType = 'Seat Matrix';
-    else if (t.includes('cutoff') || t.includes('ಕಟ್-ಆಫ್')) notificationType = 'Cutoff';
-    else if (t.includes('result') || t.includes('ಫಲಿತಾಂಶ')) notificationType = 'Result';
-    else if (t.includes('1st round') || t.includes('1 ನೇ ಸುತ್ತಿನ') || t.includes('ಮೊದಲ ಸುತ್ತಿನ')) notificationType = '1st Round';
-    else if (t.includes('2nd round') || t.includes('2 ನೇ ಸುತ್ತಿನ') || t.includes('ಎರಡನೇ ಸುತ್ತಿನ')) notificationType = '2nd Round';
-    else if (t.includes('extended round') || t.includes('ವಿಸ್ತರಿತ ಸುತ್ತಿನ')) notificationType = 'Extended Round';
-
-    const notif = await new CounsellingNotification({
-        title,
-        summary: 'Important Web Link Notification',
-        description: 'Please visit the linked webpage for more details directly from KEA.',
-        category,
-        notificationType,
-        sourceUrl,
-        pdfUrl: (linkUrl === sourceUrl) ? null : linkUrl,
-        documentHash,
-        isRead: false
-    });
-    await notif.save();
-
-    let priority = 'NORMAL PRIORITY';
-    const titleHasOption = t.includes('option') || t.includes('choice') || t.includes('ಆಯ್ಕೆ') || t.includes('ದಾಖಲು');
-    if (['Result', 'Mock Allotment', 'Seat Matrix', 'Cutoff'].includes(notificationType) ||
-        t.includes('fee payment') || t.includes('reporting') || titleHasOption) {
-        priority = 'HIGH PRIORITY';
-    }
-
-    const titleRegex = /\b(\d{1,2}[-./]\d{1,2}[-./]\d{2,4})\b/ig;
-    let finalDates = [...new Set(title.match(titleRegex) || [])];
-    finalDates.sort((a, b) => {
-        const pa = a.match(/(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})/);
-        const pb = b.match(/(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})/);
-        if (pa && pb) {
-            const da = new Date(`${pa[3]}-${pa[2]}-${pa[1]}`);
-            const db = new Date(`${pb[3]}-${pb[2]}-${pb[1]}`);
-            return da - db;
-        }
-        return 0;
-    });
-
-    let pushTitle = priority === 'HIGH PRIORITY' ? '🚨 KEA ALERT' : 'ℹ️ KEA UPDATE';
-    let body = title.substring(0, 100);
-
-    if (titleHasOption) {
-        body = `⚠️ OPTION/CHOICE ENTRY ALERT! Please check immediately. ${body}`;
-    }
-
-    if (finalDates && finalDates.length > 0) {
-        let dts;
-        if (finalDates.length === 1) {
-            dts = `Deadline: ${finalDates[0]}`;
-        } else {
-            dts = `Starts: ${finalDates[0]} | Closing Date: ${finalDates[finalDates.length - 1]}`;
-        }
-        body = `📌 ${dts}. ${body}`;
-    }
-    if (body.length > 130) body = body.substring(0, 130) + '...';
-
-    await sendPushNotifications(pushTitle, body, { type: 'counseling_notification', id: notif.id, url: linkUrl });
-    return true;
 }
