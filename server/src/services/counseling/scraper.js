@@ -237,6 +237,7 @@ export async function runScraper() {
         const elements = $('a, span, p, div, marquee, li, td').toArray().reverse();
 
         let seenTexts = new Set();
+        let lastSeenUrlDate = null;
 
         for (const el of elements) {
             const $el = $(el);
@@ -260,17 +261,23 @@ export async function runScraper() {
 
             seenTexts.add(normText);
 
+            const itemUrlDate = extractUploadDateFromUrl(href);
+            if (itemUrlDate) {
+                lastSeenUrlDate = itemUrlDate;
+            }
+            const fallbackDate = lastSeenUrlDate || new Date();
+
             if (href && href.toLowerCase().endsWith('.pdf')) {
                 pdfsScanned++;
                 try {
-                    const created = await processPdfLink(text, href, START_URL);
+                    const created = await processPdfLink(text, href, START_URL, fallbackDate);
                     if (created) notificationsCreated++;
                 } catch (e) {
                     errors.push(`PDF error [${text.substring(0, 40)}]: ${e.message}`);
                 }
             } else {
                 try {
-                    const created = await processNonPdfLink(text, href, rawHref, START_URL);
+                    const created = await processNonPdfLink(text, href, rawHref, START_URL, fallbackDate);
                     if (created) notificationsCreated++;
                 } catch (e) {
                     errors.push(`Link error [${text.substring(0, 40)}]: ${e.message}`);
@@ -288,7 +295,7 @@ export async function runScraper() {
     }
 }
 
-async function processPdfLink(title, pdfUrl, sourceUrl) {
+async function processPdfLink(title, pdfUrl, sourceUrl, fallbackDate) {
     const hash = crypto.createHash('sha256').update(title + pdfUrl).digest('hex');
     if (await CounsellingNotification.findOne({ documentHash: hash }).lean()) return false;
 
@@ -300,9 +307,9 @@ async function processPdfLink(title, pdfUrl, sourceUrl) {
     const finalDates = (pdfData && pdfData.dates && pdfData.dates.length > 0) ? pdfData.dates : extractDates(title);
     const summary = (pdfData && pdfData.summary) ? pdfData.summary : `New KEA update: ${title}`;
 
-    // Try to parse actual publish date from URL filename for correct date ordering
+    // Use extracted url date, or the adjacent context date
     const urlDate = extractUploadDateFromUrl(pdfUrl);
-    const uploadDate = urlDate || new Date();
+    const uploadDate = urlDate || fallbackDate;
 
     const notif = await new CounsellingNotification({
         title, summary,
@@ -317,7 +324,7 @@ async function processPdfLink(title, pdfUrl, sourceUrl) {
     return true;
 }
 
-async function processNonPdfLink(title, linkUrl, rawHref, sourceUrl) {
+async function processNonPdfLink(title, linkUrl, rawHref, sourceUrl, fallbackDate) {
     const key = title + (linkUrl || sourceUrl);
     const hash = crypto.createHash('sha256').update(key).digest('hex');
     if (await CounsellingNotification.findOne({ documentHash: hash }).lean()) return false;
@@ -326,8 +333,10 @@ async function processNonPdfLink(title, linkUrl, rawHref, sourceUrl) {
     const category = detectCategory(t);
     const notificationType = detectType(t);
     const finalDates = extractDates(title);
+
+    // Group text items with their adjacent PDF date seamlessly
     const urlDate = extractUploadDateFromUrl(linkUrl);
-    const uploadDate = urlDate || new Date();
+    const uploadDate = urlDate || fallbackDate;
 
     const notif = await new CounsellingNotification({
         title,
