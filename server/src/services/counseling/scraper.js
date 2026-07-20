@@ -249,7 +249,7 @@ async function processNonPdfLink(title, linkUrl, sourceUrl) {
         category,
         notificationType,
         sourceUrl,
-        pdfUrl: linkUrl,
+        pdfUrl: (linkUrl === sourceUrl) ? null : linkUrl,
         documentHash,
         isRead: false
     });
