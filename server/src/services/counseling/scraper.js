@@ -78,7 +78,12 @@ export async function runScraper() {
             visited.add(currentUrl);
 
             try {
-                const response = await axios.get(currentUrl, { timeout: 15000 });
+                const response = await axios.get(currentUrl, {
+                    timeout: 45000,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (HTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    }
+                });
                 pagesScanned++;
                 const $ = cheerio.load(response.data);
 
@@ -250,6 +255,44 @@ async function processNonPdfLink(title, linkUrl, sourceUrl) {
     });
     await notif.save();
 
-    await sendPushNotifications(`🚨 KEA ALERT: ${notificationType}`, title, { type: 'counseling_notification', id: notif.id, url: linkUrl });
+    let priority = 'NORMAL PRIORITY';
+    const titleHasOption = t.includes('option') || t.includes('choice') || t.includes('ಆಯ್ಕೆ') || t.includes('ದಾಖಲು');
+    if (['Result', 'Mock Allotment', 'Seat Matrix', 'Cutoff'].includes(notificationType) ||
+        t.includes('fee payment') || t.includes('reporting') || titleHasOption) {
+        priority = 'HIGH PRIORITY';
+    }
+
+    const titleRegex = /\b(\d{1,2}[-./]\d{1,2}[-./]\d{2,4})\b/ig;
+    let finalDates = [...new Set(title.match(titleRegex) || [])];
+    finalDates.sort((a, b) => {
+        const pa = a.match(/(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})/);
+        const pb = b.match(/(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})/);
+        if (pa && pb) {
+            const da = new Date(`${pa[3]}-${pa[2]}-${pa[1]}`);
+            const db = new Date(`${pb[3]}-${pb[2]}-${pb[1]}`);
+            return da - db;
+        }
+        return 0;
+    });
+
+    let pushTitle = priority === 'HIGH PRIORITY' ? '🚨 KEA ALERT' : 'ℹ️ KEA UPDATE';
+    let body = title.substring(0, 100);
+
+    if (titleHasOption) {
+        body = `⚠️ OPTION/CHOICE ENTRY ALERT! Please check immediately. ${body}`;
+    }
+
+    if (finalDates && finalDates.length > 0) {
+        let dts;
+        if (finalDates.length === 1) {
+            dts = `Deadline: ${finalDates[0]}`;
+        } else {
+            dts = `Starts: ${finalDates[0]} | Closing Date: ${finalDates[finalDates.length - 1]}`;
+        }
+        body = `📌 ${dts}. ${body}`;
+    }
+    if (body.length > 130) body = body.substring(0, 130) + '...';
+
+    await sendPushNotifications(pushTitle, body, { type: 'counseling_notification', id: notif.id, url: linkUrl });
     return true;
 }
