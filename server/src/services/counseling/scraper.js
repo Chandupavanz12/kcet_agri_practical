@@ -32,6 +32,8 @@ const REJECT_URL = [
     'ugcet2025', 'ugcet2024', 'ugcet2023',
 ];
 
+const CUTOFF_DATE = new Date('2026-07-10');
+
 function resolveUrl(href) {
     if (!href) return null;
     if (href.startsWith('http')) return href;
@@ -66,6 +68,24 @@ function isRelevant(text, href) {
 
     // Reject if URL explicitly belongs to an old year (not 2026)
     if (/cet20(1[0-9]|2[0-5])|ugcet20(1[0-9]|2[0-5])/.test(ul)) return false;
+
+    const combined = text + ' ' + ul;
+    // Reject items with dates strictly before July 10, 2026
+    const dateMatches = combined.match(/(\d{2})[-/](\d{2})[-/](\d{4})/g) || [];
+    for (const dm of dateMatches) {
+        const parts = dm.match(/(\d{2})[-/](\d{2})[-/](\d{4})/);
+        if (!parts) continue;
+        const d = parseInt(parts[1]), m = parseInt(parts[2]), y = parseInt(parts[3]);
+        if (y < 2026) return false;
+        if (y === 2026) {
+            const notifDate = new Date(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+            if (notifDate < CUTOFF_DATE) return false;
+        }
+    }
+
+    // Also check if the URL embeds an older date (like 0619 = June 19)
+    const urlDate = extractUploadDateFromUrl(ul);
+    if (urlDate && urlDate < CUTOFF_DATE) return false;
 
     return true;
 }
@@ -214,7 +234,9 @@ export async function runScraper() {
         pagesScanned = 1;
         const $ = cheerio.load(htmlData);
 
-        const elements = $('a').toArray().reverse();
+        const elements = $('a, span, p, div, marquee, li, td').toArray().reverse();
+
+        let seenTexts = new Set();
 
         for (const el of elements) {
             const $el = $(el);
@@ -222,10 +244,21 @@ export async function runScraper() {
             if (!isNotificationElement($el)) continue;
 
             const text = $el.text().trim().replace(/\s+/g, ' ');
+            if (text.length < 2) continue;
+
+            // Prevent duplicate alert vs link for nested elements (like span inside a)
+            if (el.tagName !== 'a' && $el.closest('a').length > 0) continue;
+
             const rawHref = $el.attr('href') || null;
             const href = resolveUrl(rawHref);
 
+            // Deduplicate if we saw exact same text + url on this run
+            const normText = text.toLowerCase() + (href ? href.toLowerCase() : '');
+            if (seenTexts.has(normText)) continue;
+
             if (!isRelevant(text, href)) continue;
+
+            seenTexts.add(normText);
 
             if (href && href.toLowerCase().endsWith('.pdf')) {
                 pdfsScanned++;
@@ -289,4 +322,25 @@ async function processNonPdfLink(title, linkUrl, rawHref, sourceUrl) {
     const hash = crypto.createHash('sha256').update(key).digest('hex');
     if (await CounsellingNotification.findOne({ documentHash: hash }).lean()) return false;
 
+    const t = title.toLowerCase();
+    const category = detectCategory(t);
+    const notificationType = detectType(t);
+    const finalDates = extractDates(title);
+    const urlDate = extractUploadDateFromUrl(linkUrl);
+    const uploadDate = urlDate || new Date();
+
+    const notif = await new CounsellingNotification({
+        title,
+        summary: title,
+        description: rawHref && rawHref !== '#' ? `Visit: ${linkUrl}` : 'Text notification from KEA portal.',
+        category, notificationType, sourceUrl,
+        pdfUrl: (linkUrl && linkUrl !== sourceUrl) ? linkUrl : null,
+        uploadDate, documentHash: hash, isRead: false
+    }).save();
+
+    const highPri = isHighPriority(title, notificationType, null);
+    const pushTitle = highPri ? '🚨 KEA ALERT' : 'ℹ️ KEA UPDATE';
+    const body = buildPushBody(title, null, finalDates);
+    await sendPushNotifications(pushTitle, body, { id: notif._id, url: linkUrl || sourceUrl });
+    return true;
 }
