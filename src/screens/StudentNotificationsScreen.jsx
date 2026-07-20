@@ -30,9 +30,13 @@ function bestDate(n) {
 // Client-side sort: newest uploadDate / created_at first
 function sortByNewest(list) {
   return [...list].sort((a, b) => {
-    const da = new Date(a.uploadDate || a.created_at || 0);
-    const db = new Date(b.uploadDate || b.created_at || 0);
-    return db - da;
+    const da = new Date(a.uploadDate || a.created_at || 0).getTime();
+    const db = new Date(b.uploadDate || b.created_at || 0).getTime();
+    if (da !== db) return db - da;
+
+    const ca = new Date(a.created_at || 0).getTime();
+    const cb = new Date(b.created_at || 0).getTime();
+    return cb - ca;
   });
 }
 
@@ -75,15 +79,26 @@ export default function StudentNotificationsScreen() {
     loadNotifications({ showLoading: true });
   }, [token, activeCategory]);
 
-  const markAsRead = async (id) => {
+  const deleteNotificationItem = async (id) => {
     try {
-      await apiFetch(`/api/counseling/notifications/${id}/read`, { token, method: 'POST' });
-      setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+      await apiFetch(`/api/counseling/notifications/${id}`, { token, method: 'DELETE' });
+      setNotifications(prev => prev.filter(n => n._id !== id));
+    } catch (e) { console.error('Failed to delete', e); }
+  };
+
+  const markAsRead = async (id, isAlert = false) => {
+    try {
+      if (isAlert) {
+        await deleteNotificationItem(id);
+      } else {
+        await apiFetch(`/api/counseling/notifications/${id}/read`, { token, method: 'POST' });
+        setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+      }
     } catch (e) { console.error('Failed to mark read', e); }
   };
 
   const handleOpenLink = (url, id) => {
-    if (id) markAsRead(id);
+    if (id) markAsRead(id, false);
     if (url) Linking.openURL(url);
   };
 
@@ -158,7 +173,12 @@ export default function StudentNotificationsScreen() {
                       <Text style={[styles.typeBadgeText, { color: tag.color }]}>{tag.label}</Text>
                     </View>
                   </View>
-                  {!n.isRead && <View style={styles.unreadDot} />}
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {!n.isRead && <View style={styles.unreadDot} />}
+                    <TouchableOpacity onPress={() => deleteNotificationItem(n._id)} style={{ marginLeft: 10, padding: 4 }}>
+                      <Text style={{ fontSize: 16 }}>🗑️</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {/* Title */}
@@ -190,9 +210,9 @@ export default function StudentNotificationsScreen() {
                   ) : (
                     <TouchableOpacity
                       style={styles.btnMark}
-                      onPress={() => markAsRead(n._id)}
+                      onPress={() => markAsRead(n._id, true)}
                     >
-                      <Text style={styles.btnMarkText}>{n.isRead ? '✓ Read' : 'Mark Read'}</Text>
+                      <Text style={styles.btnMarkText}>Mark Read</Text>
                     </TouchableOpacity>
                   )}
                 </View>

@@ -28,6 +28,16 @@ export async function readNotification(req, res, next) {
     }
 }
 
+export async function deleteNotification(req, res, next) {
+    try {
+        const { id } = req.params;
+        await CounsellingNotification.findByIdAndDelete(id);
+        return res.json({ success: true });
+    } catch (err) {
+        return next(err);
+    }
+}
+
 export async function getDeadlines(req, res, next) {
     try {
         const deadlines = await Deadline.find({ date: { $gte: new Date() } })
