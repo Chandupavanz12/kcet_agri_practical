@@ -121,7 +121,9 @@ export default function StudentNotificationsScreen() {
                 <Text style={styles.dateText}>{new Date(n.created_at).toLocaleString()}</Text>
                 {n.pdfUrl ? (
                   <TouchableOpacity style={styles.btnAction} onPress={() => handleOpenPdf(n.pdfUrl, n._id)}>
-                    <Text style={styles.btnActionText}>Open PDF</Text>
+                    <Text style={styles.btnActionText}>
+                      {String(n.pdfUrl).toLowerCase().endsWith('.pdf') ? 'Open PDF' : 'Open Link'}
+                    </Text>
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity style={styles.btnActionOutlined} onPress={() => markAsRead(n._id)}>
