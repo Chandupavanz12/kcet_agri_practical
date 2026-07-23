@@ -16,10 +16,10 @@ export function requireAuth(req, res, next) {
   }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
     req.user = payload;
     return next();
-  } catch {
+  } catch (err) {
     return res.status(401).json({ message: 'Invalid token' });
   }
 }
