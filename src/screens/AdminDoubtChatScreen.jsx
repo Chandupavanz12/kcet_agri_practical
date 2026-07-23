@@ -1,7 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,6 +15,7 @@ export default function AdminDoubtChatScreen() {
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [inputText, setInputText] = useState('');
+    const [selectedAttachment, setSelectedAttachment] = useState(null);
 
     const [selectionMode, setSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -37,17 +41,40 @@ export default function AdminDoubtChatScreen() {
         return () => clearInterval(interval);
     }, [fetchMessages]);
 
+    const pickImage = async () => {
+        let result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            quality: 0.5,
+        });
+
+        if (!result.canceled && result.assets?.[0]) {
+            setSelectedAttachment(result.assets[0]);
+        }
+    };
+
     const handleSend = async () => {
-        if (!inputText.trim()) return;
+        if (!inputText.trim() && !selectedAttachment) return;
         try {
             setSending(true);
+            let attachment_url = null;
+            let attachment_type = null;
+
+            if (selectedAttachment) {
+                const base64 = await FileSystem.readAsStringAsync(selectedAttachment.uri, { encoding: 'base64' });
+                const mimeType = selectedAttachment.mimeType || 'image/jpeg';
+                attachment_url = `data:${mimeType};base64,${base64}`;
+                attachment_type = 'image';
+            }
+
             const newMsg = await apiFetch(`/api/doubts/admin/${studentId}/reply`, {
                 method: 'POST',
                 token,
-                body: { message: inputText.trim(), studentName: name }
+                body: { message: inputText.trim(), studentName: name, attachment_url, attachment_type }
             });
             setMessages(prev => [...prev, newMsg]);
             setInputText('');
+            setSelectedAttachment(null);
             setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
         } catch (err) {
             Alert.alert('Error', 'Failed to send message');
@@ -119,9 +146,14 @@ export default function AdminDoubtChatScreen() {
                 ]}
             >
                 <View style={[styles.bubble, isAdmin ? styles.bubbleMe : styles.bubbleStudent]}>
-                    <Text style={[styles.messageText, isAdmin ? styles.messageTextMe : styles.messageTextStudent]}>
-                        {item.message}
-                    </Text>
+                    {item.attachment_type === 'image' && item.attachment_url && (
+                        <Image source={{ uri: item.attachment_url }} style={styles.attachmentImg} resizeMode="cover" />
+                    )}
+                    {!!item.message && (
+                        <Text style={[styles.messageText, isAdmin ? styles.messageTextMe : styles.messageTextStudent]}>
+                            {item.message}
+                        </Text>
+                    )}
                     <Text style={[styles.timeText, isAdmin ? styles.timeTextMe : styles.timeTextStudent]}>
                         {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </Text>
@@ -181,18 +213,31 @@ export default function AdminDoubtChatScreen() {
                     }
                 />
                 <View style={styles.inputContainer}>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Type a reply..."
-                        value={inputText}
-                        onChangeText={setInputText}
-                        multiline
-                        maxLength={1000}
-                    />
+                    <TouchableOpacity style={styles.attachButton} onPress={pickImage}>
+                        <Ionicons name="image" size={24} color="#64748b" />
+                    </TouchableOpacity>
+                    <View style={styles.inputWrapper}>
+                        {selectedAttachment && (
+                            <View style={styles.previewBox}>
+                                <Image source={{ uri: selectedAttachment.uri }} style={styles.previewImg} />
+                                <TouchableOpacity style={styles.previewClose} onPress={() => setSelectedAttachment(null)}>
+                                    <Ionicons name="close-circle" size={20} color="#ef4444" />
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                        <TextInput
+                            style={styles.input}
+                            placeholder={`Reply to ${name || 'Student'}...`}
+                            value={inputText}
+                            onChangeText={setInputText}
+                            multiline
+                            maxLength={1000}
+                        />
+                    </View>
                     <TouchableOpacity
-                        style={[styles.sendButton, !inputText.trim() && { opacity: 0.5 }]}
+                        style={[styles.sendButton, (!inputText.trim() && !selectedAttachment) && { opacity: 0.5 }]}
                         onPress={handleSend}
-                        disabled={!inputText.trim() || sending}
+                        disabled={(!inputText.trim() && !selectedAttachment) || sending}
                     >
                         {sending ? (
                             <ActivityIndicator size="small" color="#fff" />
@@ -252,6 +297,13 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 1
     },
+    attachmentImg: {
+        width: 200,
+        height: 200,
+        borderRadius: 12,
+        marginBottom: 8,
+        backgroundColor: '#e2e8f0'
+    },
     messageText: { fontSize: 15, lineHeight: 22 },
     messageTextMe: { color: '#fff' },
     messageTextStudent: { color: '#334155' },
@@ -265,19 +317,38 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#e2e8f0',
         alignItems: 'flex-end',
-        paddingBottom: Platform.OS === 'ios' ? 32 : 12
+        paddingBottom: Platform.OS === 'ios' ? 32 : 16
     },
-    input: {
+    attachButton: {
+        padding: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 4,
+        marginBottom: 2
+    },
+    inputWrapper: {
         flex: 1,
         backgroundColor: '#f1f5f9',
+        borderRadius: 22,
+        marginRight: 12,
+        overflow: 'hidden'
+    },
+    previewBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e2e8f0'
+    },
+    previewImg: { width: 50, height: 50, borderRadius: 8 },
+    previewClose: { position: 'absolute', top: 4, right: 4, zIndex: 1 },
+    input: {
         minHeight: 44,
         maxHeight: 120,
-        borderRadius: 22,
         paddingHorizontal: 16,
         paddingTop: 12,
         paddingBottom: 12,
         fontSize: 15,
-        marginRight: 12,
         color: '#0f172a'
     },
     sendButton: {

@@ -33,10 +33,10 @@ export async function sendDoubtMessage(req, res, next) {
     try {
         const studentId = req.user.sub || req.user.id;
         const studentName = req.user.name || req.user.full_name || 'Student'; // Depending on user model
-        const { message } = req.body;
+        const { message, attachment_url, attachment_type } = req.body;
 
-        if (!message?.trim()) {
-            return res.status(400).json({ message: 'Message is required' });
+        if (!message?.trim() && !attachment_url) {
+            return res.status(400).json({ message: 'Message or attachment is required' });
         }
 
         const DoubtMessage = getDoubtMessageModel();
@@ -46,7 +46,9 @@ export async function sendDoubtMessage(req, res, next) {
             student_id: studentId,
             student_name: studentName,
             sender_type: 'student',
-            message: message.trim()
+            message: message ? message.trim() : '',
+            attachment_url: attachment_url || null,
+            attachment_type: attachment_type || null
         });
 
         res.json(newMessage);
@@ -139,10 +141,10 @@ export async function getAdminMessagesForStudent(req, res, next) {
 export async function sendAdminReply(req, res, next) {
     try {
         const studentId = Number(req.params.studentId);
-        let { message, studentName } = req.body;
+        let { message, attachment_url, attachment_type, studentName } = req.body;
 
-        if (!message?.trim()) {
-            return res.status(400).json({ message: 'Message is required' });
+        if (!message?.trim() && !attachment_url) {
+            return res.status(400).json({ message: 'Message or attachment is required' });
         }
 
         const DoubtMessage = getDoubtMessageModel();
@@ -156,7 +158,9 @@ export async function sendAdminReply(req, res, next) {
             student_id: studentId,
             student_name: studentName,
             sender_type: 'admin',
-            message: message.trim(),
+            message: message ? message.trim() : '',
+            attachment_url: attachment_url || null,
+            attachment_type: attachment_type || null,
             read: false
         });
 
