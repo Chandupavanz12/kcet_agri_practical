@@ -24,6 +24,7 @@ export default function AdminDoubtChatScreen() {
     const router = useRouter();
 
     const fetchMessages = useCallback(async () => {
+        if (!token) return;
         try {
             const data = await apiFetch(`/api/doubts/admin/${studentId}`, { token });
             setMessages(data);
@@ -46,6 +47,7 @@ export default function AdminDoubtChatScreen() {
             mediaTypes: ['images'],
             allowsEditing: true,
             quality: 0.5,
+            base64: true,
         });
 
         if (!result.canceled && result.assets?.[0]) {
@@ -61,10 +63,12 @@ export default function AdminDoubtChatScreen() {
             let attachment_type = null;
 
             if (selectedAttachment) {
-                const base64 = await FileSystem.readAsStringAsync(selectedAttachment.uri, { encoding: 'base64' });
-                const mimeType = selectedAttachment.mimeType || 'image/jpeg';
-                attachment_url = `data:${mimeType};base64,${base64}`;
-                attachment_type = 'image';
+                const base64 = selectedAttachment.base64 || await FileSystem.readAsStringAsync(selectedAttachment.uri, { encoding: 'base64' }).catch(() => '');
+                if (base64) {
+                    const mimeType = selectedAttachment.mimeType || 'image/jpeg';
+                    attachment_url = `data:${mimeType};base64,${base64}`;
+                    attachment_type = 'image';
+                }
             }
 
             const newMsg = await apiFetch(`/api/doubts/admin/${studentId}/reply`, {
