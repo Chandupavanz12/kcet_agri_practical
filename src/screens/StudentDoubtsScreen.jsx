@@ -43,7 +43,7 @@ export default function StudentDoubtsScreen() {
             const newMsg = await apiFetch('/api/doubts/student', {
                 method: 'POST',
                 token,
-                body: JSON.stringify({ message: inputText.trim() })
+                body: { message: inputText.trim() }
             });
             setMessages(prev => [...prev, newMsg]);
             setInputText('');
@@ -86,7 +86,7 @@ export default function StudentDoubtsScreen() {
                             await apiFetch('/api/doubts/student/clear', {
                                 method: 'POST',
                                 token,
-                                body: JSON.stringify({ messageIds: Array.from(selectedIds) })
+                                body: { messageIds: Array.from(selectedIds) }
                             });
                             setMessages(prev => prev.filter(m => !selectedIds.has(m._id)));
                             setSelectionMode(false);

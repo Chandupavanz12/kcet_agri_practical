@@ -44,7 +44,7 @@ export default function AdminDoubtChatScreen() {
             const newMsg = await apiFetch(`/api/doubts/admin/${studentId}/reply`, {
                 method: 'POST',
                 token,
-                body: JSON.stringify({ message: inputText.trim(), studentName: name })
+                body: { message: inputText.trim(), studentName: name }
             });
             setMessages(prev => [...prev, newMsg]);
             setInputText('');
@@ -87,7 +87,7 @@ export default function AdminDoubtChatScreen() {
                             await apiFetch(`/api/doubts/admin/${studentId}/clear`, {
                                 method: 'POST',
                                 token,
-                                body: JSON.stringify({ messageIds: Array.from(selectedIds) })
+                                body: { messageIds: Array.from(selectedIds) }
                             });
                             setMessages(prev => prev.filter(m => !selectedIds.has(m._id)));
                             setSelectionMode(false);
