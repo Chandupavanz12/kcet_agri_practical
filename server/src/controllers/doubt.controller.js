@@ -14,7 +14,7 @@ export async function initializeDoubtDb(req, res, next) {
 // Student routes
 export async function getStudentMessages(req, res, next) {
     try {
-        const studentId = req.user.id;
+        const studentId = req.user.sub || req.user.id;
         const DoubtMessage = getDoubtMessageModel();
         if (!DoubtMessage) return res.status(503).json({ message: 'Doubt Service Unavailable' });
 
@@ -31,7 +31,7 @@ export async function getStudentMessages(req, res, next) {
 
 export async function sendDoubtMessage(req, res, next) {
     try {
-        const studentId = req.user.id;
+        const studentId = req.user.sub || req.user.id;
         const studentName = req.user.name || req.user.full_name || 'Student'; // Depending on user model
         const { message } = req.body;
 
@@ -57,7 +57,7 @@ export async function sendDoubtMessage(req, res, next) {
 
 export async function clearStudentHistory(req, res, next) {
     try {
-        const studentId = req.user.id;
+        const studentId = req.user.sub || req.user.id;
         const { messageIds } = req.body; // if empty, just ignore? no we need it maybe array
         const DoubtMessage = getDoubtMessageModel();
         if (!DoubtMessage) return res.status(503).json({ message: 'Doubt Service Unavailable' });
