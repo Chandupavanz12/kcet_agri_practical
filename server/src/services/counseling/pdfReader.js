@@ -7,7 +7,7 @@ export async function parsePdfContent(pdfUrl) {
     try {
         const response = await axios.get(pdfUrl, {
             responseType: 'arraybuffer',
-            timeout: 45000,
+            timeout: 5000,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (HTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             }

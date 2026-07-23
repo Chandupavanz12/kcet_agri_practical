@@ -1,10 +1,10 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
-import React, { useEffect, useState, useCallback, memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, FlatList } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAuth } from '../contexts/AuthContext.jsx';
-import { apiFetch } from '../api/client.js';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import React, { memo, useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { apiFetch } from '../api/client.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 const MANAGE_LINKS = [
   { to: '/admin/students', icon: '👥', label: 'Students', desc: 'Accounts & Subscription' },
@@ -19,6 +19,7 @@ const MANAGE_LINKS = [
   { to: '/admin/notifications', icon: '🔔', label: 'Broadcast', desc: 'Global Announcements' },
   { to: '/admin/results', icon: '🏆', label: 'Results', desc: 'Student Performance' },
   { to: '/admin/settings', icon: '⚙️', label: 'Settings', desc: 'Global configuration' },
+  { to: '/admin/doubts', icon: '💬', label: 'Students Doubts', desc: 'Clarify Student Doubts' },
 ];
 
 const StatCard = memo(({ icon, label, value, color, onPress }) => {
@@ -53,7 +54,7 @@ const ManageCard = memo(({ item, onPress }) => {
 export default function AdminDashboardScreen() {
   const { token, user, logout } = useAuth();
   const router = useRouter();
-  
+
   const [counts, setCounts] = useState({ students: 0, tests: 0, videos: 0, materials: 0 });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -71,9 +72,9 @@ export default function AdminDashboardScreen() {
       ]);
       setCounts({
         students: studentsRes.status === 'fulfilled' ? (studentsRes.value?.students?.length ?? 0) : 0,
-        tests:    testsRes.status    === 'fulfilled' ? (testsRes.value?.tests?.length    ?? 0) : 0,
-        videos:   videosRes.status   === 'fulfilled' ? (videosRes.value?.videos?.length  ?? 0) : 0,
-        materials:materialsRes.status=== 'fulfilled' ? (materialsRes.value?.materials?.length ?? 0) : 0,
+        tests: testsRes.status === 'fulfilled' ? (testsRes.value?.tests?.length ?? 0) : 0,
+        videos: videosRes.status === 'fulfilled' ? (videosRes.value?.videos?.length ?? 0) : 0,
+        materials: materialsRes.status === 'fulfilled' ? (materialsRes.value?.materials?.length ?? 0) : 0,
       });
     } catch (err) {
       setError(err?.message || 'Failed to load dashboard');
@@ -102,9 +103,9 @@ export default function AdminDashboardScreen() {
 
   const stats = [
     { icon: '👥', label: 'Students', value: counts.students, color: '#10b981', route: '/admin/students' },
-    { icon: '📝', label: 'Tests',    value: counts.tests,    color: '#0ea5e9', route: '/admin/tests' },
-    { icon: '🎥', label: 'Videos',   value: counts.videos,   color: '#3b82f6', route: '/admin/videos' },
-    { icon: '📚', label: 'Documents',value: counts.materials, color: '#f59e0b', route: '/admin/materials' },
+    { icon: '📝', label: 'Tests', value: counts.tests, color: '#0ea5e9', route: '/admin/tests' },
+    { icon: '🎥', label: 'Videos', value: counts.videos, color: '#3b82f6', route: '/admin/videos' },
+    { icon: '📚', label: 'Documents', value: counts.materials, color: '#f59e0b', route: '/admin/materials' },
   ];
 
   return (
@@ -127,7 +128,7 @@ export default function AdminDashboardScreen() {
               </View>
               <Text style={styles.heroTitle}>Welcome, {user?.name || 'Admin'}</Text>
               <Text style={styles.heroSubtitle}>Platform metrics are stable. You have full control over students, content, and revenue.</Text>
-              
+
               <View style={styles.heroStatsRow}>
                 <LinearGradient colors={['#10b981', '#059669']} style={styles.heroStatBoxBrand}>
                   <Text style={styles.heroStatValueWhite}>PRO</Text>
@@ -139,8 +140,8 @@ export default function AdminDashboardScreen() {
                 </LinearGradient>
               </View>
 
-              <TouchableOpacity 
-                style={styles.heroLogoutBtn} 
+              <TouchableOpacity
+                style={styles.heroLogoutBtn}
                 onPress={() => {
                   logout();
                   router.replace('/');
@@ -166,10 +167,10 @@ export default function AdminDashboardScreen() {
 
             <View style={styles.statsGrid}>
               {stats.map((s, idx) => (
-                <StatCard 
-                  key={idx} 
-                  {...s} 
-                  onPress={() => s.route && handleNavigation(s.route)} 
+                <StatCard
+                  key={idx}
+                  {...s}
+                  onPress={() => s.route && handleNavigation(s.route)}
                 />
               ))}
             </View>

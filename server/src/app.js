@@ -10,6 +10,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { adminRouter } from './routes/admin.routes.js';
 import { authRouter } from './routes/auth.routes.js';
 import { counselingRouter } from './routes/counseling.routes.js';
+import { doubtRouter } from './routes/doubt.routes.js';
 import { studentRouter } from './routes/student.routes.js';
 
 export function createApp() {
@@ -211,6 +212,7 @@ export function createApp() {
   app.use('/api/admin', adminRouter);
   app.use('/api/student', studentRouter);
   app.use('/api/counseling', counselingRouter);
+  app.use('/api/doubts', doubtRouter);
 
   app.use(errorHandler);
 

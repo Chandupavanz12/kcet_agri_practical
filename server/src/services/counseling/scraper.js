@@ -154,6 +154,17 @@ function detectType(t) {
     return 'General';
 }
 
+function parseTitleDate(dateStr) {
+    if (!dateStr) return null;
+    const parts = dateStr.match(/(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})/);
+    if (!parts) return null;
+    let d = parseInt(parts[1], 10), m = parseInt(parts[2], 10), y = parseInt(parts[3], 10);
+    if (y < 100) y += 2000;
+    const dateObj = new Date(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T00:00:00Z`);
+    return isNaN(dateObj) ? null : dateObj;
+}
+
+
 function buildPushBody(title, pdfData, finalDates) {
     const t = title.toLowerCase();
     const isOptionEntry = t.includes('option') || t.includes('choice') || t.includes('ಆಯ್ಕೆ') || t.includes('ದಾಖಲು') || (pdfData && pdfData.hasOptionEntry);
@@ -253,19 +264,24 @@ export async function runScraper() {
             const rawHref = $el.attr('href') || null;
             const href = resolveUrl(rawHref);
 
-            // Deduplicate if we saw exact same text + url on this run
-            const normText = text.toLowerCase() + (href ? href.toLowerCase() : '');
+            // Deduplicate if we saw exact same text on this run (e.g. nested link vs span)
+            const normText = text.toLowerCase();
             if (seenTexts.has(normText)) continue;
 
             if (!isRelevant(text, href)) continue;
 
             seenTexts.add(normText);
 
-            const itemUrlDate = extractUploadDateFromUrl(href);
+            const finalDates = extractDates(text);
+            const titleDate = finalDates.length > 0 ? parseTitleDate(finalDates[finalDates.length - 1]) : null;
+
+            const itemUrlDate = extractUploadDateFromUrl(href) || titleDate;
             if (itemUrlDate) {
                 lastSeenUrlDate = itemUrlDate;
             }
-            const fallbackDate = lastSeenUrlDate || new Date();
+            // Strict UTC midnight to prevent 'newer' sorting for falling back to today
+            const todayUtc = new Date(new Date().setUTCHours(0, 0, 0, 0));
+            const fallbackDate = lastSeenUrlDate || todayUtc;
 
             if (href && href.toLowerCase().endsWith('.pdf')) {
                 pdfsScanned++;

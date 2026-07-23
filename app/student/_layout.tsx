@@ -25,6 +25,7 @@ function CustomDrawerContent(props) {
     { label: 'PYQs', icon: '📄', route: '/student/pyqs' },
     { label: 'Notifications', icon: '🔔', route: '/student/notifications' },
     { label: 'Admin Notifications', icon: '📢', route: '/student/admin-notifications' },
+    { label: 'Doubt Clarification', icon: '💬', route: '/student/doubts' },
     { label: 'Profile', icon: '👤', route: '/student/profile' },
   ];
 
@@ -109,6 +110,7 @@ export default function StudentLayout() {
       <Drawer.Screen name="pyqs" options={{ title: 'PYQs' }} />
       <Drawer.Screen name="notifications" options={{ title: 'Notifications' }} />
       <Drawer.Screen name="admin-notifications" options={{ title: 'Admin Notifications' }} />
+      <Drawer.Screen name="doubts" options={{ title: 'Doubt Clarification' }} />
       <Drawer.Screen name="profile" options={{ title: 'Profile' }} />
       <Drawer.Screen name="mock-test/[id]" options={{ title: 'Mock Test' }} />
       <Drawer.Screen name="mock-test/result" options={{ title: 'Test Result' }} />
