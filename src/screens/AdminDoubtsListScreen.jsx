@@ -13,6 +13,7 @@ export default function AdminDoubtsListScreen() {
     const router = useRouter();
 
     const fetchStudents = useCallback(async () => {
+        if (!token) return;
         try {
             const data = await apiFetch('/api/doubts/admin/students', { token });
             setStudents(data);
