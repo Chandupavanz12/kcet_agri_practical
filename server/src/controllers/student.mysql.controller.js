@@ -565,31 +565,144 @@ export async function verifyPaymentStudent(req, res, next) {
   }
 }
 
+function renderPaymentBridgeHtml({ success, targetAppUrl, message, planName = 'Premium Access' }) {
+  const safeTitle = success ? 'Payment Successful' : 'Payment Update';
+  const safeHeading = success ? '🎉 Payment Successful!' : '⏳ Payment Received';
+  const btnText = success ? 'Open App & Access Premium' : 'Return to App';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>${safeTitle} - KCET Agri Practical</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f1f5f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 18px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      padding: 36px 24px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+    .icon {
+      font-size: 56px;
+      margin-bottom: 16px;
+      line-height: 1;
+    }
+    h2 {
+      color: ${success ? '#15803d' : '#b45309'};
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    p {
+      color: #475569;
+      font-size: 15px;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      background-color: ${success ? '#16a34a' : '#2563eb'};
+      color: #ffffff;
+      border: none;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      box-shadow: 0 4px 12px ${success ? 'rgba(22, 163, 74, 0.35)' : 'rgba(37, 99, 235, 0.35)'};
+      margin-bottom: 12px;
+    }
+    .btn:active {
+      opacity: 0.9;
+    }
+    .hint {
+      color: #94a3b8;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">${success ? '🎉' : '⏳'}</div>
+    <h2>${safeHeading}</h2>
+    <p>${message}</p>
+    <a id="open-app-btn" href="${targetAppUrl}" class="btn">${btnText}</a>
+    <div class="hint">Tap above if the app does not open automatically</div>
+  </div>
+  <script>
+    // Automatically navigate back to the mobile app
+    try {
+      window.location.href = "${targetAppUrl}";
+    } catch (e) {}
+
+    setTimeout(function() {
+      var btn = document.getElementById('open-app-btn');
+      if (btn) btn.focus();
+    }, 1500);
+  </script>
+</body>
+</html>`;
+}
+
 export async function verifyPaymentRedirect(req, res, next) {
   try {
-    const orderId = String(req.body?.razorpay_order_id || req.query?.razorpay_order_id || '').trim();
-    const paymentId = String(req.body?.razorpay_payment_id || req.query?.razorpay_payment_id || '').trim();
-    const signature = String(req.body?.razorpay_signature || req.query?.razorpay_signature || '').trim();
+    const orderId = String(req.body?.razorpay_order_id || req.query?.razorpay_order_id || req.query?.orderId || '').trim();
+    const paymentId = String(req.body?.razorpay_payment_id || req.query?.razorpay_payment_id || req.body?.paymentId || req.query?.paymentId || '').trim();
+    const signature = String(req.body?.razorpay_signature || req.query?.razorpay_signature || req.body?.signature || req.query?.signature || '').trim();
 
-    // Always redirect back to the app on error or success
-    const failRedirect = `${process.env.CLIENT_ORIGIN || 'http://localhost:5173'}/student/premium?error=PaymentVerificationFailed`;
-    const successRedirect = `${process.env.CLIENT_ORIGIN || 'http://localhost:5173'}/student/premium?success=PremiumActivated`;
+    const customRedirect = String(req.query?.redirect_url || req.body?.redirect_url || '').trim();
+    const defaultAppBase = 'mymobileapp://student/premium';
+    const targetAppBase = customRedirect || defaultAppBase;
 
-    if (!orderId || !paymentId || !signature) {
-      return res.redirect(failRedirect);
-    }
+    const buildUrl = (base, param) => `${base}${base.includes('?') ? '&' : '?'}${param}`;
+    const successAppUrl = buildUrl(targetAppBase, 'success=PremiumActivated');
+    const failAppUrl = buildUrl(targetAppBase, 'error=PaymentVerificationFailed');
 
-    if (!verifyRazorpayPaymentSignature({ orderId, paymentId, signature })) {
-      return res.redirect(failRedirect);
+    if (!orderId) {
+      res.setHeader('Content-Type', 'text/html');
+      return res.status(200).send(renderPaymentBridgeHtml({
+        success: false,
+        targetAppUrl: failAppUrl,
+        message: 'Order information was not received. If payment was deducted, please tap Return to App to check status.',
+      }));
     }
 
     const paymentDoc = await Payment.findOne({ razorpay_order_id: orderId }).lean();
-    if (!paymentDoc) return res.redirect(failRedirect);
+    if (!paymentDoc) {
+      res.setHeader('Content-Type', 'text/html');
+      return res.status(200).send(renderPaymentBridgeHtml({
+        success: false,
+        targetAppUrl: failAppUrl,
+        message: 'Payment order could not be located. Tap Return to App to check your payment status.',
+      }));
+    }
 
     const planDoc = await Plan.findOne({ id: Number(paymentDoc.plan_id) }).select({ code: 1, name: 1, duration_days: 1 }).lean();
-    if (!planDoc) return res.redirect(failRedirect);
+    const planName = planDoc?.name || 'Premium Access';
 
-    if (paymentDoc.status !== 'paid' && paymentDoc.status !== 'free') {
+    let verified = false;
+    if (paymentDoc.status === 'paid' || paymentDoc.status === 'free') {
+      // Already marked paid by Razorpay webhook!
+      verified = true;
+    } else if (orderId && paymentId && signature && verifyRazorpayPaymentSignature({ orderId, paymentId, signature })) {
+      verified = true;
       await Payment.updateOne(
         { id: Number(paymentDoc.id) },
         {
@@ -602,13 +715,15 @@ export async function verifyPaymentRedirect(req, res, next) {
           },
         }
       );
+    }
+
+    if (verified && planDoc) {
       await grantAccessForPlan(Number(paymentDoc.user_id), String(planDoc.code), Number(planDoc.duration_days || 365));
       await createUserNotification(Number(paymentDoc.user_id), 'Premium activated', `Your ${planDoc.name} is active.`);
 
       // Invalidate server-side TTL caches so next requests return fresh data
       const uid = Number(paymentDoc.user_id);
       _ttlCache.delete(`access:status:${uid}`);
-      // Materials list cache is global; invalidate so locked flags recalculate
       _ttlCache.delete('materials:list:v1:pdf:all');
       _ttlCache.delete('materials:list:v1:pdf:paid');
       _ttlCache.delete('materials:list:v1:pyq:all');
@@ -616,11 +731,30 @@ export async function verifyPaymentRedirect(req, res, next) {
       _ttlCache.delete('materials:list:v1:all:all');
       _ttlCache.delete('dashboard:pdfs:v1');
       _ttlCache.delete('dashboard:pyqs:v1');
+
+      res.setHeader('Content-Type', 'text/html');
+      return res.status(200).send(renderPaymentBridgeHtml({
+        success: true,
+        targetAppUrl: successAppUrl,
+        planName,
+        message: `Your payment was successful and ${planName} is now active! Returning to KCET Agri Practical…`,
+      }));
     }
 
-    return res.redirect(successRedirect);
+    res.setHeader('Content-Type', 'text/html');
+    return res.status(200).send(renderPaymentBridgeHtml({
+      success: false,
+      targetAppUrl: failAppUrl,
+      message: 'Payment verification could not be completed immediately. Tap Return to App to check status.',
+    }));
   } catch (err) {
-    return res.redirect(`${process.env.CLIENT_ORIGIN || 'http://localhost:5173'}/student/premium?error=ServerError`);
+    const fallbackUrl = 'mymobileapp://student/premium?error=ServerError';
+    res.setHeader('Content-Type', 'text/html');
+    return res.status(200).send(renderPaymentBridgeHtml({
+      success: false,
+      targetAppUrl: fallbackUrl,
+      message: 'An unexpected error occurred. Tap Return to App to check your payment status.',
+    }));
   }
 }
 
@@ -1926,13 +2060,14 @@ export async function submitFeedback(req, res, next) {
 }
 
 export async function serveRazorpayCheckoutHtml(req, res) {
-  const { orderId, amount, name, email, planId } = req.query;
+  const { orderId, amount, name, email, planId, redirect_url } = req.query;
   if (!orderId) {
     return res.status(400).send('Invalid request: Missing Order ID');
   }
 
   const razorpayKey = process.env.RAZORPAY_KEY_ID;
-  const webCallbackUrl = `/api/student/premium/verify`;
+  const redirectParam = redirect_url ? `&redirect_url=${encodeURIComponent(redirect_url)}` : '';
+  const webCallbackUrl = `/api/webhooks/razorpay-redirect?razorpay_order_id=${encodeURIComponent(orderId)}${redirectParam}`;
 
   const html = `
     <!DOCTYPE html>
@@ -1969,7 +2104,8 @@ export async function serveRazorpayCheckoutHtml(req, res) {
                 "description": "Premium Access Upgrade",
                 "image": "https://kcet-agri-practical.onrender.com/assets/images/favicon.png",
                 "order_id": "${orderId}",
-                "callback_url": "${webCallbackUrl}?razorpay_order_id=${orderId}",
+                "callback_url": "${webCallbackUrl}",
+                "redirect": true,
                 "prefill": {
                     "name": "${name || ''}",
                     "email": "${email || ''}"

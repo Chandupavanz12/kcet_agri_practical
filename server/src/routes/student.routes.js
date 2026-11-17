@@ -34,6 +34,7 @@ import {
   submitFeedback,
   submitTest,
   updateProfile,
+  verifyPaymentRedirect,
   verifyPaymentStudent,
 } from '../controllers/student.mysql.controller.js';
 
@@ -45,8 +46,17 @@ const paymentLimiter = simpleRateLimit({
   keyGenerator: (req) => `${req.ip}:${req.user?.sub || ''}`,
 });
 
-// Note: Checkout needs to be public because the external browser doesn't have the Bearer token!
+// Note: Checkout and redirects need to be public because the external browser doesn't have the Bearer token!
 studentRouter.get('/premium/checkout', serveRazorpayCheckoutHtml);
+studentRouter.all('/premium/redirect', verifyPaymentRedirect);
+studentRouter.all('/premium/callback', verifyPaymentRedirect);
+studentRouter.post('/premium/verify', (req, res, next) => {
+  // If Razorpay posted directly to verify from external browser (no Bearer token)
+  if (!req.headers.authorization && (req.body?.razorpay_signature || req.query?.razorpay_signature || req.body?.razorpay_order_id)) {
+    return verifyPaymentRedirect(req, res, next);
+  }
+  return next();
+});
 
 studentRouter.use(requireAuth, requireRole('student', 'admin'));
 
