@@ -5,10 +5,14 @@ import { sendPushNotificationToUser } from '../services/counseling/notifier.js';
 export async function initializeDoubtDb(req, res, next) {
     try {
         await connectDoubtDb();
-        next();
     } catch (err) {
-        next(err);
+        console.warn('[mongo-doubt] initializeDoubtDb warning:', err?.message || err);
     }
+    const conn = getDoubtMessageModel();
+    if (!conn) {
+        return res.status(503).json({ message: 'Doubt Service Temporarily Unavailable' });
+    }
+    next();
 }
 
 // Student routes
