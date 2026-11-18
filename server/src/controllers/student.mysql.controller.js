@@ -565,7 +565,7 @@ export async function verifyPaymentStudent(req, res, next) {
   }
 }
 
-function renderPaymentBridgeHtml({ success, targetAppUrl, message, planName = 'Premium Access' }) {
+function renderPaymentBridgeHtml({ success, targetAppUrl, androidIntentUrl = '', message, planName = 'Premium Access' }) {
   const safeTitle = success ? 'Payment Successful' : 'Payment Update';
   const safeHeading = success ? '🎉 Payment Successful!' : '⏳ Payment Received';
   const btnText = success ? 'Open App & Access Premium' : 'Return to App';
@@ -644,18 +644,29 @@ function renderPaymentBridgeHtml({ success, targetAppUrl, message, planName = 'P
     <h2>${safeHeading}</h2>
     <p>${message}</p>
     <a id="open-app-btn" href="${targetAppUrl}" class="btn">${btnText}</a>
-    <div class="hint">Tap above if the app does not open automatically</div>
+    <div class="hint">Tap above to return to the app if it doesn't open automatically</div>
   </div>
   <script>
-    // Automatically navigate back to the mobile app
-    try {
-      window.location.href = "${targetAppUrl}";
-    } catch (e) {}
+    function openApp() {
+      try {
+        var isAndroid = /android/i.test(navigator.userAgent || '');
+        if (isAndroid && "${androidIntentUrl}") {
+          window.location.href = "${androidIntentUrl}";
+        } else {
+          window.location.href = "${targetAppUrl}";
+        }
+      } catch (e) {}
+    }
 
-    setTimeout(function() {
-      var btn = document.getElementById('open-app-btn');
-      if (btn) btn.focus();
-    }, 1500);
+    openApp();
+
+    window.onload = function() {
+      setTimeout(openApp, 300);
+      setTimeout(function() {
+        var btn = document.getElementById('open-app-btn');
+        if (btn) btn.focus();
+      }, 1000);
+    };
   </script>
 </body>
 </html>`;
@@ -663,9 +674,33 @@ function renderPaymentBridgeHtml({ success, targetAppUrl, message, planName = 'P
 
 export async function verifyPaymentRedirect(req, res, next) {
   try {
-    const orderId = String(req.body?.razorpay_order_id || req.query?.razorpay_order_id || req.query?.orderId || '').trim();
-    const paymentId = String(req.body?.razorpay_payment_id || req.query?.razorpay_payment_id || req.body?.paymentId || req.query?.paymentId || '').trim();
-    const signature = String(req.body?.razorpay_signature || req.query?.razorpay_signature || req.body?.signature || req.query?.signature || '').trim();
+    const orderId = String(
+      req.body?.razorpay_order_id ||
+      req.query?.razorpay_order_id ||
+      req.body?.orderId ||
+      req.query?.orderId ||
+      req.body?.order_id ||
+      req.query?.order_id ||
+      ''
+    ).trim();
+
+    const paymentId = String(
+      req.body?.razorpay_payment_id ||
+      req.query?.razorpay_payment_id ||
+      req.body?.paymentId ||
+      req.query?.paymentId ||
+      req.body?.payment_id ||
+      req.query?.payment_id ||
+      ''
+    ).trim();
+
+    const signature = String(
+      req.body?.razorpay_signature ||
+      req.query?.razorpay_signature ||
+      req.body?.signature ||
+      req.query?.signature ||
+      ''
+    ).trim();
 
     const customRedirect = String(req.query?.redirect_url || req.body?.redirect_url || '').trim();
     const defaultAppBase = 'mymobileapp://student/premium';
@@ -674,12 +709,15 @@ export async function verifyPaymentRedirect(req, res, next) {
     const buildUrl = (base, param) => `${base}${base.includes('?') ? '&' : '?'}${param}`;
     const successAppUrl = buildUrl(targetAppBase, 'success=PremiumActivated');
     const failAppUrl = buildUrl(targetAppBase, 'error=PaymentVerificationFailed');
+    const successIntentUrl = `intent://student/premium?success=PremiumActivated#Intent;scheme=mymobileapp;package=com.chandu.kcetapp;end;`;
+    const failIntentUrl = `intent://student/premium?error=PaymentVerificationFailed#Intent;scheme=mymobileapp;package=com.chandu.kcetapp;end;`;
 
     if (!orderId) {
       res.setHeader('Content-Type', 'text/html');
       return res.status(200).send(renderPaymentBridgeHtml({
         success: false,
         targetAppUrl: failAppUrl,
+        androidIntentUrl: failIntentUrl,
         message: 'Order information was not received. If payment was deducted, please tap Return to App to check status.',
       }));
     }
@@ -690,6 +728,7 @@ export async function verifyPaymentRedirect(req, res, next) {
       return res.status(200).send(renderPaymentBridgeHtml({
         success: false,
         targetAppUrl: failAppUrl,
+        androidIntentUrl: failIntentUrl,
         message: 'Payment order could not be located. Tap Return to App to check your payment status.',
       }));
     }
@@ -715,6 +754,48 @@ export async function verifyPaymentRedirect(req, res, next) {
           },
         }
       );
+    } else if (orderId && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+      // Query Razorpay API directly as fallback to guarantee payment status check
+      try {
+        const keyId = process.env.RAZORPAY_KEY_ID;
+        const keySecret = process.env.RAZORPAY_KEY_SECRET;
+        const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+        const https = (await import('https')).default;
+        const rzpData = await new Promise((resolve) => {
+          const r = https.request({
+            method: 'GET',
+            hostname: 'api.razorpay.com',
+            path: `/v1/orders/${orderId}/payments`,
+            headers: { Authorization: `Basic ${auth}` },
+          }, (resp) => {
+            let body = '';
+            resp.on('data', c => { body += c; });
+            resp.on('end', () => {
+              try { resolve(JSON.parse(body)); } catch { resolve({}); }
+            });
+          });
+          r.on('error', () => resolve({}));
+          r.end();
+        });
+
+        if (rzpData && Array.isArray(rzpData.items)) {
+          const successful = rzpData.items.find(i => i.status === 'captured' || i.status === 'authorized');
+          if (successful) {
+            verified = true;
+            await Payment.updateOne(
+              { id: Number(paymentDoc.id) },
+              {
+                $set: {
+                  status: 'paid',
+                  razorpay_payment_id: successful.id,
+                  paid_at: new Date(),
+                  updated_at: new Date(),
+                },
+              }
+            );
+          }
+        }
+      } catch (_) {}
     }
 
     if (verified && planDoc) {
@@ -736,6 +817,7 @@ export async function verifyPaymentRedirect(req, res, next) {
       return res.status(200).send(renderPaymentBridgeHtml({
         success: true,
         targetAppUrl: successAppUrl,
+        androidIntentUrl: successIntentUrl,
         planName,
         message: `Your payment was successful and ${planName} is now active! Returning to KCET Agri Practical…`,
       }));
@@ -745,14 +827,17 @@ export async function verifyPaymentRedirect(req, res, next) {
     return res.status(200).send(renderPaymentBridgeHtml({
       success: false,
       targetAppUrl: failAppUrl,
+      androidIntentUrl: failIntentUrl,
       message: 'Payment verification could not be completed immediately. Tap Return to App to check status.',
     }));
   } catch (err) {
     const fallbackUrl = 'mymobileapp://student/premium?error=ServerError';
+    const fallbackIntent = `intent://student/premium?error=ServerError#Intent;scheme=mymobileapp;package=com.chandu.kcetapp;end;`;
     res.setHeader('Content-Type', 'text/html');
     return res.status(200).send(renderPaymentBridgeHtml({
       success: false,
       targetAppUrl: fallbackUrl,
+      androidIntentUrl: fallbackIntent,
       message: 'An unexpected error occurred. Tap Return to App to check your payment status.',
     }));
   }
@@ -2066,8 +2151,11 @@ export async function serveRazorpayCheckoutHtml(req, res) {
   }
 
   const razorpayKey = process.env.RAZORPAY_KEY_ID;
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+  const host = req.headers['x-forwarded-host'] || req.get('host') || 'kcet-agri-practical.onrender.com';
+  const baseUrl = `${protocol}://${host}`;
   const redirectParam = redirect_url ? `&redirect_url=${encodeURIComponent(redirect_url)}` : '';
-  const webCallbackUrl = `/api/webhooks/razorpay-redirect?razorpay_order_id=${encodeURIComponent(orderId)}${redirectParam}`;
+  const webCallbackUrl = `${baseUrl}/api/webhooks/razorpay-redirect?orderId=${encodeURIComponent(orderId)}${redirectParam}`;
 
   const html = `
     <!DOCTYPE html>
@@ -2094,6 +2182,13 @@ export async function serveRazorpayCheckoutHtml(req, res) {
             <div id="loading" class="loading">Loading Razorpay... Please do not close this window.</div>
         </div>
 
+        <form id="rzp-form" method="POST" action="${webCallbackUrl}" style="display:none;">
+            <input type="hidden" name="razorpay_payment_id" id="rzp_payment_id" value="">
+            <input type="hidden" name="razorpay_order_id" id="rzp_order_id" value="${orderId}">
+            <input type="hidden" name="razorpay_signature" id="rzp_signature" value="">
+            <input type="hidden" name="redirect_url" value="${redirect_url || ''}">
+        </form>
+
         <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
         <script>
             var options = {
@@ -2106,6 +2201,12 @@ export async function serveRazorpayCheckoutHtml(req, res) {
                 "order_id": "${orderId}",
                 "callback_url": "${webCallbackUrl}",
                 "redirect": true,
+                "handler": function (response) {
+                    document.getElementById('rzp_payment_id').value = response.razorpay_payment_id || '';
+                    document.getElementById('rzp_order_id').value = response.razorpay_order_id || '${orderId}';
+                    document.getElementById('rzp_signature').value = response.razorpay_signature || '';
+                    document.getElementById('rzp-form').submit();
+                },
                 "prefill": {
                     "name": "${name || ''}",
                     "email": "${email || ''}"
