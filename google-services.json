@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "462726255209",
+    "project_id": "kcet-agri-practical",
+    "storage_bucket": "kcet-agri-practical.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:462726255209:android:28ca21b89b5af170c088f8",
+        "android_client_info": {
+          "package_name": "com.chandu.kcetapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCaNBsTQfmSivF2337i-go6TT7TI5rZXf8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -73,14 +73,30 @@ export default function StudentTestsScreen() {
                   <View key={t.id} style={styles.testCard}>
                     <View style={styles.cardAccent} />
                     <View style={styles.testCardBody}>
-                      <Text style={styles.testTitle}>{t.title}</Text>
-                      <Text style={styles.testQuestions}>{t.questionCount || t.question_count || 0} questions</Text>
-                      <TouchableOpacity
-                        style={styles.btnPrimary}
-                        onPress={() => router.push(`/student/mock-test/${t.id}`)}
-                      >
-                        <Text style={styles.btnPrimaryText}>Start Test</Text>
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={[styles.testTitle, { flex: 1 }]}>{t.title}</Text>
+                        <View style={[styles.statusBadge, t.locked ? styles.badgeLocked : styles.badgeFree]}>
+                          <Text style={[styles.statusBadgeText, t.locked ? styles.badgeLockedText : styles.badgeFreeText]}>
+                            {t.locked ? '🔒 Locked' : '✓ Free'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.testQuestions}>{t.questionCount || t.question_count || 0} questions • {t.durationMinutes || 30} mins</Text>
+                      {t.locked ? (
+                        <TouchableOpacity
+                          style={styles.btnUnlock}
+                          onPress={() => router.push('/student/premium')}
+                        >
+                          <Text style={styles.btnUnlockText}>🔒 Click to Unlock with VIP Plan 💳</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.btnPrimary}
+                          onPress={() => router.push(`/student/mock-test/${t.id}`)}
+                        >
+                          <Text style={styles.btnPrimaryText}>Start Test 🚀</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 ))}
@@ -117,4 +133,11 @@ const styles = StyleSheet.create({
   testQuestions: { fontSize: 14, color: '#475569', marginTop: 4, marginBottom: 16 },
   btnPrimary: { backgroundColor: '#2563eb', paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
   btnPrimaryText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  btnUnlock: { backgroundColor: '#f59e0b', paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
+  btnUnlockText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  badgeLocked: { backgroundColor: '#fef3c7' },
+  badgeLockedText: { color: '#b45309', fontSize: 11, fontWeight: '700' },
+  badgeFree: { backgroundColor: '#dcfce7' },
+  badgeFreeText: { color: '#15803d', fontSize: 11, fontWeight: '700' },
 });

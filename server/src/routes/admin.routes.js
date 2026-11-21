@@ -80,11 +80,54 @@ import {
   uploadSpecimenImage
 } from '../controllers/admin.mysql.controller.js';
 
+import {
+  getAdminBanners,
+  createAdminBanner,
+  updateAdminBanner,
+  deleteAdminBanner,
+  createAdminExamMaterial,
+  getAdminExamMaterials,
+  deleteAdminExamMaterial,
+  createAdminExamPyq,
+  getAdminExamPyqs,
+  deleteAdminExamPyq,
+  createAdminExamTest,
+  getAdminExamTests,
+  deleteAdminExamTest,
+  createAdminExamPlan,
+  updateAdminExamPlan,
+  getAdminExamPlans,
+  deleteAdminExamPlan,
+} from '../controllers/exam.controller.js';
+
 export const adminRouter = Router();
 
 adminRouter.use(requireAuth, requireRole('admin'));
 
 adminRouter.get('/dashboard', getDashboard);
+
+adminRouter.get('/banners', getAdminBanners);
+adminRouter.post('/banners', createAdminBanner);
+adminRouter.put('/banners/:id', updateAdminBanner);
+adminRouter.delete('/banners/:id', deleteAdminBanner);
+
+// Exam Content Management (PUC, KCET, NEET)
+adminRouter.get('/exam/materials', getAdminExamMaterials);
+adminRouter.post('/exam/materials', createAdminExamMaterial);
+adminRouter.delete('/exam/materials/:id', deleteAdminExamMaterial);
+
+adminRouter.get('/exam/pyqs', getAdminExamPyqs);
+adminRouter.post('/exam/pyqs', createAdminExamPyq);
+adminRouter.delete('/exam/pyqs/:id', deleteAdminExamPyq);
+
+adminRouter.get('/exam/tests', getAdminExamTests);
+adminRouter.post('/exam/tests', createAdminExamTest);
+adminRouter.delete('/exam/tests/:id', deleteAdminExamTest);
+
+adminRouter.get('/exam/plans', getAdminExamPlans);
+adminRouter.post('/exam/plans', createAdminExamPlan);
+adminRouter.put('/exam/plans/:id', updateAdminExamPlan);
+adminRouter.delete('/exam/plans/:id', deleteAdminExamPlan);
 
 adminRouter.get('/menu', getMenus);
 adminRouter.post('/menu', createMenu);

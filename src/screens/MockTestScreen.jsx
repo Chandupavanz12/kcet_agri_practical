@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
 import { API_BASE_URL as apiBaseUrl } from '../config/env';
@@ -188,9 +188,12 @@ export default function MockTestScreen() {
   }
 
   const imageUrl = current.imageUrl?.startsWith('http') ? current.imageUrl : `${apiBaseUrl}${current.imageUrl?.startsWith('/') ? '' : '/'}${current.imageUrl || ''}`;
+  const isTextMcq =
+    (test?.exam && ['puc', 'kcet', 'neet'].includes(String(test.exam).toLowerCase())) ||
+    (!current.imageUrl && !!current.questionText);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { paddingTop: Platform.OS === 'android' ? Math.max(StatusBar.currentHeight || 0, 14) : 0 }]} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle} numberOfLines={1}>{test.title}</Text>
         <View style={styles.headerRight}>
@@ -204,7 +207,8 @@ export default function MockTestScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.card}>
           <View style={styles.cardBody}>
-            {!!current.imageUrl && (
+            {/* Agri Practical Specimen Image */}
+            {!isTextMcq && !!current.imageUrl && (
               <View style={styles.imageContainer}>
                 <Image
                   source={{ uri: imageUrl }}
@@ -214,30 +218,84 @@ export default function MockTestScreen() {
               </View>
             )}
 
-            <View style={styles.optionsGrid}>
-              {current.options.map((opt, idx) => {
-                const isSelected = responses[current.id] === idx;
-                return (
-                  <TouchableOpacity
-                    key={idx}
-                    onPress={() => handleSelect(idx)}
-                    disabled={submitting}
-                    style={[
-                      styles.optionBtn,
-                      isSelected ? styles.optionBtnSelected : styles.optionBtnNormal,
-                      submitting && styles.opacity60
-                    ]}
-                  >
-                    <Text style={[styles.optionLetter, isSelected && styles.optionLetterSelected]}>
-                      {String.fromCharCode(65 + idx)}
-                    </Text>
-                    <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
-                      {opt}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            {/* Question Text Box */}
+            {!!current.questionText && (
+              <View style={[styles.questionTextBox, isTextMcq && styles.mcqQuestionBox]}>
+                {isTextMcq && (
+                  <View style={styles.mcqQuestionMetaRow}>
+                    <View style={styles.mcqPill}>
+                      <Text style={styles.mcqPillText}>Question {currentIndex + 1}</Text>
+                    </View>
+                    <Text style={styles.mcqMarksText}>+{test?.marksCorrect || 4} Marks</Text>
+                  </View>
+                )}
+                <Text style={[styles.questionText, isTextMcq && styles.mcqQuestionText]}>
+                  {current.questionText}
+                </Text>
+              </View>
+            )}
+
+            {/* If Text MCQ (PUC, KCET, NEET): Render 1 option per row (full-width stacked list) */}
+            {isTextMcq ? (
+              <View style={styles.mcqOptionsList}>
+                {current.options.map((opt, idx) => {
+                  const isSelected = responses[current.id] === idx;
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => handleSelect(idx)}
+                      disabled={submitting}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.mcqOptionRow,
+                        isSelected ? styles.mcqOptionRowSelected : styles.mcqOptionRowNormal,
+                        submitting && styles.opacity60
+                      ]}
+                    >
+                      <View style={[styles.mcqBadge, isSelected ? styles.mcqBadgeSelected : styles.mcqBadgeNormal]}>
+                        <Text style={[styles.mcqBadgeLetter, isSelected && styles.mcqBadgeLetterSelected]}>
+                          {String.fromCharCode(65 + idx)}
+                        </Text>
+                      </View>
+                      <Text style={[styles.mcqOptionText, isSelected && styles.mcqOptionTextSelected]}>
+                        {opt}
+                      </Text>
+                      {isSelected && (
+                        <View style={styles.mcqCheckPill}>
+                          <Text style={styles.mcqCheckPillText}>✓</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : (
+              /* Agri Practical Specimen: 2x2 grid */
+              <View style={styles.optionsGrid}>
+                {current.options.map((opt, idx) => {
+                  const isSelected = responses[current.id] === idx;
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => handleSelect(idx)}
+                      disabled={submitting}
+                      style={[
+                        styles.optionBtn,
+                        isSelected ? styles.optionBtnSelected : styles.optionBtnNormal,
+                        submitting && styles.opacity60
+                      ]}
+                    >
+                      <Text style={[styles.optionLetter, isSelected && styles.optionLetterSelected]}>
+                        {String.fromCharCode(65 + idx)}
+                      </Text>
+                      <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+                        {opt}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
             <View style={styles.navRow}>
               <Text style={styles.navHint}>Auto-submit when time ends</Text>
@@ -314,6 +372,8 @@ const styles = StyleSheet.create({
   cardBody: { padding: 16 },
   imageContainer: { alignItems: 'center', marginBottom: 24, backgroundColor: '#f8fafc', borderRadius: 12, padding: 8, borderWidth: 1, borderColor: '#e2e8f0' },
   specimenImage: { width: '100%', height: 250 },
+  questionTextBox: { backgroundColor: '#f8fafc', borderRadius: 14, padding: 18, marginBottom: 20, borderWidth: 1, borderColor: '#cbd5e1' },
+  questionText: { fontSize: 16, fontWeight: '700', color: '#0f172a', lineHeight: 24 },
   optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   optionBtn: { flex: 1, minWidth: '45%', borderWidth: 2, borderRadius: 12, padding: 16, alignItems: 'center' },
   optionBtnNormal: { borderColor: '#e2e8f0', backgroundColor: '#fff' },
@@ -337,4 +397,66 @@ const styles = StyleSheet.create({
   quickNavTextUnanswered: { color: '#475569' },
   quickNavTextAnswered: { color: '#fff' },
   quickNavTextCurrent: { color: '#fff' },
+
+  // MCQ 1-Option-per-row styles for PUC, KCET, NEET
+  mcqQuestionBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    marginBottom: 16,
+  },
+  mcqQuestionMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  mcqPill: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  mcqPillText: { fontSize: 12, fontWeight: '700', color: '#1d4ed8' },
+  mcqMarksText: { fontSize: 12, fontWeight: '700', color: '#16a34a' },
+  mcqQuestionText: { fontSize: 16, fontWeight: '700', color: '#0f172a', lineHeight: 24 },
+  mcqOptionsList: { flexDirection: 'column', gap: 10, width: '100%' },
+  mcqOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    gap: 14,
+  },
+  mcqOptionRowNormal: { borderColor: '#e2e8f0', backgroundColor: '#ffffff' },
+  mcqOptionRowSelected: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
+  mcqBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mcqBadgeNormal: { backgroundColor: '#f1f5f9' },
+  mcqBadgeSelected: { backgroundColor: '#2563eb' },
+  mcqBadgeLetter: { fontSize: 15, fontWeight: 'bold', color: '#334155' },
+  mcqBadgeLetterSelected: { color: '#ffffff' },
+  mcqOptionText: { flex: 1, fontSize: 15, color: '#334155', lineHeight: 22 },
+  mcqOptionTextSelected: { color: '#1e3a8a', fontWeight: '600' },
+  mcqCheckPill: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mcqCheckPillText: { color: '#ffffff', fontSize: 13, fontWeight: 'bold' },
 });

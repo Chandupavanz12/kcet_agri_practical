@@ -38,6 +38,17 @@ import {
   verifyPaymentStudent,
 } from '../controllers/student.mysql.controller.js';
 
+import {
+  getStudentBanners,
+  getExamMaterials,
+  getExamPyqs,
+  getExamTests,
+  startExamTest,
+  submitExamTest,
+  getExamPlans,
+  getAggregatedProgress,
+} from '../controllers/exam.controller.js';
+
 export const studentRouter = Router();
 
 const paymentLimiter = simpleRateLimit({
@@ -59,6 +70,15 @@ studentRouter.post('/premium/verify', (req, res, next) => {
 });
 
 studentRouter.use(requireAuth, requireRole('student', 'admin'));
+
+studentRouter.get('/banners', getStudentBanners);
+studentRouter.get('/exam/materials', getExamMaterials);
+studentRouter.get('/exam/pyqs', getExamPyqs);
+studentRouter.get('/exam/tests', getExamTests);
+studentRouter.get('/exam/tests/:id/start', startExamTest);
+studentRouter.post('/exam/tests/:id/submit', submitExamTest);
+studentRouter.get('/exam/plans', getExamPlans);
+studentRouter.get('/aggregated-progress', getAggregatedProgress);
 
 studentRouter.get('/dashboard', getDashboard);
 studentRouter.get('/menus', getMenus);
@@ -97,4 +117,6 @@ studentRouter.get('/premium/plans', listPlansStudent);
 studentRouter.get('/premium/status', getAccessStatusStudent);
 studentRouter.get('/premium/payment-status', getPaymentStatusStudent);
 studentRouter.post('/premium/order', paymentLimiter, createPaymentOrderStudent);
+studentRouter.post('/premium/create-order', paymentLimiter, createPaymentOrderStudent);
+studentRouter.post('/exam/order', paymentLimiter, createPaymentOrderStudent);
 studentRouter.post('/premium/verify', paymentLimiter, verifyPaymentStudent);

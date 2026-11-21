@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 
 const MANAGE_LINKS = [
   { to: '/admin/students', icon: '👥', label: 'Students', desc: 'Accounts & Subscription' },
+  { to: '/admin/banners', icon: '🎨', label: 'Banners', desc: 'Manage App Hero Banners' },
   { to: '/admin/tests', icon: '📝', label: 'Tests', desc: 'Manage Question Banks' },
   { to: '/admin/test-builder', icon: '🔧', label: 'Test Builder', desc: 'Craft Mock Exams' },
   { to: '/admin/videos', icon: '🎥', label: 'Videos', desc: 'Tutorials & Practical Guides' },
@@ -60,6 +61,7 @@ export default function AdminDashboardScreen() {
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
+    if (!token) return;
     try {
       setLoading(true);
       setError('');

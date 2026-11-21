@@ -1557,12 +1557,14 @@ export async function createTestWithQuestions(req, res, next) {
     const MockTest = await getMockTestModel();
     const MockQuestion = await getMockTestQuestionModel();
 
+    const isFree = body.is_free !== false && body.isFree !== false;
     const t = new MockTest({
       title,
       is_active: Boolean(isActive),
+      is_free: Boolean(isFree),
       question_count: Number(questionCount),
       per_question_seconds: Number(perQuestionSeconds),
-      marks_correct: Number(marksCorrect),
+      marksCorrect: Number(marksCorrect),
       created_at: new Date(),
       updated_at: new Date(),
     });
@@ -1622,12 +1624,14 @@ export async function createTest(req, res, next) {
     const { title, isActive = true, questionCount = 50, perQuestionSeconds = 30, marksCorrect = 4 } = req.body;
 
     const MockTest = await getMockTestModel();
+    const isFree = body.is_free !== false && body.isFree !== false;
     const t = new MockTest({
       title,
       is_active: Boolean(isActive),
+      is_free: Boolean(isFree),
       question_count: Number(questionCount),
       per_question_seconds: Number(perQuestionSeconds),
-      marks_correct: Number(marksCorrect),
+      marksCorrect: Number(marksCorrect),
       created_at: new Date(),
       updated_at: new Date(),
     });

@@ -1,9 +1,13 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, AppState, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch, clearApiCache } from '../api/client.js';
+import { API_BASE_URL } from '../config/env.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
+
+WebBrowser.maybeCompleteAuthSession();
 
 function formatINR(paise) {
   const n = Number(paise || 0) / 100;
@@ -24,7 +28,6 @@ const PLAN_BULLETS = {
 
 export default function PremiumAccessScreen() {
   const { token, user } = useAuth();
-  const router = useRouter();
   const params = useLocalSearchParams();
 
   const [plans, setPlans] = useState([]);
@@ -36,9 +39,7 @@ export default function PremiumAccessScreen() {
   const [message, setMessage] = useState('');
 
   const bustAndRefresh = async () => {
-    clearApiCache('/api/student/premium');
-    clearApiCache('/api/student/materials');
-    clearApiCache('/api/student/dashboard');
+    clearApiCache();
     const [p, s] = await Promise.all([
       apiFetch('/api/student/premium/plans', { token }),
       apiFetch('/api/student/premium/status', { token }),
@@ -46,6 +47,24 @@ export default function PremiumAccessScreen() {
     setPlans(Array.isArray(p?.plans) ? p.plans : []);
     setStatus(s?.access || null);
   };
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        apiFetch('/api/student/premium/payment-status', { token })
+          .then((payCheck) => {
+            if (payCheck?.activated) {
+              setMessage(`🎉 Payment successful! ${payCheck.planName || 'Premium'} is now active.`);
+              bustAndRefresh();
+            }
+          })
+          .catch(() => {});
+      }
+    });
+    return () => {
+      sub.remove();
+    };
+  }, [token]);
 
   useEffect(() => {
     let alive = true;
@@ -103,14 +122,33 @@ export default function PremiumAccessScreen() {
         return;
       }
 
-      // Open Hosted Web Checkout for Razorpay without requiring react-native SDK
-      const { orderId, amountPaise, user, plan } = orderRes;
-      const checkoutUrl = `https://kcet-agri-practical.onrender.com/api/student/premium/checkout?orderId=${orderId}&amount=${amountPaise}&name=${encodeURIComponent(user?.name || '')}&email=${encodeURIComponent(user?.email || '')}&planId=${plan?.code || ''}`;
+      // Open Hosted Web Checkout for Razorpay
+      const { orderId, amountPaise, user: orderUser, plan } = orderRes;
+      const appRedirectUrl = 'mymobileapp://student/premium';
+      const checkoutBase = API_BASE_URL || 'https://kcet-agri-practical.onrender.com';
+      const checkoutUrl = `${checkoutBase}/api/student/premium/checkout?orderId=${orderId}&amount=${amountPaise}&name=${encodeURIComponent(orderUser?.name || user?.name || '')}&email=${encodeURIComponent(orderUser?.email || user?.email || '')}&planId=${plan?.code || ''}&redirect_url=${encodeURIComponent(appRedirectUrl)}`;
 
-      await Linking.openURL(checkoutUrl);
+      try {
+        const result = await WebBrowser.openAuthSessionAsync(checkoutUrl, appRedirectUrl);
+        if (result?.type === 'success' && result?.url && result.url.includes('error=')) {
+          setError('Payment verification failed. Please contact support if amount was deducted.');
+        }
+      } catch (_browserErr) {
+        await Linking.openURL(checkoutUrl);
+      }
 
-      // We explicitly leave the checking logic to be triggered manually via a "Check Status" button 
-      // or deep-link callback since Linking.openURL jumps out of the app.
+      // Automatically verify and refresh status after browser session
+      setCheckingPayment(true);
+      try {
+        const payCheck = await apiFetch('/api/student/premium/payment-status', { token });
+        if (payCheck?.activated) {
+          setMessage(`🎉 Payment successful! ${payCheck.planName || 'Premium'} is now active.`);
+        }
+      } catch (_) { } finally {
+        setCheckingPayment(false);
+      }
+
+      await bustAndRefresh();
 
     } catch (e) {
       setError(e?.message || 'Payment failed. Please try again.');
@@ -132,7 +170,7 @@ export default function PremiumAccessScreen() {
       } else {
         setMessage('ℹ️ No pending payment found. If you were charged, please contact support with your payment reference number.');
       }
-    } catch (e) {
+    } catch (_e) {
       setError('Could not check payment status. Please try again.');
     } finally {
       setCheckingPayment(false);
@@ -175,7 +213,7 @@ export default function PremiumAccessScreen() {
 
         {!hasAnyAccess && !checkingPayment && (
           <View style={styles.recoveryBox}>
-            <Text style={styles.recoveryText}><Text style={{ fontWeight: 'bold' }}>Already paid?</Text> If you completed payment in your UPI / bank app but this page still shows locked, tap the button — we'll recover your access instantly without charging you again.</Text>
+            <Text style={styles.recoveryText}><Text style={{ fontWeight: 'bold' }}>Already paid?</Text> If you completed payment in your UPI / bank app but this page still shows locked, tap the button — we&apos;ll recover your access instantly without charging you again.</Text>
             <TouchableOpacity style={styles.btnRecovery} onPress={checkMyPayment} disabled={checkingPayment}>
               <Text style={styles.btnRecoveryText}>🔍 Check My Payment</Text>
             </TouchableOpacity>

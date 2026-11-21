@@ -1,14 +1,22 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
 import AdminCRUDPage from '../components/AdminCRUDPage.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { apiFetch } from '../api/client.js';
 import * as DocumentPicker from 'expo-document-picker';
-import { API_BASE_URL as apiBaseUrl } from '../config/env';
+
+const EXAM_SUBJECTS = {
+  puc: ['Physics', 'Chemistry', 'Mathematics', 'Biology'],
+  kcet: ['Physics', 'Chemistry', 'Mathematics', 'Biology'],
+  neet: ['Physics', 'Chemistry', 'Biology'], // Strictly NO Mathematics!
+  agri: ['General'],
+};
 
 export default function AdminMaterialsScreen() {
   const { token } = useAuth();
+  const [selectedExam, setSelectedExam] = useState('agri'); // 'agri' | 'puc' | 'kcet' | 'neet'
+  const [selectedSubject, setSelectedSubject] = useState('General');
   const [pdfUrl, setPdfUrl] = useState('');
   const [accessType, setAccessType] = useState('free');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -25,7 +33,7 @@ export default function AdminMaterialsScreen() {
       
       const file = result.assets[0];
       setIsUploading(true);
-      setUploadProgress(50); // Just a visual indicator
+      setUploadProgress(50);
 
       const formData = new FormData();
       formData.append('file', {
@@ -39,7 +47,6 @@ export default function AdminMaterialsScreen() {
         token,
         method: 'POST',
         body: formData,
-        // Don't set Content-Type header, let fetch set it with boundary
       });
 
       setPdfUrl(res?.url || res?.ref || '');
@@ -57,9 +64,11 @@ export default function AdminMaterialsScreen() {
   const fields = [
     { name: 'title', label: 'Title', type: 'text' },
     { name: 'subject', label: 'Subject', type: 'text' },
-    { name: 'type', label: 'Type', type: 'text', placeholder: 'pdf / pyq' },
+    { name: 'type', label: 'Type', type: 'text', placeholder: 'pdf / notes' },
     { name: 'accessType', label: 'Access', type: 'text', placeholder: 'free / paid' },
   ];
+
+  const subjectsForExam = EXAM_SUBJECTS[selectedExam] || ['General'];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -68,11 +77,50 @@ export default function AdminMaterialsScreen() {
         {/* Upload Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Upload PDF</Text>
+            <Text style={styles.cardTitle}>Upload Study Material</Text>
           </View>
           <View style={styles.cardBody}>
-            <Text style={styles.label}>Upload as</Text>
             
+            {/* Target Exam Selector */}
+            <Text style={styles.label}>1. Target Exam</Text>
+            <View style={styles.examRow}>
+              {['agri', 'puc', 'kcet', 'neet'].map((ex) => (
+                <TouchableOpacity
+                  key={ex}
+                  style={[styles.examBtn, selectedExam === ex && styles.examBtnActive]}
+                  onPress={() => {
+                    setSelectedExam(ex);
+                    setSelectedSubject(EXAM_SUBJECTS[ex]?.[0] || 'General');
+                  }}
+                >
+                  <Text style={[styles.examBtnText, selectedExam === ex && styles.examBtnTextActive]}>
+                    {ex === 'agri' ? 'Agri Practical' : ex.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Subject Selector for PUC, KCET, NEET */}
+            {selectedExam !== 'agri' && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.label}>2. Subject</Text>
+                <View style={styles.subRow}>
+                  {subjectsForExam.map((sub) => (
+                    <TouchableOpacity
+                      key={sub}
+                      style={[styles.subBtn, selectedSubject === sub && styles.subBtnActive]}
+                      onPress={() => setSelectedSubject(sub)}
+                    >
+                      <Text style={[styles.subBtnText, selectedSubject === sub && styles.subBtnTextActive]}>
+                        {sub}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <Text style={[styles.label, { marginTop: 12 }]}>3. Access Type</Text>
             <View style={styles.accessBtns}>
               <TouchableOpacity
                 style={[styles.accessBtn, accessType === 'free' && styles.accessBtnActive]}
@@ -89,7 +137,7 @@ export default function AdminMaterialsScreen() {
             </View>
 
             <TouchableOpacity style={styles.btnUpload} onPress={handleUpload} disabled={isUploading}>
-              <Text style={styles.btnUploadText}>{isUploading ? 'Uploading...' : 'Select File to Upload'}</Text>
+              <Text style={styles.btnUploadText}>{isUploading ? 'Uploading...' : 'Select PDF File to Upload'}</Text>
             </TouchableOpacity>
 
             {isUploading && (
@@ -103,7 +151,7 @@ export default function AdminMaterialsScreen() {
 
             {!!pdfUrl && (
               <View style={styles.resultBox}>
-                <Text style={styles.label}>File Reference (copied to form)</Text>
+                <Text style={styles.label}>Uploaded File Reference:</Text>
                 <TextInput style={styles.input} value={pdfUrl} editable={false} />
               </View>
             )}
@@ -111,29 +159,54 @@ export default function AdminMaterialsScreen() {
         </View>
 
         <AdminCRUDPage
-          title="Manage Materials"
+          key={selectedExam}
+          title={`Materials (${selectedExam.toUpperCase()})`}
           apiEndpoint="materials"
+          endpointPath={selectedExam === 'agri' ? 'materials' : `exam/materials?exam=${selectedExam}`}
+          deleteEndpointPath={selectedExam === 'agri' ? 'materials' : `exam/materials`}
           fields={fields}
-          initialForm={{ title: '', pdf_url: pdfUrl || '', subject: 'General', type: 'pdf', accessType: accessType || 'free' }}
+          initialForm={{
+            title: '',
+            pdf_url: pdfUrl || '',
+            subject: selectedSubject || 'General',
+            type: 'pdf',
+            accessType: accessType || 'free'
+          }}
           onFormChange={(next) => {
-            if (next && typeof next === 'object' && typeof next.accessType === 'string') {
+            if (next?.accessType && next.accessType !== accessType) {
               setAccessType(next.accessType);
             }
-            return next;
           }}
           listTransform={(m) => ({
             ...m,
             accessType: m.accessType || m.access_type || 'free',
           })}
           customCreateHandler={async (data) => {
-            const payload = {
-              title: data.title,
-              pdf_url: pdfUrl || data.pdf_url,
-              subject: data.subject,
-              type: data.type,
-              access_type: data.accessType || accessType || 'free'
-            };
-            return await apiFetch('/api/admin/materials', { token, method: 'POST', body: payload });
+            if (selectedExam !== 'agri') {
+              // Store in PostgreSQL DB 1 (PUC) or DB 2 (KCET/NEET)
+              return await apiFetch('/api/admin/exam/materials', {
+                token,
+                method: 'POST',
+                body: {
+                  exam: selectedExam,
+                  subject: selectedSubject.toLowerCase(),
+                  title: data.title,
+                  pdf_url: pdfUrl || data.pdf_url,
+                  type: data.type || 'pdf',
+                  is_free: (data.accessType || accessType) === 'free',
+                },
+              });
+            } else {
+              // Store in MongoDB Atlas (Agri Practical)
+              const payload = {
+                title: data.title,
+                pdf_url: pdfUrl || data.pdf_url,
+                subject: data.subject || selectedSubject,
+                type: data.type || 'pdf',
+                access_type: data.accessType || accessType || 'free'
+              };
+              return await apiFetch('/api/admin/materials', { token, method: 'POST', body: payload });
+            }
           }}
         />
 
@@ -149,7 +222,20 @@ const styles = StyleSheet.create({
   cardHeader: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#0f172a' },
   cardBody: { padding: 16 },
-  label: { fontSize: 14, fontWeight: '500', color: '#334155', marginBottom: 8 },
+  label: { fontSize: 12, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+
+  examRow: { flexDirection: 'row', gap: 8 },
+  examBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' },
+  examBtnActive: { backgroundColor: '#059669', borderColor: '#059669' },
+  examBtnText: { fontSize: 12, fontWeight: '700', color: '#475569' },
+  examBtnTextActive: { color: '#ffffff' },
+
+  subRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  subBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
+  subBtnActive: { backgroundColor: '#0284c7', borderColor: '#0284c7' },
+  subBtnText: { fontSize: 12, fontWeight: '700', color: '#475569' },
+  subBtnTextActive: { color: '#ffffff' },
+
   accessBtns: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   accessBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' },
   accessBtnActive: { backgroundColor: '#eff6ff', borderColor: '#3b82f6' },

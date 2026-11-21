@@ -326,15 +326,12 @@ export async function razorpayWebhook(req, res, next) {
     const planDoc = await Plan.findOne({ id: Number(paymentDoc.plan_id) })
       .select({ code: 1, name: 1, duration_days: 1 })
       .lean();
-    if (!planDoc) {
-      return res.json({ ok: true, missing: true });
-    }
 
     const payment = {
       ...paymentDoc,
-      plan_code: planDoc.code,
-      plan_name: planDoc.name,
-      duration_days: planDoc.duration_days,
+      plan_code: planDoc?.code || '',
+      plan_name: planDoc?.name || '',
+      duration_days: planDoc?.duration_days || 365,
     };
 
     if (payment.status === 'paid' || payment.status === 'free') {
@@ -358,8 +355,31 @@ export async function razorpayWebhook(req, res, next) {
       }
     );
 
-    const expiry = await grantAccessForPlan(Number(payment.user_id), String(payment.plan_code), Number(payment.duration_days || 365));
-    await createUserNotification(Number(payment.user_id), 'Premium activated', `Your ${payment.plan_name} is active.`);
+    let expiry = null;
+    if (planDoc) {
+      // Existing Agri Practical MongoDB Plan
+      expiry = await grantAccessForPlan(Number(payment.user_id), String(payment.plan_code), Number(payment.duration_days || 365));
+      await createUserNotification(Number(payment.user_id), 'Premium activated', `Your ${payment.plan_name} is active.`);
+    } else {
+      // Exam Plan in Neon Postgres (PUC, KCET, NEET, Global)
+      try {
+        const { grantExamAccess } = await import('./exam.controller.js');
+        const notes = payload?.payload?.payment?.entity?.notes || payload?.payload?.order?.entity?.notes || {};
+        const exam = notes.exam || 'kcet';
+        const planCode = notes.planCode || 'exam_pro';
+        const pName = notes.planName || 'Exam Access Plan';
+        const durationDays = Number(notes.durationDays || 365);
+        let accessModules = ['all'];
+        if (notes.accessModules) {
+          try { accessModules = JSON.parse(notes.accessModules); } catch { accessModules = [notes.accessModules]; }
+        }
+
+        await grantExamAccess(Number(payment.user_id), exam, planCode, accessModules, durationDays);
+        await createUserNotification(Number(payment.user_id), 'Premium activated', `Your ${pName} for ${exam.toUpperCase()} is active.`);
+      } catch (examErr) {
+        console.error('[razorpayWebhook] Exam access grant error:', examErr);
+      }
+    }
 
     // Invalidate server-side TTL caches for this user and shared material caches
     const uid = Number(payment.user_id);
@@ -429,9 +449,81 @@ export async function getAccessStatusStudent(req, res, next) {
 
 export async function createPaymentOrderStudent(req, res, next) {
   try {
-    const userId = Number(req.user?.sub);
+    const userId = Number(req.user?.sub || req.user?.id);
     if (!Number.isFinite(userId)) return res.status(401).json({ message: 'Unauthorized' });
+
     const planCode = String(req.body?.planCode || req.body?.code || '').trim().toLowerCase();
+    const planId = req.body?.planId || req.body?.id;
+    const exam = String(req.body?.exam || '').toLowerCase().trim();
+
+    // ── Check if this is an Exam Plan (PUC, KCET, NEET, Global) ──────────────
+    if ((exam && exam !== 'agri') || (!['pyq', 'materials', 'combo'].includes(planCode) && (planId || planCode))) {
+      const { getPoolForExam, getKcetNeetPool } = await import('../config/examPgs.js');
+      const { grantExamAccess } = await import('./exam.controller.js');
+      const pool = getPoolForExam(exam) || getKcetNeetPool();
+      let pgPlan = null;
+      if (pool) {
+        if (planId) {
+          const r = await pool.query('SELECT * FROM plans WHERE id = $1', [planId]);
+          if (r.rows.length > 0) pgPlan = r.rows[0];
+        }
+        if (!pgPlan && planCode) {
+          const r = await pool.query('SELECT * FROM plans WHERE LOWER(code) = $1', [planCode]);
+          if (r.rows.length > 0) pgPlan = r.rows[0];
+        }
+      }
+
+      if (pgPlan && pgPlan.status === 'active') {
+        const pricePaise = Number(pgPlan.price_paise || 0);
+        const durationDays = Number(pgPlan.duration_days || 365);
+        const targetExam = pgPlan.exam || exam || 'kcet';
+        let accessModules = pgPlan.access_modules;
+        if (typeof accessModules === 'string') {
+          try { accessModules = JSON.parse(accessModules); } catch { accessModules = [accessModules]; }
+        }
+        if (!Array.isArray(accessModules)) accessModules = ['all'];
+
+        if (pricePaise <= 0) {
+          await grantExamAccess(userId, targetExam, pgPlan.code, accessModules, durationDays);
+          await createUserNotification(userId, 'Premium activated', `Your ${pgPlan.name} is active.`);
+          return res.json({ success: true, free: true, plan: { code: pgPlan.code, name: pgPlan.name } });
+        }
+
+        const receipt = `rcpt_${userId}_${pgPlan.code}_${Date.now()}`.slice(0, 40);
+        const order = await razorpayCreateOrder({
+          amountPaise: pricePaise,
+          receipt,
+          notes: {
+            userId: String(userId),
+            planCode: String(pgPlan.code),
+            exam: String(targetExam),
+            accessModules: JSON.stringify(accessModules),
+            durationDays: String(durationDays),
+            planName: String(pgPlan.name),
+          },
+        });
+
+        await new Payment({
+          user_id: userId,
+          plan_id: Number(pgPlan.id || 0),
+          amount_paise: pricePaise,
+          razorpay_order_id: String(order.id),
+          status: 'created',
+        }).save();
+
+        return res.json({
+          success: true,
+          orderId: String(order.id),
+          amountPaise: pricePaise,
+          currency: 'INR',
+          keyId: process.env.RAZORPAY_KEY_ID,
+          plan: { code: pgPlan.code, name: pgPlan.name, durationDays },
+          user: { name: req.user?.name, email: req.user?.email },
+        });
+      }
+    }
+
+    // ── Standard Agri Practical MongoDB Plans ─────────────────────────────────
     if (!['pyq', 'materials', 'combo'].includes(planCode)) {
       return res.status(400).json({ message: 'Invalid planCode' });
     }
@@ -441,10 +533,6 @@ export async function createPaymentOrderStudent(req, res, next) {
 
     const durationDays = Number(plan.duration_days || 365);
 
-    // ── Guard 1: student already has active access for this plan ──────────
-    // This handles the case where they paid but never returned to the site.
-    // The webhook/redirect already granted access server-side, so just tell
-    // the client they are premium (avoids showing payment form again).
     const role = String(req.user?.role || 'student');
     const alreadyActive = await canAccessPlan(userId, role, planCode);
     if (alreadyActive) {
@@ -468,8 +556,7 @@ export async function createPaymentOrderStudent(req, res, next) {
       return res.json({ free: true, plan: { code: plan.code, name: plan.name }, expiry });
     }
 
-
-    const receipt = `rcpt_${userId}_${planCode}_${Date.now()}`;
+    const receipt = `rcpt_${userId}_${planCode}_${Date.now()}`.slice(0, 40);
     const order = await razorpayCreateOrder({
       amountPaise: Number(plan.price_paise),
       receipt,
@@ -485,6 +572,7 @@ export async function createPaymentOrderStudent(req, res, next) {
     }).save();
 
     return res.json({
+      success: true,
       orderId: String(order.id),
       amountPaise: Number(plan.price_paise),
       currency: 'INR',
@@ -798,9 +886,61 @@ export async function verifyPaymentRedirect(req, res, next) {
       } catch (_) {}
     }
 
-    if (verified && planDoc) {
-      await grantAccessForPlan(Number(paymentDoc.user_id), String(planDoc.code), Number(planDoc.duration_days || 365));
-      await createUserNotification(Number(paymentDoc.user_id), 'Premium activated', `Your ${planDoc.name} is active.`);
+    if (verified) {
+      if (planDoc) {
+        await grantAccessForPlan(Number(paymentDoc.user_id), String(planDoc.code), Number(planDoc.duration_days || 365));
+        await createUserNotification(Number(paymentDoc.user_id), 'Premium activated', `Your ${planDoc.name} is active.`);
+      } else {
+        // Exam Plan in Neon Postgres (PUC, KCET, NEET, Global)
+        try {
+          const { grantExamAccess } = await import('./exam.controller.js');
+          let exam = 'kcet';
+          let planCode = 'exam_pro';
+          let accessModules = ['all'];
+          let durationDays = 365;
+          let pName = 'Exam Premium Access';
+
+          // Try fetching order details from Razorpay to get notes
+          if (orderId && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+            const keyId = process.env.RAZORPAY_KEY_ID;
+            const keySecret = process.env.RAZORPAY_KEY_SECRET;
+            const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+            const https = (await import('https')).default;
+            const orderInfo = await new Promise((resolve) => {
+              const r = https.request({
+                method: 'GET',
+                hostname: 'api.razorpay.com',
+                path: `/v1/orders/${orderId}`,
+                headers: { Authorization: `Basic ${auth}` },
+              }, (resp) => {
+                let b = '';
+                resp.on('data', c => { b += c; });
+                resp.on('end', () => {
+                  try { resolve(JSON.parse(b)); } catch { resolve({}); }
+                });
+              });
+              r.on('error', () => resolve({}));
+              r.end();
+            });
+
+            if (orderInfo?.notes) {
+              exam = orderInfo.notes.exam || exam;
+              planCode = orderInfo.notes.planCode || planCode;
+              pName = orderInfo.notes.planName || pName;
+              durationDays = Number(orderInfo.notes.durationDays || 365);
+              if (orderInfo.notes.accessModules) {
+                try { accessModules = JSON.parse(orderInfo.notes.accessModules); } catch { accessModules = [orderInfo.notes.accessModules]; }
+              }
+            }
+          }
+
+          await grantExamAccess(Number(paymentDoc.user_id), exam, planCode, accessModules, durationDays);
+          await createUserNotification(Number(paymentDoc.user_id), 'Premium activated', `Your ${pName} for ${exam.toUpperCase()} is active.`);
+          planName = pName;
+        } catch (e) {
+          console.error('[verifyPaymentRedirect] Exam grant error:', e);
+        }
+      }
 
       // Invalidate server-side TTL caches so next requests return fresh data
       const uid = Number(paymentDoc.user_id);
@@ -819,7 +959,7 @@ export async function verifyPaymentRedirect(req, res, next) {
         targetAppUrl: successAppUrl,
         androidIntentUrl: successIntentUrl,
         planName,
-        message: `Your payment was successful and ${planName} is now active! Returning to KCET Agri Practical…`,
+        message: `Your payment was successful and ${planName} is now active! Returning to app…`,
       }));
     }
 
@@ -1246,17 +1386,34 @@ export async function listActiveTests(req, res, next) {
       return res.json({ tests: [] });
     }
 
-    const MockTest = await getMockTestModel();
-    const rows = await MockTest.find({ is_active: true, question_count: { $gt: 0 } }).sort({ created_at: -1, id: -1 }).select({ id: 1, title: 1, is_active: 1, question_count: 1, per_question_seconds: 1, marks_correct: 1 }).lean();
+    const userId = Number(req.user?.sub || req.user?.id);
+    const role = String(req.user?.role || 'student');
+    const isSubscribed = Boolean(userId) && (
+      await canAccessPlan(userId, role, 'combo') ||
+      await canAccessPlan(userId, role, 'materials') ||
+      await canAccessPlan(userId, role, 'pyq')
+    );
 
-    const tests = (rows || []).map((t) => ({
-      id: t.id,
-      title: t.title,
-      isActive: toBool(t.is_active),
-      questionCount: t.question_count,
-      perQuestionSeconds: t.per_question_seconds,
-      marksCorrect: t.marks_correct,
-    }));
+    const MockTest = await getMockTestModel();
+    const rows = await MockTest.find({ is_active: true, question_count: { $gt: 0 } })
+      .sort({ created_at: -1, id: -1 })
+      .select({ id: 1, title: 1, is_active: 1, is_free: 1, question_count: 1, per_question_seconds: 1, marks_correct: 1 })
+      .lean();
+
+    const tests = (rows || []).map((t) => {
+      const isFree = t.is_free === true || t.is_free === null || t.is_free === undefined ? (t.is_free !== false) : false;
+      const locked = !isFree && !isSubscribed;
+      return {
+        id: t.id,
+        title: t.title,
+        isActive: toBool(t.is_active),
+        questionCount: t.question_count,
+        perQuestionSeconds: t.per_question_seconds,
+        marksCorrect: t.marks_correct,
+        isFree,
+        locked,
+      };
+    });
 
     return res.json({ tests });
   } catch (err) {
@@ -1280,7 +1437,70 @@ export async function startTest(req, res, next) {
     const MockQuestion = await getMockTestQuestionModel();
     let test = await MockTest.findOne({ id: Number(testId) }).lean();
     if (!test || !toBool(test.is_active)) {
-      return res.status(404).json({ message: 'Test not found' });
+      // Check PostgreSQL Neon DB (PUC, KCET, NEET)
+      const { getPucPool, getKcetNeetPool } = await import('../config/examPgs.js');
+      const { checkUserModuleAccess } = await import('./exam.controller.js');
+      const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+      let pgTest = null;
+      let pgQuestions = [];
+      let foundPool = null;
+
+      for (const pool of pools) {
+        try {
+          const tRes = await pool.query('SELECT * FROM mock_tests WHERE id = $1 AND is_active = true', [Number(testId)]);
+          if (tRes.rows.length > 0) {
+            pgTest = tRes.rows[0];
+            foundPool = pool;
+            const qRes = await pool.query(
+              'SELECT * FROM mock_questions WHERE test_id = $1 ORDER BY question_order ASC, id ASC',
+              [Number(testId)]
+            );
+            pgQuestions = qRes.rows;
+            break;
+          }
+        } catch (_) {}
+      }
+
+      if (!pgTest) {
+        return res.status(404).json({ message: 'Test not found' });
+      }
+
+      // Check access if test is paid
+      const isFree = pgTest.is_free === true || pgTest.is_free === null || pgTest.is_free === undefined ? (pgTest.is_free !== false) : false;
+      const userId = Number(req.user?.sub || req.user?.id);
+      if (!isFree) {
+        const hasAccess = await checkUserModuleAccess(foundPool, userId, pgTest.exam, 'tests');
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'This test is exclusive to premium members. Upgrade your plan to unlock.' });
+        }
+      }
+
+      const questions = pgQuestions.map((q, idx) => ({
+        index: idx,
+        id: q.id,
+        specimenId: q.id,
+        questionText: q.question_text || '',
+        imageUrl: q.image_url || '',
+        image_url: q.image_url || '',
+        options: [q.option_a, q.option_b, q.option_c, q.option_d],
+        correctOption: q.correct_option,
+      }));
+
+      return res.json({
+        test: {
+          id: pgTest.id,
+          title: pgTest.title,
+          exam: pgTest.exam,
+          subject: pgTest.subject,
+          questionCount: questions.length,
+          durationMinutes: pgTest.duration_minutes || 30,
+          perQuestionSeconds: pgTest.per_question_seconds || 30,
+          marksCorrect: pgTest.marks_correct || 4,
+          totalMarks: pgTest.total_marks || (questions.length * (pgTest.marks_correct || 4)),
+        },
+        questions,
+        serverTime: Date.now(),
+      });
     }
 
     // Fetch questions using aggregation to check for image presence without downloading 12MB of base64 data
@@ -1403,7 +1623,118 @@ export async function submitTest(req, res, next) {
     const MockTest = await getMockTestModel();
     let test = await MockTest.findOne({ id: Number(testId) }).lean();
     if (!test) {
-      return res.status(404).json({ message: 'Test not found' });
+      // Check PostgreSQL Neon DB (PUC, KCET, NEET)
+      const { getPucPool, getKcetNeetPool } = await import('../config/examPgs.js');
+      const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+      let pgTest = null;
+      let pgQuestions = [];
+      let foundPool = null;
+
+      for (const pool of pools) {
+        try {
+          const tRes = await pool.query('SELECT * FROM mock_tests WHERE id = $1', [Number(testId)]);
+          if (tRes.rows.length > 0) {
+            pgTest = tRes.rows[0];
+            foundPool = pool;
+            const qRes = await pool.query(
+              'SELECT * FROM mock_questions WHERE test_id = $1 ORDER BY question_order ASC, id ASC',
+              [Number(testId)]
+            );
+            pgQuestions = qRes.rows;
+            break;
+          }
+        } catch (_) {}
+      }
+
+      if (!pgTest) {
+        return res.status(404).json({ message: 'Test not found' });
+      }
+
+      const { responses, timeTakenSec } = req.body;
+      if (!Array.isArray(responses) || typeof timeTakenSec !== 'number') {
+        return res.status(400).json({ message: 'responses (array) and timeTakenSec (number) are required' });
+      }
+
+      const correctMap = new Map(pgQuestions.map((q) => [Number(q.id), String(q.correct_option || '').trim().toUpperCase()]));
+      let correctCount = 0;
+      let wrongCount = 0;
+      const optionLetters = ['A', 'B', 'C', 'D'];
+
+      const normalizedResponses = responses.map((r) => {
+        const questionId = Number(r.questionId || r.specimenId);
+        const correctOption = correctMap.get(questionId);
+        const selected = typeof r.selected === 'number' ? optionLetters[r.selected] : (typeof r.selected === 'string' ? r.selected.toUpperCase() : null);
+        const isCorrect = correctOption && selected === correctOption;
+        if (selected) {
+          if (isCorrect) correctCount += 1;
+          else wrongCount += 1;
+        }
+        return {
+          questionId,
+          selected,
+          correct: Boolean(isCorrect),
+          correctOption,
+          selectedIndex: typeof r.selected === 'number' ? r.selected : null,
+        };
+      });
+
+      const totalQuestions = pgQuestions.length;
+      const marksCorrect = pgTest.marks_correct || 4;
+      const score = correctCount * marksCorrect;
+      const accuracy = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 10000) / 100 : 0;
+
+      const MockResult = await getMockResultModel();
+      const inserted = await new MockResult({
+        user_id: userId,
+        test_id: Number(testId),
+        exam: pgTest.exam || 'kcet',
+        subject: pgTest.subject || '',
+        score,
+        correct_count: correctCount,
+        wrong_count: wrongCount,
+        total_questions: totalQuestions,
+        accuracy,
+        time_taken_sec: timeTakenSec,
+        responses_json: JSON.stringify(normalizedResponses),
+        date: new Date(),
+      }).save();
+
+      // Also persist to PostgreSQL mock_results for live aggregated progress
+      if (foundPool) {
+        try {
+          await foundPool.query(
+            `INSERT INTO mock_results (user_id, exam, test_id, score, correct_count, wrong_count, total_questions, accuracy, time_taken_sec, responses_json)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            [
+              userId,
+              pgTest.exam || 'kcet',
+              Number(testId),
+              score,
+              correctCount,
+              wrongCount,
+              totalQuestions,
+              accuracy,
+              timeTakenSec,
+              JSON.stringify(normalizedResponses),
+            ]
+          );
+        } catch (pgErr) {
+          console.error('[submitTest] Postgres mock_results insert error:', pgErr.message);
+        }
+      }
+
+      return res.json({
+        result: {
+          id: inserted._id || inserted.id,
+          testId: Number(testId),
+          score,
+          correctCount,
+          wrongCount,
+          totalQuestions,
+          accuracy,
+          timeTakenSec,
+        },
+      });
     }
 
     const { responses, timeTakenSec } = req.body;

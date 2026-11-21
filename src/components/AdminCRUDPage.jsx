@@ -17,6 +17,7 @@ export default function AdminCRUDPage({
   listTransform = (r) => r,
   formTransform = (data) => data,
   customCreateHandler = null,
+  customUpdateHandler = null,
   onEdit = null,
   renderItemActions = null,
   onFormChange = null,
@@ -55,11 +56,15 @@ export default function AdminCRUDPage({
     try {
       const payload = formTransform(form);
       if (editing) {
-        await apiFetch(`/api/admin/${updPath}/${editing.id}`, {
-          token,
-          method: 'PUT',
-          body: payload,
-        });
+        if (customUpdateHandler) {
+          await customUpdateHandler(editing.id, payload);
+        } else {
+          await apiFetch(`/api/admin/${updPath}/${editing.id}`, {
+            token,
+            method: 'PUT',
+            body: payload,
+          });
+        }
         setMessage('Updated');
       } else {
         if (customCreateHandler) {
@@ -86,12 +91,11 @@ export default function AdminCRUDPage({
 
   const handleEdit = (item) => {
     setEditing(item);
-    setForm(() => {
-      const next = item;
-      const maybe = onFormChange?.(next);
-      return maybe && typeof maybe === 'object' ? maybe : next;
-    });
+    setForm(item);
     onEdit?.(item);
+    if (onFormChange) {
+      setTimeout(() => onFormChange(item), 0);
+    }
   };
 
   const handleDelete = (id) => {
@@ -119,8 +123,10 @@ export default function AdminCRUDPage({
   const updateForm = (field, value) => {
     setForm((prev) => {
       const next = { ...prev, [field.name]: value };
-      const maybe = onFormChange?.(next, prev);
-      return maybe && typeof maybe === 'object' ? maybe : next;
+      if (onFormChange) {
+        setTimeout(() => onFormChange(next, prev), 0);
+      }
+      return next;
     });
   };
 
@@ -212,12 +218,11 @@ export default function AdminCRUDPage({
                     style={styles.btnGhost}
                     onPress={() => {
                       setEditing(null);
-                      setForm(() => {
-                        const next = initialForm;
-                        const maybe = onFormChange?.(next);
-                        return maybe && typeof maybe === 'object' ? maybe : next;
-                      });
+                      setForm(initialForm);
                       onCancelEdit?.();
+                      if (onFormChange) {
+                        setTimeout(() => onFormChange(initialForm), 0);
+                      }
                     }}
                   >
                     <Text style={styles.btnGhostText}>Cancel</Text>

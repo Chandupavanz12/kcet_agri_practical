@@ -1,122 +1,229 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
+
+const { width } = Dimensions.get('window');
+
+// ─── StudyHack Logo Component ────────────────────────────────────────────────
+function StudyHackLogo() {
+  return (
+    <View style={styles.logoRow}>
+      {/* Stylized S Cap Badge */}
+      <View style={styles.logoBadge}>
+        <Text style={styles.logoGradCap}>🎓</Text>
+        <Text style={styles.logoS}>S</Text>
+      </View>
+      <View style={styles.logoTextCol}>
+        <Text style={styles.logoTitle}>
+          Study<Text style={styles.logoTitleGreen}>Hack</Text>
+        </Text>
+        <Text style={styles.logoSubtitle}>Learn Smart. Score Higher.</Text>
+        <View style={styles.logoUnderline} />
+      </View>
+    </View>
+  );
+}
+
+// ─── Exam Cards Data ─────────────────────────────────────────────────────────
+const EXAM_CARDS = [
+  {
+    id: 'puc',
+    name: 'PUC',
+    subtitle: 'Study • Practice • Ace',
+    icon: '📄',
+    bgColor: '#e0e7ff', // soft indigo
+    iconColor: '#4f46e5',
+    borderColor: '#c7d2fe',
+  },
+  {
+    id: 'kcet',
+    name: 'KCET',
+    subtitle: 'Target Your Rank',
+    icon: '🎯',
+    bgColor: '#e0f2fe', // soft sky blue
+    iconColor: '#0284c7',
+    borderColor: '#bae6fd',
+  },
+  {
+    id: 'neet',
+    name: 'NEET',
+    subtitle: 'Prepare for Success',
+    icon: '🩺',
+    bgColor: '#ffe4e6', // soft rose
+    iconColor: '#e11d48',
+    borderColor: '#fecdd3',
+  },
+  {
+    id: 'agri',
+    name: 'Agri Practical',
+    subtitle: 'Grow Your Future',
+    icon: '🌱',
+    bgColor: '#dcfce7', // soft mint
+    iconColor: '#16a34a',
+    borderColor: '#bbf7d0',
+  },
+];
 
 export default function StudentDashboardScreen() {
   const { token, user } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  const [data, setData] = useState(null);
-  const [tests, setTests] = useState([]);
+  const [banners, setBanners] = useState([
+    {
+      id: 1,
+      title: 'Dream Big...',
+      highlight_text: 'Prepare Smart!',
+      subtitle: 'Your Complete Exam Preparation Partner',
+      button_text: 'Start Learning >',
+      action_route: '/student/exam/puc',
+      bg_gradient_start: '#07162c',
+      bg_gradient_end: '#059669',
+    },
+  ]);
+  const [activeBannerIdx, setActiveBannerIdx] = useState(0);
+  const bannerFlatListRef = useRef(null);
+  const BANNER_WIDTH = width - 32;
+  const [progress, setProgress] = useState({
+    progressPercent: 0,
+    totalTestsGiven: 0,
+    totalScore: 0,
+    overallAccuracy: 0,
+  });
   const [notifications, setNotifications] = useState([]);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = async (showLoading = true) => {
+  const loadDashboardData = async (showLoading = false) => {
     if (showLoading) setLoading(true);
-    let alive = true;
     try {
       setError('');
-      const [dashRes, testsRes, notifRes] = await Promise.all([
-        apiFetch('/api/student/dashboard', { token }).catch(() => null),
-        apiFetch('/api/student/tests', { token }).catch(() => null),
-        apiFetch('/api/student/notifications', { token }).catch(() => null)
+      const [bannerRes, progRes, notifRes] = await Promise.all([
+        apiFetch('/api/student/banners?exam=global', { token }).catch(() => null),
+        apiFetch('/api/student/aggregated-progress', { token }).catch(() => null),
+        apiFetch('/api/student/notifications', { token }).catch(() => null),
       ]);
 
-      if (!alive) return;
-      setData(dashRes);
-      setTests(Array.isArray(testsRes?.tests) ? testsRes.tests : []);
+      if (Array.isArray(bannerRes?.banners) && bannerRes.banners.length > 0) {
+        setBanners(bannerRes.banners);
+      }
+
+      if (progRes?.overall) {
+        setProgress(progRes.overall);
+      }
 
       const rows = Array.isArray(notifRes?.notifications) ? notifRes.notifications : [];
-      const seen = new Set();
-      const uniq = [];
-      for (const n of rows) {
-        const msg = String(n?.message || '').trim();
-        if (!msg) continue;
-        const key = msg.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-        uniq.push({ ...n, message: msg });
-      }
-      setNotifications(uniq);
+      setNotifications(rows);
     } catch (err) {
-      if (!alive) return;
       setError(err?.message || 'Failed to load dashboard data');
     } finally {
-      if (alive) {
-        setLoading(false);
-        setRefreshing(false);
-      }
+      setLoading(false);
+      setRefreshing(false);
     }
-    return () => { alive = false; };
   };
 
   useEffect(() => {
-    loadData(true);
+    loadDashboardData(false);
   }, [token]);
+
+  // Auto-scroll hero banners every 4 seconds with smooth sliding animation
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveBannerIdx((prev) => {
+        const next = (prev + 1) % banners.length;
+        bannerFlatListRef.current?.scrollToOffset({
+          offset: next * (BANNER_WIDTH + 12),
+          animated: true,
+        });
+        return next;
+      });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [banners.length]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadData(false);
+    loadDashboardData(false);
   }, [token]);
 
   useEffect(() => {
     if (params.error) {
-      if (params.error === 'PaymentVerificationFailed') setError('Payment verification failed.');
-      else setError(params.error);
+      setError(params.error === 'PaymentVerificationFailed' ? 'Payment verification failed.' : String(params.error));
     }
     if (params.success) {
-      if (params.success === 'PremiumActivated') setSuccessMsg('🎉 Payment successful! Premium access is now activated.');
-      else setSuccessMsg(params.success);
+      setSuccessMsg(params.success === 'PremiumActivated' ? '🎉 Payment successful! Premium access is now activated.' : String(params.success));
     }
   }, [params.error, params.success]);
 
-  const handleNavigation = useCallback((route) => {
-    router.push(route);
-  }, [router]);
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#10b981" />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Get the latest notification or fall back to default
-  const latestNotification = notifications.length > 0
-    ? notifications[0].message
-    : "Mock test-2 will be scheduled on today 6pm";
-
-  // Get mock tests or fall back to default list
-  const displayTests = tests.length > 0
-    ? tests.slice(0, 6)
-    : [
-      { id: 'mock-6', title: 'Mock test-6', questionCount: 20 },
-      { id: 'mock-5', title: 'Mock test-5', questionCount: 20 },
-      { id: 'mock-4', title: 'Mock test-4', questionCount: 20 },
-    ];
+  const currentBanner = banners[activeBannerIdx] || banners[0] || {
+    title: 'Dream Big...',
+    highlight_text: 'Prepare Smart!',
+    subtitle: 'Your Complete Exam Preparation Partner',
+    button_text: 'Start Learning >',
+    action_route: '/student/exam/puc',
+    bg_gradient_start: '#07162c',
+    bg_gradient_end: '#059669',
+  };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#10b981']} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#10b981']} />}
       >
+        {/* Top Header with StudyHack Logo, Notification Bell and User Avatar */}
+        <View style={styles.topHeader}>
+          <StudyHackLogo />
 
-        {/* Error / Success Banners */}
+          <View style={styles.headerRight}>
+            {/* Notification Bell */}
+            <TouchableOpacity
+              style={styles.iconCircle}
+              onPress={() => router.push('/student/notifications')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.bellIcon}>🔔</Text>
+              {notifications.length > 0 && <View style={styles.notifBadge} />}
+            </TouchableOpacity>
+
+            {/* User Avatar Initial Letter with Green Active Dot */}
+            <TouchableOpacity
+              style={styles.avatarWrapper}
+              onPress={() => router.push('/student/profile')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarLetter}>
+                  {(user?.name?.trim()?.[0] || 'S').toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.avatarOnlineDot} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Error / Success Notifications */}
         {!!error && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
@@ -128,264 +235,405 @@ export default function StudentDashboardScreen() {
           </View>
         )}
 
-        {/* 1. Dashboard Welcome Card */}
-        <View style={styles.card}>
-          <View style={styles.welcomeContainer}>
-            <View style={styles.welcomeLeft}>
-              <Text style={styles.welcomeTitle}>Student Dashboard</Text>
-              <Text style={styles.welcomeSub}>Welcome back, {user?.name || 'Student'} 👋</Text>
-            </View>
-            <View style={styles.badgeContainer}>
-              {(data?.premiumStatus?.comboActive || data?.premiumStatus?.pyqActive || data?.premiumStatus?.materialActive) ? (
-                <>
-                  <View style={[styles.badgeActive, { backgroundColor: '#fef3c7', borderColor: '#fcd34d' }]}>
-                    <Text style={[styles.badgeActiveText, { color: '#d97706' }]}>👑 Premium User</Text>
-                  </View>
-                  {data?.premiumStatus?.comboActive && (
-                    <View style={styles.badgePrep}>
-                      <Text style={styles.badgePrepText}>Combo Plan Active</Text>
-                    </View>
-                  )}
-                </>
-              ) : (
-                <View style={styles.badgePrep}>
-                  <Text style={styles.badgePrepText}>Free Student</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* 2. Notifications Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Notifications</Text>
-            <TouchableOpacity onPress={() => handleNavigation('/student/notifications')}>
-              <Text style={styles.viewAllLink}>View all</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.notificationBox}>
-            <Text style={styles.notificationText}>
-              {latestNotification}
-            </Text>
-          </View>
-        </View>
-
-        {/* Feedback Section */}
-        <View style={[styles.card, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}>
-          <View style={[styles.cardHeader, { marginBottom: 8 }]}>
-            <Text style={[styles.cardTitle, { color: '#1e3a8a' }]}>Have Suggestions?</Text>
-          </View>
-          <Text style={{ color: '#3b82f6', marginBottom: 12, fontSize: 13 }}>Share your feedback or queries with the admin directly.</Text>
-          <TouchableOpacity
-            onPress={() => handleNavigation('/student/feedback')}
-            style={styles.btnAction}
-          >
-            <Text style={[styles.btnActionText, { textAlign: 'center' }]}>Submit Feedback</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* 3. Mock Tests Grid Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Tests</Text>
-            <TouchableOpacity onPress={() => handleNavigation('/student/tests')}>
-              <Text style={styles.viewAllLink}>View all</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.grid}>
-            {displayTests.map((t) => (
-              <View key={t.id} style={styles.testCard}>
-                <View style={styles.testCardBody}>
-                  <Text style={styles.testTitle}>{t.title}</Text>
-                  <Text style={styles.testInfo}>
-                    {t.questionCount || t.question_count || 20} questions • 30s per question
+        {/* 1. Hero Banner Slider (Smooth left-to-right sliding animation) */}
+        <View style={{ marginBottom: 4 }}>
+          <FlatList
+            ref={bannerFlatListRef}
+            data={banners}
+            horizontal
+            pagingEnabled={false}
+            snapToInterval={BANNER_WIDTH + 12}
+            decelerationRate="fast"
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 12 }}
+            keyExtractor={(item, index) => String(item.id || index)}
+            onMomentumScrollEnd={(e) => {
+              const offsetX = e.nativeEvent.contentOffset.x;
+              const index = Math.round(offsetX / (BANNER_WIDTH + 12));
+              setActiveBannerIdx(index);
+            }}
+            renderItem={({ item }) => (
+              <LinearGradient
+                colors={[item.bg_gradient_start || '#07162c', item.bg_gradient_end || '#059669']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.heroCard, { width: BANNER_WIDTH }]}
+              >
+                <View style={styles.heroLeft}>
+                  <Text style={styles.heroHeading}>
+                    {item.title}{'\n'}
+                    {!!item.highlight_text && (
+                      <Text style={styles.heroHeadingHighlight}>{item.highlight_text}</Text>
+                    )}
+                  </Text>
+                  <Text style={styles.heroSubText}>
+                    {item.subtitle || 'Your Complete Exam Preparation Partner'}
                   </Text>
 
                   <TouchableOpacity
-                    onPress={() => handleNavigation(`/student/mock-test/${t.id}`)}
-                    style={styles.gradientBtnWrapper}
+                    style={styles.heroCtaBtn}
+                    onPress={() => router.push(item.action_route || '/student/exam/puc')}
+                    activeOpacity={0.85}
                   >
-                    <LinearGradient
-                      colors={['#10b981', '#2563eb']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.startBtn}
-                    >
-                      <Text style={styles.startBtnText}>Start Test</Text>
-                    </LinearGradient>
+                    <Text style={styles.heroCtaText}>{item.button_text || 'Start Learning >'}</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
-            ))}
-          </View>
+
+                {/* Student Illustration / Image on Right */}
+                <View style={styles.heroRight}>
+                  <Image
+                    source={{
+                      uri: item.image_url || 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=400&auto=format&fit=crop&q=80',
+                    }}
+                    style={styles.heroStudentImg}
+                  />
+                </View>
+              </LinearGradient>
+            )}
+          />
+
+          {/* Carousel Dots */}
+          {banners.length > 1 && (
+            <View style={styles.carouselDotsRow}>
+              {banners.map((_, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => {
+                    setActiveBannerIdx(idx);
+                    bannerFlatListRef.current?.scrollToOffset({
+                      offset: idx * (BANNER_WIDTH + 12),
+                      animated: true,
+                    });
+                  }}
+                  style={[styles.dot, idx === activeBannerIdx && styles.dotActive]}
+                />
+              ))}
+            </View>
+          )}
         </View>
 
+        {/* 2. "Choose Your Exam" Section */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeading}>Choose Your Exam</Text>
+          <TouchableOpacity onPress={() => router.push('/student/exam/puc')}>
+            <Text style={styles.viewAllText}>View All →</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.examGrid}>
+          {EXAM_CARDS.map((exam) => (
+            <TouchableOpacity
+              key={exam.id}
+              style={[styles.examCard, { backgroundColor: exam.bgColor, borderColor: exam.borderColor }]}
+              onPress={() => router.push(`/student/exam/${exam.id}`)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.examIconCircle}>
+                <Text style={styles.examIcon}>{exam.icon}</Text>
+              </View>
+              <Text style={styles.examName}>{exam.name}</Text>
+              <Text style={styles.examSub}>{exam.subtitle}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* 3. Features Row (Quick Actions) */}
+        <View style={styles.featuresRow}>
+          {/* Video Guidance (Active for Agri Practical) */}
+          <TouchableOpacity
+            style={styles.featureItem}
+            onPress={() => router.push('/student/exam/agri')}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.featureIconBox, { backgroundColor: '#ede9fe' }]}>
+              <Text style={{ fontSize: 20 }}>▶️</Text>
+            </View>
+            <Text style={styles.featureLabel}>Video{'\n'}Lectures</Text>
+          </TouchableOpacity>
+
+          {/* Mock Tests */}
+          <TouchableOpacity
+            style={styles.featureItem}
+            onPress={() => router.push('/student/tests')}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.featureIconBox, { backgroundColor: '#dcfce7' }]}>
+              <Text style={{ fontSize: 20 }}>📋</Text>
+            </View>
+            <Text style={styles.featureLabel}>Mock{'\n'}Tests</Text>
+          </TouchableOpacity>
+
+          {/* Study Materials */}
+          <TouchableOpacity
+            style={styles.featureItem}
+            onPress={() => router.push('/student/materials')}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.featureIconBox, { backgroundColor: '#ffedd5' }]}>
+              <Text style={{ fontSize: 20 }}>📖</Text>
+            </View>
+            <Text style={styles.featureLabel}>Study{'\n'}Materials</Text>
+          </TouchableOpacity>
+
+          {/* Previous Year Papers */}
+          <TouchableOpacity
+            style={styles.featureItem}
+            onPress={() => router.push('/student/pyqs')}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.featureIconBox, { backgroundColor: '#e0f2fe' }]}>
+              <Text style={{ fontSize: 20 }}>📑</Text>
+            </View>
+            <Text style={styles.featureLabel}>Previous{'\n'}Year Papers</Text>
+          </TouchableOpacity>
+
+          {/* Performance Analytics */}
+          <TouchableOpacity
+            style={styles.featureItem}
+            onPress={() => router.push('/student/progress')}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.featureIconBox, { backgroundColor: '#fae8ff' }]}>
+              <Text style={{ fontSize: 20 }}>📈</Text>
+            </View>
+            <Text style={styles.featureLabel}>Performance{'\n'}Analytics</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 4. "Your Progress" Section Card */}
+        <LinearGradient
+          colors={['#0f172a', '#1e293b']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.progressCard}
+        >
+          <View style={styles.progressHeaderRow}>
+            <View style={styles.progressTitleBox}>
+              <Text style={{ fontSize: 18 }}>📊</Text>
+              <Text style={styles.progressTitle}>Your Progress</Text>
+            </View>
+            <Text style={styles.keepGoingText}>Keep Going! 🔥</Text>
+          </View>
+
+          <View style={styles.progressBodyRow}>
+            {/* Left Circular Meter */}
+            <View style={styles.circleContainer}>
+              <View style={styles.circleRing}>
+                <Text style={styles.circlePercentText}>{progress.progressPercent}%</Text>
+              </View>
+              <View style={styles.circleLabelCol}>
+                <Text style={styles.overallPrepText}>Overall Preparation</Text>
+                <Text style={styles.doingGreatText}>
+                  {progress.progressPercent > 60 ? "You're doing great!" : 'Keep practicing daily!'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Right Metrics */}
+            <View style={styles.metricsCol}>
+              <View style={styles.metricItem}>
+                <Text style={{ fontSize: 22 }}>🏆</Text>
+                <Text style={styles.metricVal}>{progress.totalTestsGiven}</Text>
+                <Text style={styles.metricSub}>Tests Given</Text>
+              </View>
+
+              <View style={styles.metricItem}>
+                <Text style={{ fontSize: 22 }}>⭐</Text>
+                <Text style={styles.metricVal}>{progress.totalScore}</Text>
+                <Text style={styles.metricSub}>Total Score</Text>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* 5. "Quick Access" Section */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeading}>Quick Access</Text>
+          <TouchableOpacity onPress={() => router.push('/student/tests')}>
+            <Text style={styles.viewAllText}>See More →</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.quickAccessRow}>
+          {/* Daily Quiz */}
+          <TouchableOpacity
+            style={[styles.quickCard, { backgroundColor: '#fffbeb', borderColor: '#fef3c7' }]}
+            onPress={() => router.push('/student/tests')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.quickIconRow}>
+              <Text style={{ fontSize: 22 }}>⚡</Text>
+              <Text style={styles.quickTitle}>Daily Quiz</Text>
+            </View>
+            <Text style={styles.quickSub}>Test Your Knowledge</Text>
+            <Text style={styles.quickArrow}>→</Text>
+          </TouchableOpacity>
+
+          {/* Top Rankers Tips */}
+          <TouchableOpacity
+            style={[styles.quickCard, { backgroundColor: '#eef2ff', borderColor: '#e0e7ff' }]}
+            onPress={() => router.push('/student/materials')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.quickIconRow}>
+              <Text style={{ fontSize: 22 }}>📖</Text>
+              <Text style={styles.quickTitle}>Rankers Tips</Text>
+            </View>
+            <Text style={styles.quickSub}>Learn from the Best</Text>
+            <Text style={styles.quickArrow}>→</Text>
+          </TouchableOpacity>
+
+          {/* Study Rewards */}
+          <TouchableOpacity
+            style={[styles.quickCard, { backgroundColor: '#fff1f2', borderColor: '#ffe4e6' }]}
+            onPress={() => router.push('/student/premium')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.quickIconRow}>
+              <Text style={{ fontSize: 22 }}>🎁</Text>
+              <Text style={styles.quickTitle}>Rewards</Text>
+            </View>
+            <Text style={styles.quickSub}>Earn & Unlock</Text>
+            <Text style={styles.quickArrow}>→</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      {/* 6. Bottom Navigation Bar */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity style={styles.bottomNavItem} onPress={() => {}}>
+          <Text style={[styles.bottomNavIcon, { color: '#16a34a' }]}>🏠</Text>
+          <Text style={[styles.bottomNavLabel, { color: '#16a34a', fontWeight: '800' }]}>Home</Text>
+          <View style={styles.bottomActiveBar} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.bottomNavItem} onPress={() => router.push('/student/tests')}>
+          <Text style={styles.bottomNavIcon}>📊</Text>
+          <Text style={styles.bottomNavLabel}>Practice</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.bottomNavItem} onPress={() => router.push('/student/progress')}>
+          <Text style={styles.bottomNavIcon}>🏆</Text>
+          <Text style={styles.bottomNavLabel}>Leaderboard</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.bottomNavItem} onPress={() => router.push('/student/profile')}>
+          <Text style={styles.bottomNavIcon}>⚙️</Text>
+          <Text style={styles.bottomNavLabel}>Settings</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f5f5f4' },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  scrollContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 85,
+    gap: 16,
+  },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  container: { padding: 16, gap: 16, paddingBottom: 32 },
 
-  errorBox: { backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 4 },
-  errorText: { color: '#b91c1c', fontSize: 14, fontWeight: '600' },
-  successBox: { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 4 },
-  successText: { color: '#15803d', fontSize: 14, fontWeight: '600' },
-
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#e4e4e7',
-    shadowColor: '#000',
-    shadowOpacity: 0.02,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-
-  // Welcome Card Styles
-  welcomeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  welcomeLeft: {
-    flex: 1,
-    minWidth: 150,
-  },
-  welcomeTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  welcomeSub: {
-    fontSize: 15,
-    color: '#64748b',
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  badgeContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  badgePrep: {
-    backgroundColor: '#f1f5f9',
-    borderColor: '#e2e8f0',
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  badgePrepText: {
-    color: '#475569',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  badgeActive: {
-    backgroundColor: '#ecfdf5',
-    borderColor: '#bbf7d0',
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  badgeActiveText: {
-    color: '#059669',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  // Common Card Headers
-  cardHeader: {
+  // Top Header
+  topHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingTop: 2,
+    paddingBottom: 2,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1e293b',
-  },
-  viewAllLink: {
-    fontSize: 14,
-    color: '#2563eb',
-    fontWeight: '700',
-  },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logoBadge: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#0284c7', alignItems: 'center', justifyContent: 'center' },
+  logoGradCap: { fontSize: 14, position: 'absolute', top: 2 },
+  logoS: { fontSize: 22, fontWeight: '900', color: '#ffffff', marginTop: 10 },
+  logoTextCol: { gap: 1 },
+  logoTitle: { fontSize: 22, fontWeight: '900', color: '#0f172a', letterSpacing: -0.5 },
+  logoTitleGreen: { color: '#16a34a' },
+  logoSubtitle: { fontSize: 10, fontWeight: '700', color: '#334155' },
+  logoUnderline: { height: 2, backgroundColor: '#16a34a', borderRadius: 2, width: 40, marginTop: 1 },
 
-  // Notifications Styles
-  notificationBox: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#bfdbfe',
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 14,
-  },
-  notificationText: {
-    fontSize: 14,
-    color: '#1e40af',
-    lineHeight: 20,
-    fontWeight: '500',
-  },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconCircle: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  bellIcon: { fontSize: 18 },
+  notifBadge: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#ef4444', position: 'absolute', top: 9, right: 9 },
+  avatarWrapper: { width: 42, height: 42, borderRadius: 21, borderWidth: 2, borderColor: '#10b981' },
+  avatarCircle: { width: '100%', height: '100%', borderRadius: 21, backgroundColor: '#0284c7', alignItems: 'center', justifyContent: 'center' },
+  avatarLetter: { fontSize: 18, fontWeight: '900', color: '#ffffff' },
+  avatarOnlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#22c55e', position: 'absolute', bottom: -1, right: -1, borderWidth: 2, borderColor: '#fff' },
 
-  // Mock Tests Grid Styles
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  testCard: {
-    width: '48%',
-    flexGrow: 1,
-    minWidth: '45%',
-    backgroundColor: '#ffffff',
-    borderColor: '#e2e8f0',
-    borderWidth: 1,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  testCardBody: {
-    padding: 14,
-    justifyContent: 'space-between',
-    flex: 1,
-  },
-  testTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  testInfo: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 6,
-    marginBottom: 12,
-    lineHeight: 16,
-  },
-  gradientBtnWrapper: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  startBtn: {
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  startBtnText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  btnAction: { backgroundColor: '#3b82f6', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
-  btnActionText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  errorBox: { backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1, borderRadius: 14, padding: 12 },
+  errorText: { color: '#b91c1c', fontSize: 13, fontWeight: '600' },
+  successBox: { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', borderWidth: 1, borderRadius: 14, padding: 12 },
+  successText: { color: '#15803d', fontSize: 13, fontWeight: '600' },
+
+  // Hero Card
+  heroCard: { borderRadius: 22, padding: 20, flexDirection: 'row', alignItems: 'center', position: 'relative', overflow: 'hidden', minHeight: 175 },
+  heroLeft: { flex: 1.2, gap: 8 },
+  heroHeading: { fontSize: 20, fontWeight: '900', color: '#ffffff', lineHeight: 26 },
+  heroHeadingHighlight: { color: '#facc15', fontStyle: 'italic' },
+  heroSubText: { fontSize: 12, color: '#e2e8f0', lineHeight: 16 },
+  heroCtaBtn: { alignSelf: 'flex-start', backgroundColor: '#facc15', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, marginTop: 4 },
+  heroCtaText: { color: '#0f172a', fontWeight: '800', fontSize: 12 },
+  heroRight: { flex: 0.8, alignItems: 'center', justifyContent: 'center' },
+  heroStudentImg: { width: 110, height: 130, borderRadius: 16, resizeMode: 'cover' },
+  carouselDotsRow: { position: 'absolute', bottom: 8, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.4)' },
+  dotActive: { width: 18, backgroundColor: '#facc15' },
+
+  // Sections
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  sectionHeading: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
+  viewAllText: { fontSize: 13, fontWeight: '700', color: '#059669' },
+
+  // Exam Grid
+  examGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  examCard: { width: (width - 44) / 2, borderRadius: 18, padding: 14, borderWidth: 1, gap: 4, shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 6, elevation: 1 },
+  examIconCircle: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  examIcon: { fontSize: 22 },
+  examName: { fontSize: 17, fontWeight: '900', color: '#0f172a' },
+  examSub: { fontSize: 11, fontWeight: '600', color: '#64748b' },
+
+  // Features Row
+  featuresRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#f8fafc', borderRadius: 18, paddingVertical: 14, paddingHorizontal: 10, borderWidth: 1, borderColor: '#f1f5f9' },
+  featureItem: { alignItems: 'center', gap: 6, width: (width - 60) / 5 },
+  featureIconBox: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  featureLabel: { fontSize: 10, fontWeight: '700', color: '#334155', textAlign: 'center', lineHeight: 13 },
+
+  // Progress Card
+  progressCard: { borderRadius: 20, padding: 18, gap: 14 },
+  progressHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  progressTitleBox: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  progressTitle: { fontSize: 15, fontWeight: '800', color: '#ffffff' },
+  keepGoingText: { fontSize: 12, fontWeight: '700', color: '#facc15' },
+  progressBodyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  circleContainer: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  circleRing: { width: 62, height: 62, borderRadius: 31, borderWidth: 5, borderColor: '#22c55e', alignItems: 'center', justifyContent: 'center' },
+  circlePercentText: { fontSize: 17, fontWeight: '900', color: '#ffffff' },
+  circleLabelCol: { gap: 2, flex: 1 },
+  overallPrepText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
+  doingGreatText: { fontSize: 11, color: '#94a3b8' },
+  metricsCol: { flexDirection: 'row', gap: 16 },
+  metricItem: { alignItems: 'center', gap: 2 },
+  metricVal: { fontSize: 16, fontWeight: '900', color: '#ffffff' },
+  metricSub: { fontSize: 10, color: '#94a3b8' },
+
+  // Quick Access
+  quickAccessRow: { flexDirection: 'row', gap: 10 },
+  quickCard: { flex: 1, borderRadius: 14, padding: 12, borderWidth: 1, gap: 4 },
+  quickIconRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  quickTitle: { fontSize: 12, fontWeight: '800', color: '#0f172a' },
+  quickSub: { fontSize: 10, color: '#64748b' },
+  quickArrow: { fontSize: 14, color: '#0f172a', fontWeight: '800', marginTop: 4 },
+
+  // Bottom Nav
+  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 65, backgroundColor: '#ffffff', flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#f1f5f9', alignItems: 'center', justifyContent: 'space-around' },
+  bottomNavItem: { alignItems: 'center', justifyContent: 'center', gap: 2, position: 'relative' },
+  bottomNavIcon: { fontSize: 20 },
+  bottomNavLabel: { fontSize: 11, fontWeight: '600', color: '#64748b' },
+  bottomActiveBar: { position: 'absolute', bottom: -6, width: 20, height: 3, backgroundColor: '#16a34a', borderRadius: 2 },
 });

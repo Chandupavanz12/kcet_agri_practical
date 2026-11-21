@@ -65,28 +65,10 @@ export function createApp() {
     }
   });
   // (moved cors here, after the proxy)
-  const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
-    .split(',').map(o => o.trim()).filter(Boolean);
-
-  const isOriginAllowed = (origin) => {
-    if (!origin) return true;
-    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return true;
-    if (origin.includes('onrender.com')) return true;
-    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:') || origin.startsWith('http://192.168.')) return true;
-    return false;
-  };
-
+  // Allow all origins for mobile app, webviews, Razorpay callbacks, and dev servers
   app.use(
     cors({
-      origin: (origin, cb) => {
-        // Allow requests with no origin (curl, mobile apps, server-to-server) or approved origins
-        if (isOriginAllowed(origin)) {
-          return cb(null, true);
-        }
-        // Do not throw an unhandled Error (which crashes into 500 error page in Express).
-        // Simply return false to disallow CORS headers on unauthorized origins.
-        return cb(null, false);
-      },
+      origin: true,
       credentials: true,
     })
   );
