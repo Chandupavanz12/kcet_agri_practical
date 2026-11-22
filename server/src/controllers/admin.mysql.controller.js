@@ -518,22 +518,92 @@ export async function listStudents(req, res, next) {
       .lean();
 
     const userIds = rows.map((u) => Number(u.id));
+    const now = new Date();
+
+    // 1. Mongo Agri Access
     const accessRows = await UserAccess.find({ user_id: { $in: userIds } }).lean();
     const accessByUserId = new Map(accessRows.map((a) => [Number(a.user_id), a]));
 
+    // 2. Active MongoDB Payments across all exams
+    const paidDocs = await Payment.find({
+      user_id: { $in: userIds },
+      status: { $in: ['paid', 'free'] },
+      admin_revoked: { $ne: true },
+    }).lean();
+    const paymentsByUser = new Map();
+    for (const p of paidDocs) {
+      const uid = Number(p.user_id);
+      const paidDate = p.paid_at || p.created_at || now;
+      const duration = Number(p.duration_days || 365);
+      const expiry = new Date(new Date(paidDate).getTime() + duration * 86400000);
+      if (expiry > now) {
+        if (!paymentsByUser.has(uid)) paymentsByUser.set(uid, []);
+        paymentsByUser.get(uid).push(p);
+      }
+    }
+
+    // 3. PostgreSQL Neon user_access
+    const pgAccessByUser = new Map();
+    try {
+      const { getPucPool, getKcetNeetPool } = await import('../config/examPgs.js');
+      const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+      for (const pool of pools) {
+        const res = await pool.query(
+          `SELECT user_id, exam, plan_code, expires_at FROM user_access WHERE expires_at > NOW()`
+        );
+        for (const row of res.rows) {
+          const uid = Number(row.user_id);
+          if (!pgAccessByUser.has(uid)) pgAccessByUser.set(uid, new Set());
+          pgAccessByUser.get(uid).add(String(row.exam).toLowerCase());
+        }
+      }
+    } catch (_) {}
+
     const students = rows.map((u) => {
-      const acc = accessByUserId.get(Number(u.id));
-      const now = new Date();
+      const uid = Number(u.id);
+      const acc = accessByUserId.get(uid);
+      const uPayments = paymentsByUser.get(uid) || [];
+      const pgExams = pgAccessByUser.get(uid) || new Set();
 
       const hasCombo = acc?.combo_access && (!acc.expiry || new Date(acc.expiry) > now);
       const hasPyq = acc?.pyq_access && (!acc.pyq_expiry || new Date(acc.pyq_expiry) > now);
       const hasMaterial = acc?.material_access && (!acc.material_expiry || new Date(acc.material_expiry) > now);
 
+      const activeExamSet = new Set();
+      if (hasCombo) activeExamSet.add('Agri Combo');
+      else if (hasPyq && hasMaterial) activeExamSet.add('Agri (PYQ+Notes)');
+      else if (hasPyq) activeExamSet.add('Agri PYQ');
+      else if (hasMaterial) activeExamSet.add('Agri Notes');
+
+      // Check PUC, KCET, NEET
+      for (const p of uPayments) {
+        const ex = String(p.exam || '').toLowerCase();
+        if (ex === 'puc') activeExamSet.add('PUC');
+        else if (ex === 'kcet') activeExamSet.add('KCET');
+        else if (ex === 'neet') activeExamSet.add('NEET');
+        else if (ex === 'agri' && !hasCombo && !hasPyq && !hasMaterial) activeExamSet.add('Agri');
+        else if (ex === 'global') {
+          activeExamSet.add('PUC');
+          activeExamSet.add('KCET');
+          activeExamSet.add('NEET');
+        }
+      }
+      for (const ex of pgExams) {
+        if (ex === 'puc') activeExamSet.add('PUC');
+        else if (ex === 'kcet') activeExamSet.add('KCET');
+        else if (ex === 'neet') activeExamSet.add('NEET');
+        else if (ex === 'global') {
+          activeExamSet.add('PUC');
+          activeExamSet.add('KCET');
+          activeExamSet.add('NEET');
+        }
+      }
+
+      const activePlans = Array.from(activeExamSet);
       let premiumStatus = 'Free';
-      if (hasCombo) premiumStatus = 'Premium (Combo)';
-      else if (hasPyq && hasMaterial) premiumStatus = 'Premium (PYQ + Materials)';
-      else if (hasPyq) premiumStatus = 'Premium (PYQ Only)';
-      else if (hasMaterial) premiumStatus = 'Premium (Materials Only)';
+      if (activePlans.length > 0) {
+        premiumStatus = activePlans.join(' • ');
+      }
 
       return {
         id: u.id,
@@ -541,6 +611,7 @@ export async function listStudents(req, res, next) {
         email: u.email,
         createdAt: u.created_at,
         premiumStatus,
+        activePlans,
       };
     });
 
@@ -553,7 +624,7 @@ export async function listStudents(req, res, next) {
 export async function manageStudentSubscription(req, res, next) {
   try {
     const { id } = req.params;
-    const { planCode, action } = req.body; // action: 'subscribe' | 'unsubscribe'
+    const { planCode, action, exam } = req.body; // action: 'subscribe' | 'unsubscribe'
     const userId = Number(id);
 
     if (!['subscribe', 'unsubscribe'].includes(action)) {
@@ -563,58 +634,104 @@ export async function manageStudentSubscription(req, res, next) {
     const user = await User.findOne({ id: userId, role: 'student' }).lean();
     if (!user) return res.status(404).json({ message: 'Student not found' });
 
+    const normalizedCode = String(planCode || exam || '').toLowerCase().trim();
+    const { grantExamAccess, revokeExamAccess } = await import('./exam.controller.js');
+
+    // ── REVOKE ACTION ─────────────────────────────────────────────────────────
+    if (action === 'unsubscribe') {
+      if (normalizedCode === 'all') {
+        // Revoke EVERYTHING across PUC, KCET, NEET, and Agri
+        let acc = await UserAccess.findOne({ user_id: userId });
+        if (acc) {
+          acc.combo_access = false;
+          acc.expiry = null;
+          acc.pyq_access = false;
+          acc.pyq_expiry = null;
+          acc.material_access = false;
+          acc.material_expiry = null;
+          acc.admin_revoked_at = new Date();
+          acc.updated_at = new Date();
+          await acc.save();
+        }
+        await revokeExamAccess(userId, 'all');
+        _ttlCache.delete(`access:status:${userId}`);
+        return res.json({ success: true, message: `Successfully revoked ALL access (PUC, KCET, NEET, Agri) for ${user.name}` });
+      }
+
+      if (['puc', 'kcet', 'neet'].includes(normalizedCode)) {
+        await revokeExamAccess(userId, normalizedCode);
+        _ttlCache.delete(`access:status:${userId}`);
+        return res.json({ success: true, message: `Successfully revoked ${normalizedCode.toUpperCase()} access for ${user.name}` });
+      }
+
+      // Agri plans
+      let acc = await UserAccess.findOne({ user_id: userId });
+      if (acc) {
+        if (normalizedCode === 'combo' || normalizedCode === 'agri_combo' || normalizedCode === 'agri') {
+          acc.combo_access = false;
+          acc.expiry = null;
+        }
+        if (normalizedCode === 'pyq' || normalizedCode === 'agri_pyq' || normalizedCode === 'agri') {
+          acc.pyq_access = false;
+          acc.pyq_expiry = null;
+        }
+        if (normalizedCode === 'materials' || normalizedCode === 'agri_materials' || normalizedCode === 'agri') {
+          acc.material_access = false;
+          acc.material_expiry = null;
+        }
+        acc.admin_revoked_at = new Date();
+        acc.updated_at = new Date();
+        await acc.save();
+      }
+      await Payment.updateMany({ user_id: userId, exam: 'agri' }, { $set: { status: 'revoked', admin_revoked: true, admin_revoked_at: new Date() } });
+      _ttlCache.delete(`access:status:${userId}`);
+      return res.json({ success: true, message: `Successfully revoked ${normalizedCode} access for ${user.name}` });
+    }
+
+    // ── SUBSCRIBE / UNLOCK ACTION ─────────────────────────────────────────────
+    if (['puc', 'kcet', 'neet'].includes(normalizedCode)) {
+      await grantExamAccess(userId, normalizedCode, `${normalizedCode}_pro`, ['all'], 365);
+      // Also write to MongoDB Payment so it reflects in payment records
+      const newPay = new Payment({
+        user_id: userId,
+        plan_id: 1,
+        amount_paise: 0,
+        status: 'paid',
+        exam: normalizedCode,
+        plan_code: `${normalizedCode}_pro`,
+        plan_name: `${normalizedCode.toUpperCase()} Complete Access (Admin Grant)`,
+        access_modules: ['all'],
+        duration_days: 365,
+        paid_at: new Date(),
+      });
+      await newPay.save();
+      _ttlCache.delete(`access:status:${userId}`);
+      return res.json({ success: true, message: `Successfully granted full access to ${normalizedCode.toUpperCase()} for ${user.name}` });
+    }
+
+    // Agri plans subscribe
     let acc = await UserAccess.findOne({ user_id: userId });
-    if (!acc) {
-      if (action === 'unsubscribe') return res.json({ success: true });
-      acc = new UserAccess({ user_id: userId });
+    if (!acc) acc = new UserAccess({ user_id: userId });
+
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + 365);
+
+    if (normalizedCode === 'combo' || normalizedCode === 'agri_combo') {
+      acc.combo_access = true;
+      acc.expiry = expiryDate;
+    } else if (normalizedCode === 'pyq' || normalizedCode === 'agri_pyq') {
+      acc.pyq_access = true;
+      acc.pyq_expiry = expiryDate;
+    } else if (normalizedCode === 'materials' || normalizedCode === 'agri_materials') {
+      acc.material_access = true;
+      acc.material_expiry = expiryDate;
     }
-
-    if (action === 'subscribe') {
-      const plan = await Plan.findOne({ code: planCode, status: 'active' }).lean();
-      if (!plan) return res.status(404).json({ message: 'Invalid or inactive plan' });
-
-      // Calculate new expiry (365 days from now by default if not set on plan)
-      const durationDays = Number(plan.duration_days) || 365;
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + durationDays);
-
-      if (planCode === 'combo') {
-        acc.combo_access = true;
-        acc.expiry = expiryDate;
-      } else if (planCode === 'pyq') {
-        acc.pyq_access = true;
-        acc.pyq_expiry = expiryDate;
-      } else if (planCode === 'materials') {
-        acc.material_access = true;
-        acc.material_expiry = expiryDate;
-      }
-      // Clear any prior admin revocation so auto-recovery doesn't get confused
-      acc.admin_revoked_at = null;
-    } else if (action === 'unsubscribe') {
-      if (planCode === 'combo') {
-        acc.combo_access = false;
-        acc.expiry = null;
-      } else if (planCode === 'pyq') {
-        acc.pyq_access = false;
-        acc.pyq_expiry = null;
-      } else if (planCode === 'materials') {
-        acc.material_access = false;
-        acc.material_expiry = null;
-      }
-      // ── Stamp revocation time ──────────────────────────────────────────
-      // The student payment auto-recovery will only re-grant access if the
-      // student's payment.paid_at is AFTER this timestamp, preventing the
-      // auto-recovery from silently undoing admin revocations.
-      acc.admin_revoked_at = new Date();
-    }
-
+    acc.admin_revoked_at = null;
     acc.updated_at = new Date();
     await acc.save();
 
-    // Bust the student's access status cache so the change is immediate
     _ttlCache.delete(`access:status:${userId}`);
-
-    return res.json({ success: true, message: `Successfully ${action}d ${planCode} plan for ${user.name}` });
+    return res.json({ success: true, message: `Successfully granted ${normalizedCode} access for ${user.name}` });
   } catch (err) {
     return next(err);
   }
@@ -1222,13 +1339,26 @@ export async function listPayments(req, res, next) {
     const payments = (rows || []).map((r) => {
       const u = userById.get(Number(r.user_id));
       const p = planById.get(Number(r.plan_id));
+      const rawExam = String(r.exam || (p?.code ? 'agri' : 'puc')).toLowerCase();
+
+      // Display correct plan name and accessed modules
+      const planName = r.plan_name || p?.name || (r.plan_code ? `${r.plan_code.toUpperCase()} Plan` : `${rawExam.toUpperCase()} Plan`);
+      const planCode = r.plan_code || p?.code || 'plan';
+      let accessModules = r.access_modules;
+      if (typeof accessModules === 'string') {
+        try { accessModules = JSON.parse(accessModules); } catch { accessModules = [accessModules]; }
+      }
+      if (!Array.isArray(accessModules)) accessModules = ['all'];
+
       return {
         id: r.id,
         userId: r.user_id,
-        userName: u?.name ?? null,
-        userEmail: u?.email ?? null,
-        planCode: p?.code ?? null,
-        planName: p?.name ?? null,
+        userName: u?.name ?? 'Student',
+        userEmail: u?.email ?? '',
+        exam: rawExam,
+        planCode,
+        planName,
+        accessModules,
         amountPaise: Number(r.amount_paise || 0),
         orderId: r.razorpay_order_id,
         paymentId: r.razorpay_payment_id,
@@ -1659,12 +1789,57 @@ export async function listTests(req, res, next) {
 
     const tests = (rows || []).map((t) => ({
       id: t.id,
+      exam: 'agri',
+      uniqueId: `agri_${t.id}`,
       title: t.title,
+      displayTitle: `[Agri] ${t.title}`,
       isActive: toBool(t.is_active),
       questionCount: t.question_count,
       perQuestionSeconds: t.per_question_seconds,
       marksCorrect: t.marks_correct,
     }));
+
+    // Also query PostgreSQL mock_tests for PUC, KCET, NEET
+    try {
+      const { getPucPool, getKcetNeetPool } = await import('../config/examPgs.js');
+      const pools = [
+        { pool: getPucPool(), defaultExam: 'puc' },
+        { pool: getKcetNeetPool(), defaultExam: 'kcet' },
+      ];
+
+      for (const { pool, defaultExam } of pools) {
+        if (!pool) continue;
+        const r = await pool.query(`
+          SELECT t.id, t.exam, t.subject, t.title, t.is_active, t.marks_correct, t.per_question_seconds,
+                 COUNT(q.id) as question_count
+          FROM mock_tests t
+          LEFT JOIN mock_questions q ON q.test_id = t.id
+          GROUP BY t.id
+          ORDER BY t.id DESC
+        `);
+        for (const row of r.rows) {
+          const ex = String(row.exam || defaultExam).toLowerCase();
+          // Ensure no duplicate if same pool serves both
+          if (!tests.some((x) => x.exam === ex && x.id === row.id)) {
+            tests.push({
+              id: row.id,
+              exam: ex,
+              uniqueId: `${ex}_${row.id}`,
+              title: row.title,
+              displayTitle: `[${ex.toUpperCase()}] ${row.title}`,
+              subject: row.subject,
+              isActive: Boolean(row.is_active),
+              questionCount: Number(row.question_count || 0),
+              perQuestionSeconds: row.per_question_seconds || 30,
+              marksCorrect: row.marks_correct || 4,
+            });
+          }
+        }
+      }
+    } catch (pgErr) {
+      console.warn('[listTests] Postgres tests query notice:', pgErr?.message || pgErr);
+    }
+
     return res.json({ tests });
   } catch (err) {
     return next(err);
@@ -1782,17 +1957,76 @@ function toCsv(rows) {
 
 export async function listResults(req, res, next) {
   try {
-    const { testId } = req.query;
+    const { testId, exam } = req.query;
     const MockResult = await getMockResultModel();
     const MockTest = await getMockTestModel();
 
-    if (testId) {
-      const tid = Number(testId);
-      if (!Number.isFinite(tid)) return res.status(400).json({ message: 'testId must be a number' });
+    let targetExam = exam ? String(exam).toLowerCase().trim() : null;
+    let numericTestId = null;
 
-      // No $limit here — return ALL students who attended this test
+    if (testId) {
+      const strId = String(testId).trim();
+      if (strId.includes('_')) {
+        const parts = strId.split('_');
+        targetExam = parts[0].toLowerCase();
+        numericTestId = Number(parts[1]);
+      } else {
+        numericTestId = Number(strId);
+      }
+    }
+
+    // ── CASE 1: SPECIFIC TEST SELECTED ──────────────────────────────────────
+    if (numericTestId) {
+      // Check if it's a PostgreSQL exam test (PUC, KCET, NEET)
+      if (targetExam && ['puc', 'kcet', 'neet'].includes(targetExam)) {
+        try {
+          const { getPoolForExam } = await import('../config/examPgs.js');
+          const pool = getPoolForExam(targetExam);
+          if (pool) {
+            const r = await pool.query(
+              `SELECT r.*, t.title as test_title, t.exam as test_exam
+               FROM mock_results r
+               JOIN mock_tests t ON t.id = r.test_id
+               WHERE r.test_id = $1 AND (r.exam = $2 OR t.exam = $2)
+               ORDER BY r.score DESC, r.time_taken_sec ASC, r.date ASC`,
+              [numericTestId, targetExam]
+            );
+
+            const userIds = [...new Set(r.rows.map((row) => Number(row.user_id)).filter(Number.isFinite))];
+            const users = await User.find({ id: { $in: userIds } }, { _id: 0, id: 1, name: 1, email: 1 }).lean();
+            const userById = new Map(users.map((u) => [Number(u.id), u]));
+
+            const out = r.rows.map((row, idx) => {
+              const u = userById.get(Number(row.user_id));
+              return {
+                id: row.id,
+                test_id: row.test_id,
+                exam: targetExam,
+                user_id: row.user_id,
+                student_name: u?.name ?? `Student #${row.user_id}`,
+                student_email: u?.email ?? '',
+                test_title: row.test_title || `${targetExam.toUpperCase()} Test`,
+                score: Number(row.score || 0),
+                accuracy: Number(row.accuracy || 0),
+                correct_count: Number(row.correct_count || 0),
+                wrong_count: Number(row.wrong_count || 0),
+                total_questions: Number(row.total_questions || 0),
+                time_taken_sec: Number(row.time_taken_sec || 0),
+                date: row.date || row.created_at,
+                rank: idx + 1,
+              };
+            });
+
+            return res.json({ results: out, total: out.length });
+          }
+        } catch (pgErr) {
+          console.error('[listResults] Postgres test query error:', pgErr);
+        }
+      }
+
+      // Agri test from Mongo
       const firstAttempts = await MockResult.aggregate([
-        { $match: { test_id: tid } },
+        { $match: { test_id: numericTestId } },
         { $sort: { id: 1 } },
         { $group: { _id: '$user_id', first: { $first: '$$ROOT' } } },
         { $replaceRoot: { newRoot: '$first' } },
@@ -1803,39 +2037,95 @@ export async function listResults(req, res, next) {
       const userIds = [...new Set(firstAttempts.map((r) => Number(r.user_id)).filter((x) => Number.isFinite(x)))];
       const [users, test] = await Promise.all([
         User.find({ id: { $in: userIds } }, { _id: 0, id: 1, name: 1, email: 1 }).lean(),
-        MockTest.findOne({ id: tid }, { _id: 0, id: 1, title: 1 }).lean(),
+        MockTest.findOne({ id: numericTestId }, { _id: 0, id: 1, title: 1 }).lean(),
       ]);
 
       const userById = new Map((users || []).map((u) => [Number(u.id), u]));
       const out = firstAttempts.map((r, idx) => {
         const u = userById.get(Number(r.user_id));
-        return { ...r, student_name: u?.name ?? null, student_email: u?.email ?? null, test_title: test?.title ?? null, rank: idx + 1 };
+        return {
+          ...r,
+          exam: 'agri',
+          student_name: u?.name ?? null,
+          student_email: u?.email ?? null,
+          test_title: test?.title ?? null,
+          rank: idx + 1,
+        };
       });
 
       return res.json({ results: out, total: out.length });
     }
 
-    // No testId — recent results overview, capped at 500
-    const rows = await MockResult.find({}, { _id: 0, __v: 0 }).sort({ date: -1, id: -1 }).limit(500).lean();
+    // ── CASE 2: OVERVIEW OF RECENT RESULTS (All Exams Combined) ──────────────
+    const allResults = [];
 
-    const userIds = [...new Set(rows.map((r) => Number(r.user_id)).filter((x) => Number.isFinite(x)))];
-    const testIds = [...new Set(rows.map((r) => Number(r.test_id)).filter((x) => Number.isFinite(x)))];
+    // 1. Mongo Agri results
+    const mongoRows = await MockResult.find({}, { _id: 0, __v: 0 }).sort({ date: -1, id: -1 }).limit(250).lean();
+    const mongoUserIds = [...new Set(mongoRows.map((r) => Number(r.user_id)).filter(Number.isFinite))];
+    const mongoTestIds = [...new Set(mongoRows.map((r) => Number(r.test_id)).filter(Number.isFinite))];
 
-    const [users, tests] = await Promise.all([
-      User.find({ id: { $in: userIds } }, { _id: 0, id: 1, name: 1, email: 1 }).lean(),
-      MockTest.find({ id: { $in: testIds } }, { _id: 0, id: 1, title: 1 }).lean(),
+    const [mongoUsers, mongoTests] = await Promise.all([
+      User.find({ id: { $in: mongoUserIds } }, { _id: 0, id: 1, name: 1, email: 1 }).lean(),
+      MockTest.find({ id: { $in: mongoTestIds } }, { _id: 0, id: 1, title: 1 }).lean(),
     ]);
 
-    const userById = new Map((users || []).map((u) => [Number(u.id), u]));
-    const testById = new Map((tests || []).map((t) => [Number(t.id), t]));
+    const mongoUserMap = new Map(mongoUsers.map((u) => [Number(u.id), u]));
+    const mongoTestMap = new Map(mongoTests.map((t) => [Number(t.id), t]));
 
-    const out = rows.map((r) => {
-      const u = userById.get(Number(r.user_id));
-      const t = testById.get(Number(r.test_id));
-      return { ...r, student_name: u?.name ?? null, student_email: u?.email ?? null, test_title: t?.title ?? null };
-    });
+    for (const r of mongoRows) {
+      const u = mongoUserMap.get(Number(r.user_id));
+      const t = mongoTestMap.get(Number(r.test_id));
+      allResults.push({
+        ...r,
+        exam: 'agri',
+        student_name: u?.name ?? null,
+        student_email: u?.email ?? null,
+        test_title: t?.title ?? 'Agri Practical Test',
+      });
+    }
 
-    return res.json({ results: out });
+    // 2. PostgreSQL results (PUC, KCET, NEET)
+    try {
+      const { getPucPool, getKcetNeetPool } = await import('../config/examPgs.js');
+      const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+      for (const pool of pools) {
+        const r = await pool.query(`
+          SELECT r.*, t.title as test_title, t.exam as test_exam
+          FROM mock_results r
+          JOIN mock_tests t ON t.id = r.test_id
+          ORDER BY r.date DESC, r.id DESC
+          LIMIT 250
+        `);
+        const pgUserIds = [...new Set(r.rows.map((row) => Number(row.user_id)).filter(Number.isFinite))];
+        const pgUsers = await User.find({ id: { $in: pgUserIds } }, { _id: 0, id: 1, name: 1, email: 1 }).lean();
+        const pgUserMap = new Map(pgUsers.map((u) => [Number(u.id), u]));
+
+        for (const row of r.rows) {
+          const u = pgUserMap.get(Number(row.user_id));
+          allResults.push({
+            id: row.id,
+            test_id: row.test_id,
+            exam: row.exam || row.test_exam || 'puc',
+            user_id: row.user_id,
+            student_name: u?.name ?? `Student #${row.user_id}`,
+            student_email: u?.email ?? '',
+            test_title: row.test_title || 'Mock Test',
+            score: Number(row.score || 0),
+            accuracy: Number(row.accuracy || 0),
+            correct_count: Number(row.correct_count || 0),
+            wrong_count: Number(row.wrong_count || 0),
+            total_questions: Number(row.total_questions || 0),
+            time_taken_sec: Number(row.time_taken_sec || 0),
+            date: row.date || row.created_at,
+          });
+        }
+      }
+    } catch (_) {}
+
+    // Sort combined by date descending
+    allResults.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+    return res.json({ results: allResults.slice(0, 500) });
   } catch (err) {
     return next(err);
   }

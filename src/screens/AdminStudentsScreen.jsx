@@ -14,9 +14,12 @@ export default function AdminStudentsScreen() {
   const [filterPlan, setFilterPlan] = useState('All');
 
   const plans = [
-    { code: 'combo', label: '🌟 Combo Plan (All Access)' },
-    { code: 'pyq', label: '📄 PYQ Plan' },
-    { code: 'materials', label: '📚 Materials Plan' }
+    { code: 'puc', label: '📄 PUC (Class 12) Plan', exam: 'puc' },
+    { code: 'kcet', label: '🎯 KCET Preparation Plan', exam: 'kcet' },
+    { code: 'neet', label: '🩺 NEET Preparation Plan', exam: 'neet' },
+    { code: 'combo', label: '🌱 Agri Practical Combo (All Access)', exam: 'agri' },
+    { code: 'pyq', label: '📑 Agri Practical PYQ Plan', exam: 'agri' },
+    { code: 'materials', label: '📚 Agri Practical Notes Plan', exam: 'agri' },
   ];
 
   const [modal, setModal] = useState(null);
@@ -70,14 +73,50 @@ export default function AdminStudentsScreen() {
     }
   };
 
-  const handleSubscription = async (action) => {
+  const handleSubscription = async (action, customCode = null) => {
     if (!activeStudent) return;
+    const targetCode = customCode || selectedPlanCode;
+
+    if (action === 'unsubscribe' && targetCode === 'all') {
+      Alert.alert(
+        'Revoke ALL Access',
+        `Are you sure you want to revoke ALL exam access (PUC, KCET, NEET, Agri) for ${activeStudent.name}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Yes, Revoke All',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                setBusy(true);
+                await apiFetch(`/api/admin/students/${activeStudent.id}/subscribe`, {
+                  token,
+                  method: 'POST',
+                  body: { planCode: 'all', action: 'unsubscribe' },
+                });
+                setMessage(`❌ Revoked all exam access for ${activeStudent.name}.`);
+                closeModal();
+                fetchStudents();
+              } catch (err) {
+                Alert.alert('Error', err.message || 'Failed to revoke.');
+              } finally {
+                setBusy(false);
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     try {
       setBusy(true);
       await apiFetch(`/api/admin/students/${activeStudent.id}/subscribe`, {
-        token, method: 'POST', body: { planCode: selectedPlanCode, action }
+        token,
+        method: 'POST',
+        body: { planCode: targetCode, action },
       });
-      setMessage(`${action === 'subscribe' ? '✅ Unlocked' : '❌ Revoked'} "${selectedPlanCode}" for ${activeStudent.name}.`);
+      setMessage(`${action === 'subscribe' ? '✅ Unlocked' : '❌ Revoked'} "${targetCode.toUpperCase()}" for ${activeStudent.name}.`);
       closeModal();
       fetchStudents();
     } catch (err) {
@@ -207,11 +246,21 @@ export default function AdminStudentsScreen() {
                       </View>
 
                       <View style={styles.studentStatusBox}>
-                        <View style={[styles.statusBadge, isPremium ? styles.statusPremium : styles.statusFree]}>
-                          <Text style={[styles.statusBadgeText, isPremium ? styles.statusPremiumText : styles.statusFreeText]}>
-                            {isPremium ? `⭐ ${s.premiumStatus}` : '🆓 Free'}
-                          </Text>
-                        </View>
+                        {Array.isArray(s.activePlans) && s.activePlans.length > 0 ? (
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                            {s.activePlans.map((ap, i) => (
+                              <View key={i} style={[styles.statusBadge, styles.statusPremium]}>
+                                <Text style={[styles.statusBadgeText, styles.statusPremiumText]}>✓ {ap}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        ) : (
+                          <View style={[styles.statusBadge, isPremium ? styles.statusPremium : styles.statusFree]}>
+                            <Text style={[styles.statusBadgeText, isPremium ? styles.statusPremiumText : styles.statusFreeText]}>
+                              {isPremium ? `⭐ ${s.premiumStatus}` : '🆓 Free'}
+                            </Text>
+                          </View>
+                        )}
                       </View>
 
                       <View style={styles.studentActions}>
@@ -290,13 +339,24 @@ export default function AdminStudentsScreen() {
                 </View>
 
                 <View style={styles.modalActions}>
-                  <TouchableOpacity style={[styles.btnPrimary, { backgroundColor: '#4f46e5' }]} onPress={() => handleSubscription('subscribe')} disabled={busy}>
-                    <Text style={styles.btnPrimaryText}>{busy ? 'Processing...' : '✅ Unlock'}</Text>
+                  <TouchableOpacity style={[styles.btnPrimary, { backgroundColor: '#10b981' }]} onPress={() => handleSubscription('subscribe')} disabled={busy}>
+                    <Text style={styles.btnPrimaryText}>{busy ? 'Processing...' : '✅ Unlock Selected'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.btnDangerGhost} onPress={() => handleSubscription('unsubscribe')} disabled={busy}>
-                    <Text style={styles.btnDangerGhostText}>{busy ? 'Processing...' : '❌ Revoke'}</Text>
+                    <Text style={styles.btnDangerGhostText}>{busy ? 'Processing...' : '❌ Revoke Selected'}</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* Revoke All Access Button */}
+                <TouchableOpacity
+                  style={[styles.btnDangerSolid, { marginTop: 12 }]}
+                  onPress={() => handleSubscription('unsubscribe', 'all')}
+                  disabled={busy}
+                >
+                  <Text style={styles.btnDangerSolidText}>
+                    {busy ? 'Processing...' : '🚫 Revoke ALL Access (PUC, KCET, NEET, Agri)'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -360,6 +420,8 @@ const styles = StyleSheet.create({
   btnPrimaryText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
   btnDangerGhost: { flex: 1, borderWidth: 1, borderColor: '#fecaca', backgroundColor: '#fff', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
   btnDangerGhostText: { color: '#dc2626', fontSize: 14, fontWeight: 'bold' },
+  btnDangerSolid: { backgroundColor: '#ef4444', borderRadius: 8, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+  btnDangerSolidText: { color: '#ffffff', fontSize: 13, fontWeight: 'bold' },
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 16 },
   filterLabel: { fontSize: 12, color: '#e0e7ff', fontWeight: 'bold', marginRight: 4, textTransform: 'uppercase' },
   filterChip: { backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },

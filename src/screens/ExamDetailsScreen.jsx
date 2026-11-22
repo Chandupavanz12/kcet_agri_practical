@@ -124,6 +124,7 @@ export default function ExamDetailsScreen() {
   const [tests, setTests] = useState(cachedData?.tests || []);
   const [plans, setPlans] = useState(cachedData?.plans || []);
   const [isSubscribed, setIsSubscribed] = useState(cachedData?.isSubscribed || false);
+  const [activePlanCode, setActivePlanCode] = useState(cachedData?.activePlanCode || null);
   const [loading, setLoading] = useState(false);
   const [fetchingContent, setFetchingContent] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -184,12 +185,15 @@ export default function ExamDetailsScreen() {
         ]);
         const newPlans = Array.isArray(planRes?.plans) ? planRes.plans : [];
         const newSubscribed = Boolean(planRes?.hasActivePlan);
+        const activeCode = planRes?.activePlanCode || null;
         setPlans(newPlans);
         setIsSubscribed(newSubscribed);
+        setActivePlanCode(activeCode);
         EXAM_CLIENT_CACHE.set(examId, {
           banners: currentBanners,
           plans: newPlans,
           isSubscribed: newSubscribed,
+          activePlanCode: activeCode,
           materials: [],
           pyqs: [],
           tests: [],
@@ -209,17 +213,20 @@ export default function ExamDetailsScreen() {
         const newTests = Array.isArray(testRes?.tests) ? testRes.tests : [];
         const newPlans = Array.isArray(planRes?.plans) ? planRes.plans : [];
         const newSubscribed = Boolean(planRes?.hasActivePlan || matRes?.isSubscribed);
+        const activeCode = planRes?.activePlanCode || null;
 
         setMaterials(newMaterials);
         setPyqs(newPyqs);
         setTests(newTests);
         setPlans(newPlans);
         setIsSubscribed(newSubscribed);
+        setActivePlanCode(activeCode);
 
         EXAM_CLIENT_CACHE.set(examId, {
           banners: currentBanners,
           plans: newPlans,
           isSubscribed: newSubscribed,
+          activePlanCode: activeCode,
           materials: newMaterials,
           pyqs: newPyqs,
           tests: newTests,
@@ -282,7 +289,6 @@ export default function ExamDetailsScreen() {
   const isItemLocked = (item) => {
     if (!item) return false;
     if (item.isFree === true || item.is_free === true) return false;
-    if (isSubscribed) return false;
     return Boolean(item.locked);
   };
 
@@ -1023,7 +1029,7 @@ export default function ExamDetailsScreen() {
                 plans.map((plan) => {
                   const priceRupees = Math.round((plan.pricePaise || plan.price_paise || 0) / 100);
                   const isPaying = payingPlanId === plan.id;
-                  const isPlanActive = isSubscribed;
+                  const isPlanActive = activePlanCode ? plan.code === activePlanCode : (isSubscribed && plans.length === 1);
 
                   return (
                     <View

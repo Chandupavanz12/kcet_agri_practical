@@ -593,7 +593,7 @@ const styles = StyleSheet.create({
 
   // Exam Grid
   examGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
-  examCard: { width: '48%', borderRadius: 18, padding: 14, borderWidth: 1, gap: 4, shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 6, elevation: 1 },
+  examCard: { width: '48%', maxWidth: '48%', flexBasis: '48%', borderRadius: 18, padding: 14, borderWidth: 1, gap: 4, shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 6, elevation: 1 },
   examIconCircle: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   examIcon: { fontSize: 22 },
   examName: { fontSize: 17, fontWeight: '900', color: '#0f172a' },

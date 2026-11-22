@@ -258,11 +258,37 @@ export async function deleteAdminBanner(req, res, next) {
   }
 }
 
+// Helper: Determine if accessModules grants permission to a specific module
+export function modulesInclude(accessModules, moduleName) {
+  if (!moduleName) return true;
+  let mods = accessModules;
+  if (typeof mods === 'string') {
+    try {
+      mods = JSON.parse(mods);
+    } catch {
+      mods = [mods];
+    }
+  }
+  if (!Array.isArray(mods)) return true;
+  if (mods.length === 0 || mods.includes('all') || mods.includes('*') || mods.includes('complete')) {
+    return true;
+  }
+  const cleanMod = String(moduleName).toLowerCase().trim();
+  return mods.some((m) => {
+    const s = String(m).toLowerCase().trim();
+    if (s === 'all' || s === '*' || s === cleanMod) return true;
+    if (cleanMod === 'materials' && (s === 'material' || s === 'notes' || s === 'study' || s === 'pdfs')) return true;
+    if (cleanMod === 'tests' && (s === 'test' || s === 'mock' || s === 'mocks' || s === 'mock_tests')) return true;
+    if (cleanMod === 'pyqs' && (s === 'pyq' || s === 'paper' || s === 'papers' || s === 'previous_years')) return true;
+    return false;
+  });
+}
+
 // Helper: Check student module access (respects granular module choices & global plans)
 const _userAccessCache = new Map();
 export async function checkUserModuleAccess(pool, userId, exam, moduleName) {
   if (!userId) return false;
-  const cacheKey = `${userId}:${exam}:${moduleName}`;
+  const cacheKey = `${userId}:${exam}:${moduleName || 'all'}`;
   const cached = _userAccessCache.get(cacheKey);
   if (cached && Date.now() < cached.expiresAt) {
     return cached.hasAccess;
@@ -270,25 +296,38 @@ export async function checkUserModuleAccess(pool, userId, exam, moduleName) {
 
   const cleanExam = String(exam || '').toLowerCase().trim();
 
-  // 1. Direct MongoDB Payment check (primary source of truth for payment success)
+  // 1. Direct MongoDB Payment check (verifies active status, expiry, and granular access modules)
   try {
     const { Payment } = await import('../models/index.js');
-    const paidDoc = await Payment.findOne({
+    const paidDocs = await Payment.find({
       user_id: Number(userId),
       status: { $in: ['paid', 'free'] },
+      admin_revoked: { $ne: true },
       $or: [
         { exam: cleanExam },
         { exam: 'global' },
       ],
     }).sort({ paid_at: -1, created_at: -1 }).lean();
 
-    if (paidDoc) {
-      const paidDate = paidDoc.paid_at || paidDoc.created_at || new Date();
+    const now = new Date();
+    for (const paidDoc of paidDocs) {
+      const paidDate = paidDoc.paid_at || paidDoc.created_at || now;
       const durationDays = Number(paidDoc.duration_days || 365);
       const expiresAt = new Date(new Date(paidDate).getTime() + durationDays * 86400000);
-      if (expiresAt > new Date()) {
-        _userAccessCache.set(cacheKey, { hasAccess: true, expiresAt: Date.now() + 60000 });
-        return true;
+
+      if (expiresAt > now) {
+        // If plan is 'global', check if this exam is allowed
+        if (paidDoc.exam === 'global' && Array.isArray(paidDoc.target_exams) && paidDoc.target_exams.length > 0) {
+          if (!paidDoc.target_exams.map((x) => String(x).toLowerCase()).includes(cleanExam)) {
+            continue; // this global plan doesn't cover this exam
+          }
+        }
+
+        // Check if the requested module is included in the plan's access_modules
+        if (modulesInclude(paidDoc.access_modules, moduleName)) {
+          _userAccessCache.set(cacheKey, { hasAccess: true, expiresAt: Date.now() + 60000 });
+          return true;
+        }
       }
     }
   } catch (mongoErr) {
@@ -303,15 +342,18 @@ export async function checkUserModuleAccess(pool, userId, exam, moduleName) {
          WHERE user_id = $1 AND (exam = $2 OR exam = 'global') AND expires_at > NOW()`,
         [userId, cleanExam]
       );
-      if (res.rows.length > 0) {
-        _userAccessCache.set(cacheKey, { hasAccess: true, expiresAt: Date.now() + 60000 });
-        return true;
+      for (const row of res.rows) {
+        if (modulesInclude(row.access_modules, moduleName)) {
+          _userAccessCache.set(cacheKey, { hasAccess: true, expiresAt: Date.now() + 60000 });
+          return true;
+        }
       }
     } catch (err) {
       console.error('[checkUserModuleAccess] Postgres error:', err?.message || err);
     }
   }
 
+  _userAccessCache.set(cacheKey, { hasAccess: false, expiresAt: Date.now() + 30000 });
   return false;
 }
 
@@ -357,6 +399,109 @@ export async function grantExamAccess(userId, exam, planCode, accessModules = ['
       console.error('[grantExamAccess] error:', err);
     }
   }
+}
+
+// Helper: Revoke exam access for a user (can revoke specific exam or 'all')
+export async function revokeExamAccess(userId, targetExam = 'all') {
+  const uid = Number(userId);
+  const exam = String(targetExam || 'all').toLowerCase().trim();
+
+  _userAccessCache.clear();
+  clearExamCache();
+
+  // 1. Remove from Neon PostgreSQL user_access
+  const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+  for (const p of pools) {
+    try {
+      if (exam === 'all') {
+        await p.query('DELETE FROM user_access WHERE user_id = $1', [uid]);
+      } else {
+        await p.query('DELETE FROM user_access WHERE user_id = $1 AND (exam = $2 OR exam = $3)', [uid, exam, 'global']);
+      }
+    } catch (err) {
+      console.error(`[revokeExamAccess] Postgres delete error (${exam}):`, err?.message || err);
+    }
+  }
+
+  // 2. Mark payments as revoked in MongoDB Payment
+  try {
+    const { Payment } = await import('../models/index.js');
+    const filter = { user_id: uid };
+    if (exam !== 'all') {
+      filter.exam = exam;
+    }
+    await Payment.updateMany(filter, {
+      $set: {
+        status: 'revoked',
+        admin_revoked: true,
+        admin_revoked_at: new Date(),
+      },
+    });
+  } catch (mongoErr) {
+    console.error('[revokeExamAccess] Mongo payment revoke error:', mongoErr?.message || mongoErr);
+  }
+}
+
+// Helper: Retrieve all active exam access records for a student across Postgres and Mongo
+export async function getUserActiveExamAccess(userId) {
+  const uid = Number(userId);
+  const activePlans = [];
+  const now = new Date();
+
+  // Check MongoDB Payments
+  try {
+    const { Payment } = await import('../models/index.js');
+    const payments = await Payment.find({
+      user_id: uid,
+      status: { $in: ['paid', 'free'] },
+      admin_revoked: { $ne: true },
+    }).lean();
+
+    for (const p of payments) {
+      const paidDate = p.paid_at || p.created_at || now;
+      const duration = Number(p.duration_days || 365);
+      const expiry = new Date(new Date(paidDate).getTime() + duration * 86400000);
+      if (expiry > now) {
+        activePlans.push({
+          source: 'payment',
+          exam: p.exam || 'agri',
+          planCode: p.plan_code || 'plan',
+          planName: p.plan_name || `${(p.exam || '').toUpperCase()} Plan`,
+          accessModules: p.access_modules || ['all'],
+          expiresAt: expiry,
+        });
+      }
+    }
+  } catch (_) {}
+
+  // Check Postgres Neon user_access
+  const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+  for (const p of pools) {
+    try {
+      const r = await p.query(
+        `SELECT * FROM user_access WHERE user_id = $1 AND expires_at > NOW()`,
+        [uid]
+      );
+      for (const row of r.rows) {
+        if (!activePlans.some((ap) => ap.exam === row.exam && ap.planCode === row.plan_code)) {
+          let mods = row.access_modules;
+          if (typeof mods === 'string') {
+            try { mods = JSON.parse(mods); } catch { mods = [mods]; }
+          }
+          activePlans.push({
+            source: 'postgres',
+            exam: row.exam,
+            planCode: row.plan_code,
+            planName: `${String(row.exam).toUpperCase()} Access`,
+            accessModules: mods || ['all'],
+            expiresAt: row.expires_at,
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  return activePlans;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -733,6 +878,7 @@ export async function getExamPlans(req, res, next) {
         features: Array.isArray(p.features) ? p.features : typeof p.features === 'string' ? JSON.parse(p.features || '[]') : [],
       })),
       hasActivePlan: !!activeAccess,
+      activePlanCode: activeAccess?.plan_code || null,
       activePlanExpiresAt: activeAccess?.expires_at || null,
       activeAccessModules: activeAccess?.access_modules || null,
     });

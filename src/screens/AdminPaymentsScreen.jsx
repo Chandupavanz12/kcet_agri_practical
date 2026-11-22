@@ -17,11 +17,24 @@ export default function AdminPaymentsScreen() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [busy, setBusy] = useState(false);
   const [timeFilter, setTimeFilter] = useState('All');
+  const [examFilter, setExamFilter] = useState('All');
+
+  const EXAM_THEMES = {
+    puc: { bg: '#e0e7ff', border: '#c7d2fe', text: '#4338ca', label: 'PUC' },
+    kcet: { bg: '#e0f2fe', border: '#bae6fd', text: '#0369a1', label: 'KCET' },
+    neet: { bg: '#ffe4e6', border: '#fecdd3', text: '#be123c', label: 'NEET' },
+    agri: { bg: '#dcfce7', border: '#bbf7d0', text: '#15803d', label: 'AGRI' },
+    global: { bg: '#fef3c7', border: '#fde68a', text: '#b45309', label: 'GLOBAL' },
+  };
 
   const filteredItems = useMemo(() => {
-    if (timeFilter === 'All') return items;
+    let list = items;
+    if (examFilter !== 'All') {
+      list = list.filter((p) => String(p.exam || '').toLowerCase() === examFilter.toLowerCase());
+    }
+    if (timeFilter === 'All') return list;
     const now = new Date();
-    return items.filter(p => {
+    return list.filter((p) => {
       const d = new Date(p.createdAt);
       if (timeFilter === 'Today') {
         return d.getDate() === now.getDate() &&
@@ -37,7 +50,7 @@ export default function AdminPaymentsScreen() {
       }
       return true;
     });
-  }, [items, timeFilter]);
+  }, [items, timeFilter, examFilter]);
 
   const totalPaid = useMemo(() => {
     return filteredItems
@@ -111,7 +124,7 @@ export default function AdminPaymentsScreen() {
               <Text style={styles.revenueValue}>{formatINR(totalPaid)}</Text>
             </View>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 16 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 14 }}>
             <View style={styles.filterRow}>
               {['All', 'Today', 'Monthly', 'Yearly'].map(tf => (
                 <TouchableOpacity
@@ -120,6 +133,24 @@ export default function AdminPaymentsScreen() {
                   onPress={() => setTimeFilter(tf)}
                 >
                   <Text style={[styles.filterChipText, timeFilter === tf && styles.filterChipTextActive]}>{tf}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+
+          {/* Exam Filter Chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>EXAM:</Text>
+              {['All', 'puc', 'kcet', 'neet', 'agri'].map(ex => (
+                <TouchableOpacity
+                  key={ex}
+                  style={[styles.filterChip, examFilter === ex && styles.filterChipActive]}
+                  onPress={() => setExamFilter(ex)}
+                >
+                  <Text style={[styles.filterChipText, examFilter === ex && styles.filterChipTextActive]}>
+                    {ex === 'All' ? 'All Exams' : ex.toUpperCase()}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -165,14 +196,46 @@ export default function AdminPaymentsScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.pUser}>{p.userName}</Text>
                         <Text style={styles.pEmail}>{p.userEmail}</Text>
-                        <View style={styles.planBadge}>
-                          <Text style={styles.planBadgeText}>{p.planName || p.planCode}</Text>
+                        
+                        {/* Exam & Plan Info */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                          {(() => {
+                            const ex = String(p.exam || 'agri').toLowerCase();
+                            const theme = EXAM_THEMES[ex] || EXAM_THEMES.agri;
+                            return (
+                              <View style={[styles.examBadgePill, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+                                <Text style={[styles.examBadgePillText, { color: theme.text }]}>
+                                  {theme.label}
+                                </Text>
+                              </View>
+                            );
+                          })()}
+                          <View style={styles.planBadge}>
+                            <Text style={styles.planBadgeText}>{p.planName || p.planCode}</Text>
+                          </View>
                         </View>
+
+                        {/* Access Modules List */}
+                        {Array.isArray(p.accessModules) && (
+                          <Text style={styles.moduleAccessText}>
+                            🔓 Access: {p.accessModules.includes('all') ? 'All Modules (Notes, Tests, PYQs)' : p.accessModules.join(', ')}
+                          </Text>
+                        )}
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text style={styles.pAmount}>{formatINR(p.amountPaise)}</Text>
-                        <View style={[styles.statusBadge, (p.status === 'paid' || p.status === 'free') && styles.statusBadgeSuccess]}>
-                          <Text style={[styles.statusBadgeText, (p.status === 'paid' || p.status === 'free') && styles.statusBadgeTextSuccess]}>{p.status}</Text>
+                        <View style={[
+                          styles.statusBadge,
+                          (p.status === 'paid' || p.status === 'free') && styles.statusBadgeSuccess,
+                          p.status === 'revoked' && styles.statusBadgeRevoked,
+                        ]}>
+                          <Text style={[
+                            styles.statusBadgeText,
+                            (p.status === 'paid' || p.status === 'free') && styles.statusBadgeTextSuccess,
+                            p.status === 'revoked' && styles.statusBadgeTextRevoked,
+                          ]}>
+                            {p.status}
+                          </Text>
                         </View>
                       </View>
                     </View>
@@ -223,6 +286,12 @@ const styles = StyleSheet.create({
   pEmail: { fontSize: 12, color: '#64748b', marginTop: 2 },
   planBadge: { backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe', alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 6 },
   planBadgeText: { fontSize: 10, fontWeight: 'bold', color: '#1d4ed8', textTransform: 'uppercase' },
+  examBadgePill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1 },
+  examBadgePillText: { fontSize: 9.5, fontWeight: '800' },
+  moduleAccessText: { fontSize: 11, color: '#047857', marginTop: 4, fontWeight: '600' },
+  statusBadgeRevoked: { backgroundColor: '#fef2f2', borderColor: '#fecaca' },
+  statusBadgeTextRevoked: { color: '#b91c1c' },
+  filterLabel: { fontSize: 10, fontWeight: '800', color: '#ecfdf5', marginRight: 4, alignSelf: 'center' },
   pAmount: { fontSize: 18, fontWeight: 'bold', color: '#0f172a' },
   statusBadge: { backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 6, alignSelf: 'flex-end' },
   statusBadgeSuccess: { backgroundColor: '#ecfdf5', borderColor: '#d1fae5' },

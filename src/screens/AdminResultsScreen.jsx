@@ -49,6 +49,7 @@ export default function AdminResultsScreen() {
   const [loading, setLoading] = useState(false);
   const [tests, setTests] = useState([]);
   const [testId, setTestId] = useState('');
+  const [examFilter, setExamFilter] = useState('all'); // 'all' | 'puc' | 'kcet' | 'neet' | 'agri'
   
   const [allStudents, setAllStudents] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
@@ -101,13 +102,28 @@ export default function AdminResultsScreen() {
     alert('Export CSV is not fully supported in the mobile app preview. Please use the web dashboard to export.');
   };
 
+  const filteredTests = examFilter === 'all'
+    ? tests
+    : tests.filter((t) => String(t.exam || 'agri').toLowerCase() === examFilter.toLowerCase());
+
   const testOptions = [
-    { label: 'All tests (latest results)', value: '' },
-    ...tests.map((t) => ({ label: t.title, value: String(t.id) })),
+    { label: `All ${examFilter === 'all' ? 'Exams' : examFilter.toUpperCase()} Tests (Latest Results)`, value: '' },
+    ...filteredTests.map((t) => {
+      const ex = String(t.exam || 'agri').toUpperCase();
+      const val = t.uniqueId || `${t.exam || 'agri'}_${t.id}`;
+      return {
+        label: t.displayTitle || `[${ex}] ${t.title}`,
+        value: val,
+      };
+    }),
   ];
 
   const attendedEmails = new Set(results.map((r) => String(r.student_email || '').toLowerCase()).filter(Boolean));
   const notAttended = allStudents.filter((s) => !attendedEmails.has(String(s.email || '').toLowerCase()));
+
+  const filteredResults = examFilter === 'all' || testId
+    ? results
+    : results.filter((r) => String(r.exam || 'agri').toLowerCase() === examFilter.toLowerCase());
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -116,53 +132,115 @@ export default function AdminResultsScreen() {
         <View style={styles.heroCard}>
           <View style={styles.heroHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.heroTitle}>Results</Text>
-              <Text style={styles.heroSubtitle}>View rankings and progress.</Text>
+              <Text style={styles.heroTitle}>Results & Rankings</Text>
+              <Text style={styles.heroSubtitle}>View mock test rankings for PUC, KCET, NEET & Agri Practical</Text>
             </View>
             <TouchableOpacity style={styles.btnExport} onPress={handleExportCsv}>
               <Text style={styles.btnExportText}>Export CSV</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Exam Filter Tabs */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 14 }}>
+            <View style={styles.filterRow}>
+              {[
+                { id: 'all', label: 'All Exams' },
+                { id: 'puc', label: 'PUC (12th)' },
+                { id: 'kcet', label: 'KCET' },
+                { id: 'neet', label: 'NEET' },
+                { id: 'agri', label: 'Agri Practical' },
+              ].map((tab) => (
+                <TouchableOpacity
+                  key={tab.id}
+                  style={[styles.filterChip, examFilter === tab.id && styles.filterChipActive]}
+                  onPress={() => {
+                    setExamFilter(tab.id);
+                    setTestId(''); // reset test selection when switching exam
+                  }}
+                >
+                  <Text style={[styles.filterChipText, examFilter === tab.id && styles.filterChipTextActive]}>
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
         </View>
 
         <View style={styles.card}>
           <View style={styles.cardBody}>
-            <Text style={styles.label}>Test (for ranks)</Text>
+            <Text style={styles.label}>Select Test (PUC / KCET / NEET / Agri)</Text>
             <DropdownPicker
-              label="All tests (latest results)"
+              label="Select a test..."
               value={testId}
               options={testOptions}
               onSelect={(val) => setTestId(val)}
             />
             <Text style={styles.hintText}>
-              {testId ? `Showing ${results.length} attendees — ranked by score` : 'Select a test to view full rank list'}
+              {testId ? `Showing ${filteredResults.length} attendees — ranked by score` : 'Select a test above to view full rank list & score details'}
             </Text>
 
             {loading ? (
               <ActivityIndicator size="large" color="#4f46e5" style={{ marginVertical: 20 }} />
-            ) : results.length === 0 ? (
-              <Text style={styles.emptyText}>No results available.</Text>
+            ) : filteredResults.length === 0 ? (
+              <Text style={styles.emptyText}>No results available for this selection.</Text>
             ) : (
               <ScrollView horizontal style={styles.tableScroll}>
                 <View style={styles.table}>
                   <View style={styles.tableRowHeader}>
                     {!!testId && <Text style={[styles.th, { width: 50 }]}>Rank</Text>}
-                    <Text style={[styles.th, { width: 100 }]}>Date</Text>
+                    <Text style={[styles.th, { width: 60 }]}>Exam</Text>
+                    {!testId && <Text style={[styles.th, { width: 140 }]}>Test Title</Text>}
                     <Text style={[styles.th, { width: 120 }]}>Student</Text>
-                    <Text style={[styles.th, { width: 100 }]}>Score</Text>
-                    <Text style={[styles.th, { width: 80 }]}>Acc.</Text>
-                    <Text style={[styles.th, { width: 80 }]}>Time (s)</Text>
+                    <Text style={[styles.th, { width: 70 }]}>Score</Text>
+                    <Text style={[styles.th, { width: 70 }]}>Acc.</Text>
+                    <Text style={[styles.th, { width: 70 }]}>Time (s)</Text>
+                    <Text style={[styles.th, { width: 90 }]}>Date</Text>
                   </View>
-                  {results.map((r, i) => (
-                    <View key={r.id || i} style={styles.tableRow}>
-                      {!!testId && <Text style={[styles.td, { width: 50, fontWeight: 'bold' }]}>{r.rank}</Text>}
-                      <Text style={[styles.td, { width: 100 }]}>{new Date(r.date).toLocaleDateString()}</Text>
-                      <Text style={[styles.td, { width: 120 }]} numberOfLines={1}>{r.student_name}</Text>
-                      <Text style={[styles.td, { width: 100, fontWeight: 'bold' }]}>{r.score}</Text>
-                      <Text style={[styles.td, { width: 80 }]}>{r.accuracy}%</Text>
-                      <Text style={[styles.td, { width: 80 }]}>{r.time_taken_sec}</Text>
-                    </View>
-                  ))}
+                  {filteredResults.map((r, i) => {
+                    const ex = String(r.exam || 'agri').toLowerCase();
+                    return (
+                      <View key={r.id || i} style={styles.tableRow}>
+                        {!!testId && (
+                          <Text style={[styles.td, { width: 50, fontWeight: 'bold', color: r.rank === 1 ? '#d97706' : '#1e293b' }]}>
+                            {r.rank === 1 ? '🥇 #1' : r.rank === 2 ? '🥈 #2' : r.rank === 3 ? '🥉 #3' : `#${r.rank}`}
+                          </Text>
+                        )}
+                        <View style={{ width: 60, justifyContent: 'center' }}>
+                          <View style={[
+                            styles.examBadgePill,
+                            ex === 'puc' && { backgroundColor: '#e0e7ff', borderColor: '#c7d2fe' },
+                            ex === 'kcet' && { backgroundColor: '#e0f2fe', borderColor: '#bae6fd' },
+                            ex === 'neet' && { backgroundColor: '#ffe4e6', borderColor: '#fecdd3' },
+                            ex === 'agri' && { backgroundColor: '#dcfce7', borderColor: '#bbf7d0' },
+                          ]}>
+                            <Text style={[
+                              styles.examBadgePillText,
+                              ex === 'puc' && { color: '#4338ca' },
+                              ex === 'kcet' && { color: '#0369a1' },
+                              ex === 'neet' && { color: '#be123c' },
+                              ex === 'agri' && { color: '#15803d' },
+                            ]}>
+                              {ex.toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
+                        {!testId && (
+                          <Text style={[styles.td, { width: 140 }]} numberOfLines={1}>
+                            {r.test_title || 'Mock Test'}
+                          </Text>
+                        )}
+                        <View style={{ width: 120, justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#1e293b' }} numberOfLines={1}>{r.student_name}</Text>
+                          <Text style={{ fontSize: 10, color: '#64748b' }} numberOfLines={1}>{r.student_email}</Text>
+                        </View>
+                        <Text style={[styles.td, { width: 70, fontWeight: 'bold', color: '#059669' }]}>{r.score}</Text>
+                        <Text style={[styles.td, { width: 70 }]}>{r.accuracy}%</Text>
+                        <Text style={[styles.td, { width: 70 }]}>{r.time_taken_sec}s</Text>
+                        <Text style={[styles.td, { width: 90 }]}>{new Date(r.date).toLocaleDateString()}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
               </ScrollView>
             )}
@@ -256,4 +334,39 @@ const styles = StyleSheet.create({
   missingIndex: { width: 30, fontSize: 12, color: '#fb923c', fontWeight: 'bold' },
   missingName: { fontSize: 14, fontWeight: '600', color: '#1e293b' },
   missingEmail: { fontSize: 12, color: '#64748b' },
+  // Filter tabs
+  filterRow: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  filterChipActive: {
+    backgroundColor: '#4f46e5',
+    borderColor: '#4338ca',
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  filterChipTextActive: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  // Table Exam Badge
+  examBadgePill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
+  examBadgePillText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
 });
