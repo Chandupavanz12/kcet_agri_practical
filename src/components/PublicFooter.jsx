@@ -6,15 +6,24 @@ export default function PublicFooter() {
     <View style={styles.footer}>
       <View style={styles.container}>
         <View style={styles.row}>
-          <Text style={styles.textMedium}>Need help?</Text>
+          <Text style={styles.brandTitle}>
+            Study<Text style={styles.brandGreen}>Hack</Text>
+          </Text>
+          <Text style={styles.tagline}>Your Complete Exam Preparation Partner</Text>
+          
           <View style={styles.contactRow}>
-            <Text style={styles.textRegular}>Contact: </Text>
+            <Text style={styles.textRegular}>Need assistance? </Text>
             <TouchableOpacity onPress={() => Linking.openURL('mailto:chandupavanz12@gmail.com')}>
               <Text style={styles.link}>chandupavanz12@gmail.com</Text>
             </TouchableOpacity>
           </View>
         </View>
-        <Text style={styles.copyright}>© {new Date().getFullYear()} KCET Agri Practical</Text>
+        
+        <View style={styles.divider} />
+        
+        <Text style={styles.copyright}>
+          © {new Date().getFullYear()} StudyHack • All Rights Reserved
+        </Text>
       </View>
     </View>
   );
@@ -22,40 +31,60 @@ export default function PublicFooter() {
 
 const styles = StyleSheet.create({
   footer: {
-    marginTop: 40,
+    marginTop: 32,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.4)',
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    borderTopColor: '#f1f5f9',
+    backgroundColor: '#ffffff',
   },
   container: {
     paddingVertical: 24,
     paddingHorizontal: 16,
+    maxWidth: 1200,
+    width: '100%',
+    alignSelf: 'center',
+    alignItems: 'center',
   },
   row: {
-    flexDirection: 'column',
-    gap: 8,
+    alignItems: 'center',
+    gap: 6,
   },
-  textMedium: {
-    fontSize: 14,
-    color: '#334155',
+  brandTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0f172a',
+    letterSpacing: -0.3,
+  },
+  brandGreen: {
+    color: '#16a34a',
+  },
+  tagline: {
+    fontSize: 12,
+    color: '#64748b',
     fontWeight: '500',
   },
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 6,
   },
   textRegular: {
-    fontSize: 14,
-    color: '#334155',
+    fontSize: 13,
+    color: '#475569',
   },
   link: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#075985',
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0284c7',
+  },
+  divider: {
+    width: '60%',
+    height: 1,
+    backgroundColor: '#f1f5f9',
+    marginVertical: 14,
   },
   copyright: {
-    marginTop: 12,
     fontSize: 12,
-    color: '#64748b',
+    color: '#94a3b8',
+    fontWeight: '500',
   },
 });

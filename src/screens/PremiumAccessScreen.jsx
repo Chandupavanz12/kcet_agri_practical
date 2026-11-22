@@ -1,7 +1,7 @@
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, AppState, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch, clearApiCache } from '../api/client.js';
 import { API_BASE_URL } from '../config/env.js';
@@ -29,6 +29,7 @@ const PLAN_BULLETS = {
 export default function PremiumAccessScreen() {
   const { token, user } = useAuth();
   const params = useLocalSearchParams();
+  const router = useRouter();
 
   const [plans, setPlans] = useState([]);
   const [status, setStatus] = useState(null);
@@ -73,8 +74,12 @@ export default function PremiumAccessScreen() {
         setLoading(true);
         setError('');
 
-        if (params.success === 'PremiumActivated') {
-          setMessage('🎉 Payment successful! Your premium access is now active.');
+        if (params.success === 'PremiumActivated' || params.payment === 'success' || params.success) {
+          setMessage('🎉 Payment successful! Study material plan activated.');
+          Alert.alert(
+            'Study Material Plan Activated! 🎉',
+            'Your study materials and mock tests are now fully unlocked!'
+          );
         } else if (params.error) {
           setError('Payment verification failed. Please contact support if amount was deducted.');
         }
@@ -289,9 +294,13 @@ export default function PremiumAccessScreen() {
 
                 <View style={styles.planActions}>
                   {unlocked ? (
-                    <View style={styles.btnDisabled}>
-                      <Text style={styles.btnDisabledText}>Already Active</Text>
-                    </View>
+                    <TouchableOpacity
+                      style={[styles.btnBuy, { backgroundColor: '#10b981' }]}
+                      onPress={() => router.push('/student/materials')}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.btnBuyText}>✓ Plan Active • View Materials ➔</Text>
+                    </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
                       style={[styles.btnBuy, { backgroundColor: meta.color }]}

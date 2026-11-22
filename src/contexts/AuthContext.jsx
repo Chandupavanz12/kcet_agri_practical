@@ -21,20 +21,20 @@ const storage = {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.setItem(key, String(val));
       }
-    } catch {}
+    } catch { }
     try {
       await SecureStore.setItemAsync(key, String(val));
-    } catch {}
+    } catch { }
   },
   async deleteItem(key) {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.removeItem(key);
       }
-    } catch {}
+    } catch { }
     try {
       await SecureStore.deleteItemAsync(key);
-    } catch {}
+    } catch { }
   }
 };
 
@@ -67,7 +67,7 @@ export function AuthProvider({ children }) {
           const storedUserStr = await storage.getItem('kcet_user');
           let parsedUser = null;
           if (storedUserStr) {
-            try { parsedUser = JSON.parse(storedUserStr); } catch (_) {}
+            try { parsedUser = JSON.parse(storedUserStr); } catch (_) { }
           }
 
           if (storedToken) {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 
 export default function PublicHeader() {
@@ -8,24 +8,34 @@ export default function PublicHeader() {
   return (
     <View style={styles.header}>
       <View style={styles.container}>
-        <TouchableOpacity style={styles.logoGroup} onPress={() => router.push('/login')}>
-          <View style={styles.logoBox}>
-            <Text style={styles.logoText}>KA</Text>
+        {/* StudyHack Brand Logo */}
+        <TouchableOpacity style={styles.logoRow} onPress={() => router.push('/login')} activeOpacity={0.8}>
+          <View style={styles.logoBadge}>
+            <Text style={styles.logoGradCap}>🎓</Text>
+            <Text style={styles.logoS}>S</Text>
           </View>
-          <View>
-            <Text style={styles.brand}>KCET Agri Practical</Text>
-            <Text style={styles.subtitle}>Modern learning platform</Text>
+          <View style={styles.logoTextCol}>
+            <Text style={styles.logoTitle}>
+              Study<Text style={styles.logoTitleGreen}>Hack</Text>
+            </Text>
+            <Text style={styles.logoSubtitle}>Learn Smart. Score Higher.</Text>
+            <View style={styles.logoUnderline} />
           </View>
         </TouchableOpacity>
 
+        {/* Action Navigation */}
         <View style={styles.actionGroup}>
-          <TouchableOpacity style={styles.btnGhost} onPress={() => router.push('/login')}>
+          <TouchableOpacity style={styles.btnGhost} onPress={() => router.push('/login')} activeOpacity={0.7}>
             <Text style={styles.btnGhostText}>Login</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.btnPrimary} onPress={() => router.push('/register')}>
+          <TouchableOpacity style={styles.btnPrimary} onPress={() => router.push('/register')} activeOpacity={0.85}>
             <Text style={styles.btnPrimaryText}>Register</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.btnGhost} onPress={() => Linking.openURL('mailto:chandupavanz12@gmail.com')}>
+          <TouchableOpacity
+            style={styles.btnGhost}
+            onPress={() => Linking.openURL('mailto:chandupavanz12@gmail.com')}
+            activeOpacity={0.7}
+          >
             <Text style={styles.btnGhostText}>Support</Text>
           </TouchableOpacity>
         </View>
@@ -36,75 +46,105 @@ export default function PublicHeader() {
 
 const styles = StyleSheet.create({
   header: {
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.4)',
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    borderBottomColor: '#f1f5f9',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 2,
   },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
+    paddingVertical: 12,
     paddingHorizontal: 16,
+    maxWidth: 1200,
+    width: '100%',
+    alignSelf: 'center',
   },
-  logoGroup: {
+  logoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
-  logoBox: {
+  logoBadge: {
     width: 40,
     height: 40,
-    borderRadius: 16,
+    borderRadius: 12,
     backgroundColor: '#0284c7',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowColor: '#0284c7',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
     elevation: 2,
   },
-  logoText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  brand: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
-    lineHeight: 18,
-  },
-  subtitle: {
+  logoGradCap: {
     fontSize: 12,
-    color: '#475569',
-    lineHeight: 16,
+    position: 'absolute',
+    top: 2,
+  },
+  logoS: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#ffffff',
+    marginTop: 8,
+  },
+  logoTextCol: {
+    gap: 1,
+  },
+  logoTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#0f172a',
+    letterSpacing: -0.5,
+  },
+  logoTitleGreen: {
+    color: '#16a34a',
+  },
+  logoSubtitle: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  logoUnderline: {
+    height: 2,
+    backgroundColor: '#16a34a',
+    borderRadius: 2,
+    width: 36,
+    marginTop: 1,
   },
   actionGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   btnGhost: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
     borderRadius: 8,
   },
   btnGhostText: {
-    fontSize: 14,
-    color: '#334155',
-    fontWeight: '500',
+    fontSize: 13,
+    color: '#475569',
+    fontWeight: '600',
   },
   btnPrimary: {
-    backgroundColor: '#0284c7',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    backgroundColor: '#10b981',
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    shadowColor: '#10b981',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   btnPrimaryText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#ffffff',
-    fontWeight: '500',
+    fontWeight: '700',
   },
 });

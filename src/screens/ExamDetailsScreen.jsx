@@ -324,7 +324,12 @@ export default function ExamDetailsScreen() {
         clearApiCache();
         await loadExamData(true);
       })();
-      Alert.alert('Payment Successful!', '🎉 Your premium access is now activated! All materials are unlocked.');
+      setView('modules');
+      Alert.alert(
+        'Study Material Plan Activated! 🎉',
+        `Congratulations! Your ${config.name} study materials, mock tests, and previous year question papers are now fully unlocked!`,
+        [{ text: 'Start Learning ➔', onPress: () => setView('modules') }]
+      );
     }
   }, [params.payment, params.success]);
 
@@ -333,7 +338,16 @@ export default function ExamDetailsScreen() {
     const sub = AppState.addEventListener('change', async (nextState) => {
       if (nextState === 'active') {
         try {
-          await apiFetch('/api/student/premium/payment-status', { token });
+          const payRes = await apiFetch('/api/student/premium/payment-status', { token });
+          if (payRes?.activated) {
+            EXAM_CLIENT_CACHE.delete(examId);
+            clearApiCache();
+            await loadExamData(false);
+            Alert.alert(
+              'Study Material Plan Activated! 🎉',
+              `Your ${config.name} study materials and mock tests have been unlocked successfully!`
+            );
+          }
         } catch (_) {}
         EXAM_CLIENT_CACHE.delete(examId);
         clearApiCache();
@@ -959,13 +973,40 @@ export default function ExamDetailsScreen() {
         {/* ─── LEVEL 4: EXAM SUBSCRIPTION PLANS PAGE ──────────────────────────── */}
         {view === 'plans' && (
           <View style={styles.pageSection}>
+            {isSubscribed && (
+              <View style={styles.activePlanBannerCard}>
+                <View style={styles.activePlanBannerRow}>
+                  <View style={styles.activePlanBannerIconBox}>
+                    <Text style={styles.activePlanBannerEmoji}>🎉</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.activePlanBannerTitle}>{config.name} Plan Active & Unlocked</Text>
+                    <Text style={styles.activePlanBannerSub}>
+                      Your plan is active! All chapter study materials, mock tests, and previous year question papers are unlocked.
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={[styles.activePlanBannerBtn, { backgroundColor: config.themeColor }]}
+                  onPress={() => setView('modules')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.activePlanBannerBtnText}>Access Unlocked Materials ➔</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <View style={styles.sectionHeaderCol}>
-              <View style={[styles.subHeaderBadge, { backgroundColor: '#fef08a' }]}>
-                <Text style={[styles.subHeaderBadgeText, { color: '#854d0e' }]}>PREMIUM UNLOCK</Text>
+              <View style={[styles.subHeaderBadge, { backgroundColor: isSubscribed ? '#dcfce7' : '#fef08a' }]}>
+                <Text style={[styles.subHeaderBadgeText, { color: isSubscribed ? '#15803d' : '#854d0e' }]}>
+                  {isSubscribed ? '✓ SUBSCRIPTION ACTIVE' : 'PREMIUM UNLOCK'}
+                </Text>
               </View>
               <Text style={styles.sectionHeading}>{config.name} Subscription Plans</Text>
               <Text style={styles.sectionSubHeading}>
-                Select an official plan to unlock all subjects, tests and premium materials for {config.fullName}
+                {isSubscribed
+                  ? `Your account has active full access for ${config.fullName}.`
+                  : `Select an official plan to unlock all subjects, tests and premium materials for ${config.fullName}`}
               </Text>
             </View>
 
@@ -982,9 +1023,22 @@ export default function ExamDetailsScreen() {
                 plans.map((plan) => {
                   const priceRupees = Math.round((plan.pricePaise || plan.price_paise || 0) / 100);
                   const isPaying = payingPlanId === plan.id;
+                  const isPlanActive = isSubscribed;
 
                   return (
-                    <View key={plan.id} style={styles.planCard}>
+                    <View
+                      key={plan.id}
+                      style={[
+                        styles.planCard,
+                        isPlanActive && styles.planCardActive,
+                      ]}
+                    >
+                      {isPlanActive && (
+                        <View style={styles.activePlanBadge}>
+                          <Text style={styles.activePlanBadgeText}>✓ CURRENT ACTIVE PLAN</Text>
+                        </View>
+                      )}
+
                       <View style={styles.planHeaderRow}>
                         <View>
                           <Text style={styles.planName}>{plan.name}</Text>
@@ -1006,22 +1060,32 @@ export default function ExamDetailsScreen() {
                         ))}
                       </View>
 
-                      <TouchableOpacity
-                        style={[
-                          styles.planPayBtn,
-                          { backgroundColor: config.themeColor },
-                          isPaying && styles.opacity60,
-                        ]}
-                        onPress={() => handleSubscribe(plan)}
-                        disabled={isPaying}
-                        activeOpacity={0.85}
-                      >
-                        {isPaying ? (
-                          <ActivityIndicator color="#fff" />
-                        ) : (
-                          <Text style={styles.planPayBtnText}>Unlock {config.name} Now 💳</Text>
-                        )}
-                      </TouchableOpacity>
+                      {isPlanActive ? (
+                        <TouchableOpacity
+                          style={styles.planActiveBtn}
+                          onPress={() => setView('modules')}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={styles.planActiveBtnText}>✓ Plan Activated • Access Unlocked 📚</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={[
+                            styles.planPayBtn,
+                            { backgroundColor: config.themeColor },
+                            isPaying && styles.opacity60,
+                          ]}
+                          onPress={() => handleSubscribe(plan)}
+                          disabled={isPaying}
+                          activeOpacity={0.85}
+                        >
+                          {isPaying ? (
+                            <ActivityIndicator color="#fff" />
+                          ) : (
+                            <Text style={styles.planPayBtnText}>Unlock {config.name} Now 💳</Text>
+                          )}
+                        </TouchableOpacity>
+                      )}
                     </View>
                   );
                 })
@@ -1255,6 +1319,102 @@ const styles = StyleSheet.create({
 
   planPayBtn: { paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   planPayBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 14 },
+
+  // Active Plan Specific Styles
+  activePlanBannerCard: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1.5,
+    borderColor: '#a7f3d0',
+    borderRadius: 18,
+    padding: 16,
+    gap: 14,
+    shadowColor: '#10b981',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 6,
+  },
+  activePlanBannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  activePlanBannerIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#d1fae5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activePlanBannerEmoji: {
+    fontSize: 22,
+  },
+  activePlanBannerTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#065f46',
+  },
+  activePlanBannerSub: {
+    fontSize: 12.5,
+    color: '#047857',
+    marginTop: 2,
+    lineHeight: 17,
+  },
+  activePlanBannerBtn: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activePlanBannerBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  planCardActive: {
+    borderColor: '#10b981',
+    borderWidth: 2,
+    backgroundColor: '#ffffff',
+    shadowColor: '#10b981',
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  activePlanBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#86efac',
+    marginBottom: 2,
+  },
+  activePlanBadgeText: {
+    color: '#15803d',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  planActiveBtn: {
+    backgroundColor: '#10b981',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#10b981',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  planActiveBtnText: {
+    color: '#ffffff',
+    fontSize: 14.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
   carouselDotsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
