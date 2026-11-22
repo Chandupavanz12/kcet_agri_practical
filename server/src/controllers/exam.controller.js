@@ -878,7 +878,6 @@ export async function getExamPlans(req, res, next) {
         features: Array.isArray(p.features) ? p.features : typeof p.features === 'string' ? JSON.parse(p.features || '[]') : [],
       })),
       hasActivePlan: !!activeAccess,
-      activePlanCode: activeAccess?.plan_code || null,
       activePlanExpiresAt: activeAccess?.expires_at || null,
       activeAccessModules: activeAccess?.access_modules || null,
     });
@@ -1291,41 +1290,43 @@ export async function updateAdminExamPlan(req, res, next) {
       status = 'active',
     } = req.body;
 
-    const normalizedExam = String(exam || 'puc').toLowerCase().trim();
-    const poolsToUpdate = normalizedExam === 'global'
-      ? [getPucPool(), getKcetNeetPool()]
-      : [getPoolForExam(normalizedExam) || getKcetNeetPool()];
+    const poolsToUpdate = [getPucPool(), getKcetNeetPool()].filter(Boolean);
 
     let updatedPlan = null;
     for (const pool of poolsToUpdate) {
-      const result = await pool.query(
-        `UPDATE plans SET
-          code = COALESCE($1, code),
-          name = COALESCE($2, name),
-          price_paise = COALESCE($3, price_paise),
-          duration_days = COALESCE($4, duration_days),
-          access_modules = COALESCE($5, access_modules),
-          target_exams = COALESCE($6, target_exams),
-          features = COALESCE($7, features),
-          status = COALESCE($8, status),
-          updated_at = NOW()
-         WHERE id = $9 OR code = $1
-         RETURNING *`,
-        [
-          code ? code.trim() : null,
-          name ? name.trim() : null,
-          price_paise !== undefined ? Number(price_paise) : null,
-          duration_days !== undefined ? Number(duration_days) : null,
-          access_modules ? JSON.stringify(Array.isArray(access_modules) ? access_modules : [access_modules]) : null,
-          target_exams ? JSON.stringify(Array.isArray(target_exams) ? target_exams : [target_exams]) : null,
-          features ? JSON.stringify(Array.isArray(features) ? features : [features]) : null,
-          status,
-          id,
-        ]
-      );
-      if (result.rows.length > 0) updatedPlan = result.rows[0];
+      try {
+        const result = await pool.query(
+          `UPDATE plans SET
+            code = COALESCE($1, code),
+            name = COALESCE($2, name),
+            price_paise = COALESCE($3, price_paise),
+            duration_days = COALESCE($4, duration_days),
+            access_modules = COALESCE($5, access_modules),
+            target_exams = COALESCE($6, target_exams),
+            features = COALESCE($7, features),
+            status = COALESCE($8, status),
+            updated_at = NOW()
+           WHERE id = $9 OR code = $1
+           RETURNING *`,
+          [
+            code ? code.trim() : null,
+            name ? name.trim() : null,
+            price_paise !== undefined ? Number(price_paise) : null,
+            duration_days !== undefined ? Number(duration_days) : null,
+            access_modules ? JSON.stringify(Array.isArray(access_modules) ? access_modules : [access_modules]) : null,
+            target_exams ? JSON.stringify(Array.isArray(target_exams) ? target_exams : [target_exams]) : null,
+            features ? JSON.stringify(Array.isArray(features) ? features : [features]) : null,
+            status,
+            id,
+          ]
+        );
+        if (result.rows.length > 0) updatedPlan = result.rows[0];
+      } catch (err) {
+        console.warn('[updateAdminExamPlan] pool update error:', err?.message || err);
+      }
     }
 
+    clearExamCache();
     return res.json({ success: true, plan: updatedPlan });
   } catch (err) {
     return next(err);
@@ -1431,10 +1432,21 @@ export async function getAdminExamPlans(req, res, next) {
 export async function deleteAdminExamPlan(req, res, next) {
   try {
     const { id } = req.params;
-    const exam = String(req.query.exam || 'puc').toLowerCase().trim();
-    const pool = getPoolForExam(exam);
-    if (!pool) return res.status(400).json({ message: 'Invalid exam specified' });
-    await pool.query('DELETE FROM plans WHERE id = $1', [id]);
+    const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+    for (const pool of pools) {
+      try {
+        await pool.query('DELETE FROM plans WHERE id = $1', [id]);
+      } catch (err) {
+        console.warn('[deleteAdminExamPlan] pool delete error:', err?.message || err);
+      }
+    }
+
+    try {
+      const { Plan } = await import('../models/index.js');
+      await Plan.deleteOne({ id: Number(id) });
+    } catch (_) {}
+
+    clearExamCache();
     return res.json({ success: true, message: 'Plan deleted' });
   } catch (err) {
     return next(err);

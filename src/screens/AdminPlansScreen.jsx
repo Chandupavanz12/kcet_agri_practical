@@ -116,8 +116,8 @@ export default function AdminPlansScreen() {
           title={`Subscription Plans (${selectedExam.toUpperCase()})`}
           apiEndpoint="plans"
           endpointPath={selectedExam === 'agri' ? 'plans' : `exam/plans?exam=${selectedExam}`}
-          updateEndpointPath={selectedExam === 'agri' ? 'plans' : 'exam/plans'}
-          deleteEndpointPath={selectedExam === 'agri' ? 'plans' : 'exam/plans'}
+          updateEndpointPath={selectedExam === 'agri' ? 'plans' : `exam/plans?exam=${selectedExam}`}
+          deleteEndpointPath={selectedExam === 'agri' ? 'plans' : `exam/plans?exam=${selectedExam}`}
           responseKey="plans"
           disableCreate={false}
           fields={fields}
@@ -201,7 +201,7 @@ export default function AdminPlansScreen() {
               .filter(Boolean);
 
             if (selectedExam !== 'agri') {
-              return await apiFetch(`/api/admin/exam/plans/${id}`, {
+              return await apiFetch(`/api/admin/exam/plans/${id}?exam=${selectedExam}`, {
                 token,
                 method: 'PUT',
                 body: {

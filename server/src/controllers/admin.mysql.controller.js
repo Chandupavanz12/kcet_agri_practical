@@ -1262,11 +1262,24 @@ export async function deletePlan(req, res, next) {
   try {
     const { id } = req.params;
 
-    const existing = await Plan.findOne({ id: Number(id) }, { id: 1, _id: 0 }).lean();
-    if (!existing) return res.status(404).json({ message: 'Plan not found' });
+    // Delete from MongoDB Plan
+    await Plan.deleteOne({ id: Number(id) });
 
-    await Plan.updateOne({ id: Number(id) }, { $set: { status: 'inactive', updated_at: new Date() } });
-    return res.json({ ok: true });
+    // Also delete from PostgreSQL pools if this id existed there
+    try {
+      const { getPucPool, getKcetNeetPool } = await import('../config/examPgs.js');
+      const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+      for (const p of pools) {
+        await p.query('DELETE FROM plans WHERE id = $1', [id]);
+      }
+    } catch (_) {}
+
+    try {
+      const { clearExamCache } = await import('./exam.controller.js');
+      clearExamCache();
+    } catch (_) {}
+
+    return res.json({ ok: true, message: 'Plan deleted' });
   } catch (err) {
     return next(err);
   }
@@ -1848,9 +1861,55 @@ export async function listTests(req, res, next) {
 
 export async function updateTest(req, res, next) {
   try {
-    const { id } = req.params;
+    const rawId = String(req.params.id || '');
+    let examPrefix = null;
+    let numericId = Number(rawId);
+    if (rawId.includes('_')) {
+      const parts = rawId.split('_');
+      examPrefix = parts[0].toLowerCase();
+      numericId = Number(parts[1]);
+    }
     const body = { ...(req.body || {}) };
 
+    // 1. Try updating in PostgreSQL
+    try {
+      const { getPucPool, getKcetNeetPool, getPoolForExam } = await import('../config/examPgs.js');
+      const pools = examPrefix ? [getPoolForExam(examPrefix) || getKcetNeetPool()] : [getPucPool(), getKcetNeetPool()].filter(Boolean);
+      for (const pool of pools) {
+        if (!pool) continue;
+        const u = await pool.query(
+          `UPDATE mock_tests SET
+            title = COALESCE($1, title),
+            is_active = COALESCE($2, is_active),
+            per_question_seconds = COALESCE($3, per_question_seconds),
+            marks_correct = COALESCE($4, marks_correct),
+            updated_at = NOW()
+           WHERE id = $5
+           RETURNING *`,
+          [
+            body.title !== undefined ? body.title : null,
+            body.isActive !== undefined ? Boolean(body.isActive) : null,
+            body.perQuestionSeconds !== undefined ? Number(body.perQuestionSeconds) : null,
+            body.marksCorrect !== undefined ? Number(body.marksCorrect) : null,
+            numericId,
+          ]
+        );
+        if (u.rows.length > 0) {
+          const row = u.rows[0];
+          return res.json({
+            test: {
+              id: row.id,
+              title: row.title,
+              isActive: Boolean(row.is_active),
+              perQuestionSeconds: row.per_question_seconds || 30,
+              marksCorrect: row.marks_correct || 4,
+            },
+          });
+        }
+      }
+    } catch (_) {}
+
+    // 2. Try updating in MongoDB
     const updates = {};
     if (Object.prototype.hasOwnProperty.call(body, 'title')) updates.title = body.title;
     if (Object.prototype.hasOwnProperty.call(body, 'isActive')) updates.is_active = Boolean(body.isActive);
@@ -1862,10 +1921,10 @@ export async function updateTest(req, res, next) {
 
     if (Object.keys(updates).length > 0) {
       updates.updated_at = new Date();
-      await MockTest.updateOne({ id: Number(id) }, { $set: updates });
+      await MockTest.updateOne({ id: numericId }, { $set: updates });
     }
 
-    const t = await MockTest.findOne({ id: Number(id) }, { _id: 0, __v: 0 }).lean();
+    const t = await MockTest.findOne({ id: numericId }, { _id: 0, __v: 0 }).lean();
     if (!t) return res.status(404).json({ message: 'Test not found' });
 
     return res.json({
@@ -1885,17 +1944,38 @@ export async function updateTest(req, res, next) {
 
 export async function deleteTest(req, res, next) {
   try {
-    const { id } = req.params;
+    const rawId = String(req.params.id || '');
+    let examPrefix = null;
+    let numericId = Number(rawId);
+    if (rawId.includes('_')) {
+      const parts = rawId.split('_');
+      examPrefix = parts[0].toLowerCase();
+      numericId = Number(parts[1]);
+    }
+
+    // 1. Try deleting from PostgreSQL
+    try {
+      const { getPucPool, getKcetNeetPool, getPoolForExam } = await import('../config/examPgs.js');
+      const pools = examPrefix ? [getPoolForExam(examPrefix) || getKcetNeetPool()] : [getPucPool(), getKcetNeetPool()].filter(Boolean);
+      for (const pool of pools) {
+        if (!pool) continue;
+        const r = await pool.query('DELETE FROM mock_tests WHERE id = $1 RETURNING id', [numericId]);
+        if (r.rows.length > 0) {
+          return res.json({ ok: true, message: 'Test deleted' });
+        }
+      }
+    } catch (pgErr) {
+      console.warn('[deleteTest] Postgres delete notice:', pgErr?.message || pgErr);
+    }
+
+    // 2. Try deleting from MongoDB
     const MockTest = await getMockTestModel();
     const MockQuestion = await getMockTestQuestionModel();
     const MockResult = await getMockResultModel();
 
-    let existing = await MockTest.findOne({ id: Number(id) }, { id: 1, _id: 0 }).lean();
-    if (!existing) return res.status(404).json({ message: 'Test not found' });
-
-    await MockResult.deleteMany({ test_id: Number(id) });
-    await MockQuestion.deleteMany({ test_id: Number(id) });
-    await MockTest.deleteOne({ id: Number(id) });
+    await MockResult.deleteMany({ test_id: numericId });
+    await MockQuestion.deleteMany({ test_id: numericId });
+    await MockTest.deleteOne({ id: numericId });
 
     return res.json({ ok: true });
   } catch (err) {
@@ -2668,12 +2748,60 @@ export async function replyFeedback(req, res, next) {
 
 export async function getTestQuestions(req, res, next) {
   try {
-    const { id } = req.params;
+    const rawId = String(req.params.id || '');
+    let examPrefix = null;
+    let numericId = Number(rawId);
+
+    if (rawId.includes('_')) {
+      const parts = rawId.split('_');
+      examPrefix = parts[0].toLowerCase();
+      numericId = Number(parts[1]);
+    }
+
+    // 1. Check PostgreSQL (PUC, KCET, NEET)
+    try {
+      const { getPucPool, getKcetNeetPool, getPoolForExam } = await import('../config/examPgs.js');
+      const poolsToCheck = examPrefix
+        ? [getPoolForExam(examPrefix) || getKcetNeetPool()]
+        : [getPucPool(), getKcetNeetPool()].filter(Boolean);
+
+      for (const pool of poolsToCheck) {
+        if (!pool) continue;
+        const testRes = await pool.query('SELECT * FROM mock_tests WHERE id = $1', [numericId]);
+        if (testRes.rows.length > 0) {
+          const test = testRes.rows[0];
+          const qRes = await pool.query(
+            'SELECT * FROM mock_questions WHERE test_id = $1 ORDER BY question_order ASC, id ASC',
+            [numericId]
+          );
+          const questions = qRes.rows.map(q => ({
+            id: q.id,
+            questionText: q.question_text,
+            imageUrl: q.image_url || '',
+            optionA: q.option_a,
+            optionB: q.option_b,
+            optionC: q.option_c,
+            optionD: q.option_d,
+            correctOption: q.correct_option,
+            questionOrder: q.question_order,
+          }));
+          return res.json({
+            success: true,
+            testTitle: `[${(test.exam || 'EXAM').toUpperCase()}] ${test.title}`,
+            questions,
+          });
+        }
+      }
+    } catch (pgErr) {
+      console.warn('[getTestQuestions] Postgres check notice:', pgErr?.message || pgErr);
+    }
+
+    // 2. Check MongoDB (Agri Practical)
+    const MockTest = await getMockTestModel();
     const MockQuestion = await getMockTestQuestionModel();
+    const testDoc = await MockTest.findOne({ id: numericId }).lean();
+    let questionsRows = await MockQuestion.find({ test_id: numericId }).sort({ question_order: 1, id: 1 }).lean();
 
-    let questionsRows = await MockQuestion.find({ test_id: Number(id) }).sort({ question_order: 1 }).lean();
-
-    // map the database fields to camelCase
     const questions = (questionsRows || []).map(q => ({
       id: q.id,
       questionText: q.question_text,
@@ -2686,7 +2814,11 @@ export async function getTestQuestions(req, res, next) {
       questionOrder: q.question_order,
     }));
 
-    return res.json({ questions });
+    return res.json({
+      success: true,
+      testTitle: testDoc?.title ? `[Agri] ${testDoc.title}` : `Test ${rawId}`,
+      questions,
+    });
   } catch (err) {
     return next(err);
   }
@@ -2694,17 +2826,57 @@ export async function getTestQuestions(req, res, next) {
 
 export async function addTestQuestion(req, res, next) {
   try {
-    const { id } = req.params;
+    const rawId = String(req.params.id || '');
+    let examPrefix = null;
+    let numericId = Number(rawId);
+    if (rawId.includes('_')) {
+      const parts = rawId.split('_');
+      examPrefix = parts[0].toLowerCase();
+      numericId = Number(parts[1]);
+    }
     const body = req.body || {};
+
+    // 1. Check PostgreSQL
+    try {
+      const { getPucPool, getKcetNeetPool, getPoolForExam } = await import('../config/examPgs.js');
+      const poolsToCheck = examPrefix
+        ? [getPoolForExam(examPrefix) || getKcetNeetPool()]
+        : [getPucPool(), getKcetNeetPool()].filter(Boolean);
+
+      for (const pool of poolsToCheck) {
+        if (!pool) continue;
+        const testRes = await pool.query('SELECT * FROM mock_tests WHERE id = $1', [numericId]);
+        if (testRes.rows.length > 0) {
+          const ins = await pool.query(
+            `INSERT INTO mock_questions (test_id, question_text, option_a, option_b, option_c, option_d, correct_option, question_order)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             RETURNING id`,
+            [
+              numericId,
+              body.questionText || 'New Question',
+              body.optionA || 'Option A',
+              body.optionB || 'Option B',
+              body.optionC || 'Option C',
+              body.optionD || 'Option D',
+              body.correctOption || 'A',
+              999,
+            ]
+          );
+          return res.json({ success: true, questionId: ins.rows[0].id });
+        }
+      }
+    } catch (pgErr) {
+      console.warn('[addTestQuestion] Postgres insert notice:', pgErr?.message || pgErr);
+    }
+
+    // 2. Check MongoDB
     const MockTest = await getMockTestModel();
     const MockQuestion = await getMockTestQuestionModel();
-
-    // Validate test exists in new DB
-    let test = await MockTest.findOne({ id: Number(id) }).lean();
+    let test = await MockTest.findOne({ id: numericId }).lean();
     if (!test) return res.status(404).json({ message: 'Test not found' });
 
     const newQuestionRow = new MockQuestion({
-      test_id: Number(id),
+      test_id: numericId,
       question_text: body.questionText || 'New Question',
       image_url: body.imageUrl || '',
       option_a: body.optionA || 'Option A',
@@ -2716,10 +2888,7 @@ export async function addTestQuestion(req, res, next) {
     });
 
     await newQuestionRow.save();
-
-    // Increment question_count in the new DB
-    await MockTest.updateOne({ id: Number(id) }, { $inc: { question_count: 1 } });
-
+    await MockTest.updateOne({ id: numericId }, { $inc: { question_count: 1 } });
     return res.json({ success: true, questionId: newQuestionRow.id });
   } catch (err) {
     return next(err);
@@ -2728,9 +2897,44 @@ export async function addTestQuestion(req, res, next) {
 
 export async function updateTestQuestion(req, res, next) {
   try {
-    const { id, questionId } = req.params;
+    const rawId = String(req.params.id || '');
+    const { questionId } = req.params;
+    let numericId = Number(rawId.includes('_') ? rawId.split('_')[1] : rawId);
     const body = req.body || {};
 
+    // 1. Try updating in PostgreSQL
+    try {
+      const { getPucPool, getKcetNeetPool } = await import('../config/examPgs.js');
+      const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+      for (const pool of pools) {
+        const u = await pool.query(
+          `UPDATE mock_questions SET
+            question_text = COALESCE($1, question_text),
+            option_a = COALESCE($2, option_a),
+            option_b = COALESCE($3, option_b),
+            option_c = COALESCE($4, option_c),
+            option_d = COALESCE($5, option_d),
+            correct_option = COALESCE($6, correct_option)
+           WHERE id = $7 AND test_id = $8
+           RETURNING id`,
+          [
+            body.questionText !== undefined ? body.questionText : null,
+            body.optionA !== undefined ? body.optionA : null,
+            body.optionB !== undefined ? body.optionB : null,
+            body.optionC !== undefined ? body.optionC : null,
+            body.optionD !== undefined ? body.optionD : null,
+            body.correctOption !== undefined ? body.correctOption : null,
+            Number(questionId),
+            numericId,
+          ]
+        );
+        if (u.rows.length > 0) {
+          return res.json({ success: true });
+        }
+      }
+    } catch (_) {}
+
+    // 2. Try updating in MongoDB
     const updates = {};
     if (Object.prototype.hasOwnProperty.call(body, 'questionText')) updates.question_text = body.questionText;
     if (Object.prototype.hasOwnProperty.call(body, 'imageUrl')) updates.image_url = body.imageUrl;
@@ -2742,7 +2946,7 @@ export async function updateTestQuestion(req, res, next) {
 
     if (Object.keys(updates).length > 0) {
       const MockQuestion = await getMockTestQuestionModel();
-      await MockQuestion.updateOne({ id: Number(questionId), test_id: Number(id) }, { $set: updates });
+      await MockQuestion.updateOne({ id: Number(questionId), test_id: numericId }, { $set: updates });
     }
 
     return res.json({ success: true });
@@ -2753,14 +2957,32 @@ export async function updateTestQuestion(req, res, next) {
 
 export async function deleteTestQuestion(req, res, next) {
   try {
-    const { id, questionId } = req.params;
+    const rawId = String(req.params.id || '');
+    const { questionId } = req.params;
+    let numericId = Number(rawId.includes('_') ? rawId.split('_')[1] : rawId);
+
+    // 1. Try deleting in PostgreSQL
+    try {
+      const { getPucPool, getKcetNeetPool } = await import('../config/examPgs.js');
+      const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+      for (const pool of pools) {
+        const d = await pool.query(
+          'DELETE FROM mock_questions WHERE id = $1 AND test_id = $2 RETURNING id',
+          [Number(questionId), numericId]
+        );
+        if (d.rows.length > 0) {
+          return res.json({ success: true });
+        }
+      }
+    } catch (_) {}
+
+    // 2. Try deleting in MongoDB
     const MockTest = await getMockTestModel();
     const MockQuestion = await getMockTestQuestionModel();
 
-    // Delete from new DB
-    const r = await MockQuestion.deleteOne({ id: Number(questionId), test_id: Number(id) });
+    const r = await MockQuestion.deleteOne({ id: Number(questionId), test_id: numericId });
     if (r.deletedCount > 0) {
-      await MockTest.updateOne({ id: Number(id) }, { $inc: { question_count: -1 } });
+      await MockTest.updateOne({ id: numericId }, { $inc: { question_count: -1 } });
     }
 
     return res.json({ success: true });

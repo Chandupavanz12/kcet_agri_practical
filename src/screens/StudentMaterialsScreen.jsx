@@ -22,7 +22,11 @@ export default function StudentMaterialsScreen() {
   };
 
   const openProtectedFile = (fileUrl, itemId) => {
-    const absoluteUrl = toFileUrl(fileUrl);
+    let raw = String(fileUrl || '').trim();
+    if (raw.startsWith('gridfs:') && itemId) {
+      raw = `/api/student/materials/${itemId}/file`;
+    }
+    const absoluteUrl = toFileUrl(raw);
     if (!absoluteUrl) return;
     if (!token) {
       setError('Please login again');
@@ -30,8 +34,8 @@ export default function StudentMaterialsScreen() {
     }
     // Append token as query param so server can authenticate the download
     const urlWithToken = absoluteUrl.includes('?')
-      ? `${absoluteUrl}&token=${token}`
-      : `${absoluteUrl}?token=${token}`;
+      ? `${absoluteUrl}&token=${encodeURIComponent(token)}`
+      : `${absoluteUrl}?token=${encodeURIComponent(token)}`;
 
     // Removing Google Docs viewer because it restricts previewing files larger than its internal limit,
     // causing the "this file is too large to preview" error.

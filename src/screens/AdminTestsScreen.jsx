@@ -115,10 +115,16 @@ export default function AdminTestsScreen() {
                         <TouchableOpacity style={styles.btnAction} onPress={() => handleEditClick(t)}>
                           <Text style={styles.btnActionText}>Edit Details</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.btnActionBlue} onPress={() => router.push(`/admin/tests/${t.id}/questions`)}>
+                        <TouchableOpacity
+                          style={styles.btnActionBlue}
+                          onPress={() => router.push(`/admin/tests/${t.uniqueId || (t.exam && t.exam !== 'agri' ? `${t.exam}_${t.id}` : t.id)}/questions`)}
+                        >
                           <Text style={styles.btnActionBlueText}>Edit Questions</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.btnActionRed} onPress={() => deleteTest(t.id)}>
+                        <TouchableOpacity
+                          style={styles.btnActionRed}
+                          onPress={() => deleteTest(t.uniqueId || (t.exam && t.exam !== 'agri' ? `${t.exam}_${t.id}` : t.id))}
+                        >
                           <Text style={styles.btnActionRedText}>Delete</Text>
                         </TouchableOpacity>
                       </View>

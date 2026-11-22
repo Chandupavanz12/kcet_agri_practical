@@ -306,14 +306,23 @@ export default function ExamDetailsScreen() {
       return;
     }
 
-    const rawUrl = item.pdfUrl || item.pdf_url;
+    let rawUrl = item.pdfUrl || item.pdf_url;
     if (!rawUrl) {
       Alert.alert('Notice', 'Document link is not available yet.');
       return;
     }
+
+    // Convert GridFS reference to the streaming endpoint if needed
+    if (rawUrl.startsWith('gridfs:') || (!rawUrl.startsWith('http') && !rawUrl.startsWith('/'))) {
+      rawUrl = `/api/student/materials/${item.id}/file`;
+    }
+
     const fullUrl = rawUrl.startsWith('http') ? rawUrl : `${API_BASE_URL}${rawUrl}`;
+    const tokenParam = token ? (fullUrl.includes('?') ? `&token=${encodeURIComponent(token)}` : `?token=${encodeURIComponent(token)}`) : '';
+    const authenticatedUrl = `${fullUrl}${tokenParam}`;
+
     try {
-      await WebBrowser.openBrowserAsync(fullUrl);
+      await WebBrowser.openBrowserAsync(authenticatedUrl);
     } catch (_) {
       Alert.alert('Error', 'Unable to preview PDF document.');
     }
@@ -344,16 +353,7 @@ export default function ExamDetailsScreen() {
     const sub = AppState.addEventListener('change', async (nextState) => {
       if (nextState === 'active') {
         try {
-          const payRes = await apiFetch('/api/student/premium/payment-status', { token });
-          if (payRes?.activated) {
-            EXAM_CLIENT_CACHE.delete(examId);
-            clearApiCache();
-            await loadExamData(false);
-            Alert.alert(
-              'Study Material Plan Activated! 🎉',
-              `Your ${config.name} study materials and mock tests have been unlocked successfully!`
-            );
-          }
+          await apiFetch('/api/student/premium/payment-status', { token });
         } catch (_) {}
         EXAM_CLIENT_CACHE.delete(examId);
         clearApiCache();

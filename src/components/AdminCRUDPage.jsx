@@ -36,6 +36,15 @@ export default function AdminCRUDPage({
   const updPath = updateEndpointPath || epPath;
   const delPath = deleteEndpointPath || epPath;
 
+  const buildUrlWithId = (basePath, id) => {
+    if (!basePath) return '';
+    if (basePath.includes('?')) {
+      const [path, query] = basePath.split('?');
+      return `/api/admin/${path}/${id}?${query}`;
+    }
+    return `/api/admin/${basePath}/${id}`;
+  };
+
   const fetchItems = async () => {
     try {
       const res = await apiFetch(`/api/admin/${epPath}`, { token });
@@ -59,7 +68,7 @@ export default function AdminCRUDPage({
         if (customUpdateHandler) {
           await customUpdateHandler(editing.id, payload);
         } else {
-          await apiFetch(`/api/admin/${updPath}/${editing.id}`, {
+          await apiFetch(buildUrlWithId(updPath, editing.id), {
             token,
             method: 'PUT',
             body: payload,
@@ -106,7 +115,7 @@ export default function AdminCRUDPage({
         style: 'destructive',
         onPress: async () => {
           try {
-            await apiFetch(`/api/admin/${delPath}/${id}`, {
+            await apiFetch(buildUrlWithId(delPath, id), {
               token,
               method: 'DELETE',
             });

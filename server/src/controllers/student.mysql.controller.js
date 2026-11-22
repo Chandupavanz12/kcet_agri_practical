@@ -2292,9 +2292,33 @@ export async function streamPyqPdf(req, res, next) {
   try {
     const { id } = req.params;
     const PyqModel = await getPyqModel();
-    const p = await PyqModel.findOne({ id: Number(id) })
-      .select({ id: 1, title: 1, pdf_url: 1, status: 1, access_type: 1 })
+    let p = await PyqModel.findOne({ id: Number(id) })
+      .select({ id: 1, title: 1, pdf_url: 1, status: 1, access_type: 1, exam: 1 })
       .lean();
+
+    if (!p) {
+      // Check PostgreSQL pyqs (PUC, KCET, NEET)
+      try {
+        const { getPucPool, getKcetNeetPool } = await import('../config/examPgs.js');
+        const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+        for (const pool of pools) {
+          const r = await pool.query('SELECT * FROM pyqs WHERE id = $1', [Number(id)]);
+          if (r.rows.length > 0) {
+            const row = r.rows[0];
+            p = {
+              id: row.id,
+              title: row.title,
+              pdf_url: row.pdf_url,
+              access_type: row.is_free ? 'free' : 'paid',
+              status: row.status || 'active',
+              exam: row.exam,
+            };
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+
     if (!p || p.status !== 'active') return res.status(404).json({ message: 'PYQ not found' });
 
     const accessType = String(p.access_type || 'paid').toLowerCase();
@@ -2302,7 +2326,14 @@ export async function streamPyqPdf(req, res, next) {
     const userId = Number(req.user?.sub);
     const role = String(req.user?.role || 'student');
     if (accessType === 'paid') {
-      const ok = Number.isFinite(userId) ? await canAccessPlan(userId, role, 'pyq') : false;
+      let ok = Number.isFinite(userId) ? await canAccessPlan(userId, role, 'pyq') : false;
+      if (!ok && Number.isFinite(userId)) {
+        try {
+          const { checkUserModuleAccess } = await import('./exam.controller.js');
+          const exam = String(p.exam || 'puc').toLowerCase();
+          ok = await checkUserModuleAccess(null, userId, exam, 'pyqs');
+        } catch (_) {}
+      }
       if (!ok) return res.status(403).json({ message: 'Premium access required' });
     }
 
@@ -2411,7 +2442,31 @@ export async function streamPyqPdf(req, res, next) {
 export async function streamMaterialFile(req, res, next) {
   try {
     const { id } = req.params;
-    const m = await (await getMaterialModel()).findOne({ id: Number(id) }).select({ id: 1, title: 1, pdf_url: 1, access_type: 1, type: 1 }).lean();
+    let m = await (await getMaterialModel()).findOne({ id: Number(id) }).select({ id: 1, title: 1, pdf_url: 1, access_type: 1, type: 1, exam: 1 }).lean();
+
+    if (!m) {
+      // Check PostgreSQL materials (PUC, KCET, NEET)
+      try {
+        const { getPucPool, getKcetNeetPool } = await import('../config/examPgs.js');
+        const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+        for (const pool of pools) {
+          const r = await pool.query('SELECT * FROM materials WHERE id = $1', [Number(id)]);
+          if (r.rows.length > 0) {
+            const row = r.rows[0];
+            m = {
+              id: row.id,
+              title: row.title,
+              pdf_url: row.pdf_url,
+              access_type: row.is_free ? 'free' : 'paid',
+              type: row.type || 'pdf',
+              exam: row.exam,
+            };
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+
     if (!m) return res.status(404).json({ message: 'Material not found' });
 
     const accessType = String(m.access_type || 'free').toLowerCase();
@@ -2420,7 +2475,15 @@ export async function streamMaterialFile(req, res, next) {
     const role = String(req.user?.role || 'student');
     if (accessType === 'paid') {
       const planCode = String(m.type || '').toLowerCase() === 'pyq' ? 'pyq' : 'materials';
-      const ok = Number.isFinite(userId) ? await canAccessPlan(userId, role, planCode) : false;
+      let ok = Number.isFinite(userId) ? await canAccessPlan(userId, role, planCode) : false;
+      if (!ok && Number.isFinite(userId)) {
+        try {
+          const { checkUserModuleAccess } = await import('./exam.controller.js');
+          const exam = String(m.exam || 'puc').toLowerCase();
+          const targetModule = String(m.type || '').toLowerCase() === 'pyq' ? 'pyqs' : 'materials';
+          ok = await checkUserModuleAccess(null, userId, exam, targetModule);
+        } catch (_) {}
+      }
       if (!ok) return res.status(403).json({ message: 'Premium access required' });
     }
 
