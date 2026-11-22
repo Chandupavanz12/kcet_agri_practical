@@ -309,11 +309,29 @@ export async function grantExamAccess(userId, exam, planCode, accessModules = ['
 
   for (const p of poolsToUpdate) {
     try {
+      await p.query(`
+        CREATE TABLE IF NOT EXISTS user_access (
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL,
+          exam VARCHAR(50) NOT NULL DEFAULT 'puc',
+          plan_code VARCHAR(50) NOT NULL,
+          access_modules JSONB DEFAULT '["all"]'::jsonb,
+          expires_at TIMESTAMPTZ NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      try {
+        await p.query(`ALTER TABLE user_access ADD COLUMN IF NOT EXISTS exam VARCHAR(50) DEFAULT 'puc'`);
+        await p.query(`ALTER TABLE user_access ADD COLUMN IF NOT EXISTS access_modules JSONB DEFAULT '["all"]'::jsonb`);
+      } catch (_) {}
+
+      await p.query(
+        `DELETE FROM user_access WHERE user_id = $1 AND (exam = $2 OR exam = 'global') AND plan_code = $3`,
+        [userId, normalizedExam, planCode]
+      );
       await p.query(
         `INSERT INTO user_access (user_id, exam, plan_code, access_modules, expires_at)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (user_id, exam, plan_code) 
-         DO UPDATE SET expires_at = $5, access_modules = $4`,
+         VALUES ($1, $2, $3, $4, $5)`,
         [userId, normalizedExam, planCode, JSON.stringify(accessModules), expiresAt]
       );
     } catch (err) {

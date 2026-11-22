@@ -5,9 +5,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   BackHandler,
   Dimensions,
   FlatList,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -20,8 +22,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch, clearApiCache } from '../api/client.js';
 import { API_BASE_URL } from '../config/env.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
-
-const { width } = Dimensions.get('window');
 
 const EXAM_CONFIG = {
   puc: {
@@ -309,12 +309,32 @@ export default function ExamDetailsScreen() {
   // Listen for payment return redirect params
   useEffect(() => {
     if (params.payment === 'success' || params.success) {
-      EXAM_CLIENT_CACHE.delete(examId);
-      clearApiCache();
-      loadExamData(true);
+      (async () => {
+        try {
+          await apiFetch('/api/student/premium/payment-status', { token });
+        } catch (_) {}
+        EXAM_CLIENT_CACHE.delete(examId);
+        clearApiCache();
+        await loadExamData(true);
+      })();
       Alert.alert('Payment Successful!', '🎉 Your premium access is now activated! All materials are unlocked.');
     }
   }, [params.payment, params.success]);
+
+  // Auto-refresh access when app returns to foreground from UPI / payment apps
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active') {
+        try {
+          await apiFetch('/api/student/premium/payment-status', { token });
+        } catch (_) {}
+        EXAM_CLIENT_CACHE.delete(examId);
+        clearApiCache();
+        loadExamData(false);
+      }
+    });
+    return () => sub.remove();
+  }, [examId, token]);
 
   // Subscribe / Payment via Razorpay (matching Agri Practical flow)
   const handleSubscribe = async (plan) => {

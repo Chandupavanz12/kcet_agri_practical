@@ -646,12 +646,18 @@ export async function verifyPaymentStudent(req, res, next) {
     _ttlCache.delete('dashboard:pyqs:v1');
 
     let expiry = null;
-    if (planDoc) {
+    const targetExam = String(paymentDoc.exam || exam || '').toLowerCase().trim();
+    if (targetExam && ['puc', 'kcet', 'neet'].includes(targetExam)) {
+      const { grantExamAccess } = await import('./exam.controller.js');
+      await grantExamAccess(userId, targetExam, planCode, accessModules, durationDays);
+      await createUserNotification(userId, 'Premium activated', `Your ${planName} for ${targetExam.toUpperCase()} is active.`);
+      expiry = new Date(Date.now() + durationDays * 86400000);
+    } else if (planDoc) {
       expiry = await grantAccessForPlan(userId, String(planCode), durationDays);
       await createUserNotification(userId, 'Premium activated', `Your ${planName} is active.`);
     } else {
       const { grantExamAccess } = await import('./exam.controller.js');
-      await grantExamAccess(userId, exam, planCode, accessModules, durationDays);
+      await grantExamAccess(userId, targetExam || 'puc', planCode, accessModules, durationDays);
       await createUserNotification(userId, 'Premium activated', `Your ${planName} is active.`);
       expiry = new Date(Date.now() + durationDays * 86400000);
     }
@@ -917,58 +923,31 @@ export async function verifyPaymentRedirect(req, res, next) {
     }
 
     if (verified) {
-      if (planDoc) {
-        await grantAccessForPlan(Number(paymentDoc.user_id), String(planDoc.code), Number(planDoc.duration_days || 365));
-        await createUserNotification(Number(paymentDoc.user_id), 'Premium activated', `Your ${planDoc.name} is active.`);
-      } else {
-        // Exam Plan in Neon Postgres (PUC, KCET, NEET, Global)
+      const targetExam = String(paymentDoc.exam || '').toLowerCase().trim();
+      const planCode = paymentDoc.plan_code || planDoc?.code || 'exam_pro';
+      const durationDays = Number(paymentDoc.duration_days || planDoc?.duration_days || 365);
+      const accessModules = paymentDoc.access_modules || ['all'];
+      let pName = paymentDoc.plan_name || planDoc?.name || 'Premium Access';
+
+      if (targetExam && ['puc', 'kcet', 'neet'].includes(targetExam)) {
         try {
           const { grantExamAccess } = await import('./exam.controller.js');
-          let exam = 'kcet';
-          let planCode = 'exam_pro';
-          let accessModules = ['all'];
-          let durationDays = 365;
-          let pName = 'Exam Premium Access';
-
-          // Try fetching order details from Razorpay to get notes
-          if (orderId && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
-            const keyId = process.env.RAZORPAY_KEY_ID;
-            const keySecret = process.env.RAZORPAY_KEY_SECRET;
-            const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
-            const https = (await import('https')).default;
-            const orderInfo = await new Promise((resolve) => {
-              const r = https.request({
-                method: 'GET',
-                hostname: 'api.razorpay.com',
-                path: `/v1/orders/${orderId}`,
-                headers: { Authorization: `Basic ${auth}` },
-              }, (resp) => {
-                let b = '';
-                resp.on('data', c => { b += c; });
-                resp.on('end', () => {
-                  try { resolve(JSON.parse(b)); } catch { resolve({}); }
-                });
-              });
-              r.on('error', () => resolve({}));
-              r.end();
-            });
-
-            if (orderInfo?.notes) {
-              exam = orderInfo.notes.exam || exam;
-              planCode = orderInfo.notes.planCode || planCode;
-              pName = orderInfo.notes.planName || pName;
-              durationDays = Number(orderInfo.notes.durationDays || 365);
-              if (orderInfo.notes.accessModules) {
-                try { accessModules = JSON.parse(orderInfo.notes.accessModules); } catch { accessModules = [orderInfo.notes.accessModules]; }
-              }
-            }
-          }
-
-          await grantExamAccess(Number(paymentDoc.user_id), exam, planCode, accessModules, durationDays);
-          await createUserNotification(Number(paymentDoc.user_id), 'Premium activated', `Your ${pName} for ${exam.toUpperCase()} is active.`);
+          await grantExamAccess(Number(paymentDoc.user_id), targetExam, planCode, accessModules, durationDays);
+          await createUserNotification(Number(paymentDoc.user_id), 'Premium activated', `Your ${pName} for ${targetExam.toUpperCase()} is active.`);
           planName = pName;
         } catch (e) {
           console.error('[verifyPaymentRedirect] Exam grant error:', e);
+        }
+      } else if (planDoc) {
+        await grantAccessForPlan(Number(paymentDoc.user_id), String(planDoc.code), Number(planDoc.duration_days || 365));
+        await createUserNotification(Number(paymentDoc.user_id), 'Premium activated', `Your ${planDoc.name} is active.`);
+      } else {
+        try {
+          const { grantExamAccess } = await import('./exam.controller.js');
+          await grantExamAccess(Number(paymentDoc.user_id), targetExam || 'puc', planCode, accessModules, durationDays);
+          await createUserNotification(Number(paymentDoc.user_id), 'Premium activated', `Your ${pName} is active.`);
+        } catch (e) {
+          console.error('[verifyPaymentRedirect] Fallback grant error:', e);
         }
       }
 
@@ -1057,7 +1036,22 @@ export async function getPaymentStatusStudent(req, res, next) {
       const planDoc = await Plan.findOne({ id: Number(recentPayment.plan_id) })
         .select({ code: 1, name: 1, duration_days: 1 })
         .lean();
-      if (planDoc) {
+      const targetExam = String(recentPayment.exam || '').toLowerCase().trim();
+      const durationDays = Number(recentPayment.duration_days || planDoc?.duration_days || 365);
+      const planCode = recentPayment.plan_code || planDoc?.code || 'exam_pro';
+      const planName = recentPayment.plan_name || planDoc?.name || 'Exam Premium';
+      const accessModules = recentPayment.access_modules || ['all'];
+
+      if (targetExam && ['puc', 'kcet', 'neet'].includes(targetExam)) {
+        const { grantExamAccess } = await import('./exam.controller.js');
+        await grantExamAccess(userId, targetExam, planCode, accessModules, durationDays);
+        return res.json({
+          activated: true,
+          planCode,
+          planName,
+          expiry: new Date(Date.now() + durationDays * 86400000),
+        });
+      } else if (planDoc) {
         const expiry = await grantAccessForPlan(userId, String(planDoc.code), Number(planDoc.duration_days || 365));
         _ttlCache.delete(`access:status:${userId}`);
         return res.json({
@@ -1066,20 +1060,13 @@ export async function getPaymentStatusStudent(req, res, next) {
           planName: planDoc.name,
           expiry,
         });
-      } else if ((recentPayment.exam && recentPayment.exam !== 'agri') || recentPayment.plan_code) {
+      } else if (recentPayment.plan_code) {
         const { grantExamAccess } = await import('./exam.controller.js');
-        const durationDays = Number(recentPayment.duration_days || 365);
-        await grantExamAccess(
-          userId,
-          recentPayment.exam || 'kcet',
-          recentPayment.plan_code || 'exam_pro',
-          recentPayment.access_modules || ['all'],
-          durationDays
-        );
+        await grantExamAccess(userId, targetExam || 'puc', planCode, accessModules, durationDays);
         return res.json({
           activated: true,
-          planCode: recentPayment.plan_code,
-          planName: recentPayment.plan_name || 'Exam Premium',
+          planCode,
+          planName,
           expiry: new Date(Date.now() + durationDays * 86400000),
         });
       }
@@ -1117,24 +1104,32 @@ export async function getPaymentStatusStudent(req, res, next) {
           if (successful) {
             await Payment.updateOne({ id: recentPayment.id }, { $set: { status: 'paid', razorpay_payment_id: successful.id, paid_at: new Date(), updated_at: new Date() } });
             const planDoc = await Plan.findOne({ id: Number(recentPayment.plan_id) }).lean();
-            if (planDoc) {
+            const targetExam = String(recentPayment.exam || '').toLowerCase().trim();
+            const durationDays = Number(recentPayment.duration_days || planDoc?.duration_days || 365);
+            const planCode = recentPayment.plan_code || planDoc?.code || 'exam_pro';
+            const planName = recentPayment.plan_name || planDoc?.name || 'Exam Premium';
+            const accessModules = recentPayment.access_modules || ['all'];
+
+            if (targetExam && ['puc', 'kcet', 'neet'].includes(targetExam)) {
+              const { grantExamAccess } = await import('./exam.controller.js');
+              await grantExamAccess(userId, targetExam, planCode, accessModules, durationDays);
+              return res.json({
+                activated: true,
+                planCode,
+                planName,
+                expiry: new Date(Date.now() + durationDays * 86400000),
+              });
+            } else if (planDoc) {
               const expiry = await grantAccessForPlan(userId, String(planDoc.code), Number(planDoc.duration_days || 365));
               _ttlCache.delete(`access:status:${userId}`);
               return res.json({ activated: true, planCode: planDoc.code, planName: planDoc.name, expiry });
-            } else if ((recentPayment.exam && recentPayment.exam !== 'agri') || recentPayment.plan_code) {
+            } else if (recentPayment.plan_code) {
               const { grantExamAccess } = await import('./exam.controller.js');
-              const durationDays = Number(recentPayment.duration_days || 365);
-              await grantExamAccess(
-                userId,
-                recentPayment.exam || 'kcet',
-                recentPayment.plan_code || 'exam_pro',
-                recentPayment.access_modules || ['all'],
-                durationDays
-              );
+              await grantExamAccess(userId, targetExam || 'puc', planCode, accessModules, durationDays);
               return res.json({
                 activated: true,
-                planCode: recentPayment.plan_code,
-                planName: recentPayment.plan_name || 'Exam Premium',
+                planCode,
+                planName,
                 expiry: new Date(Date.now() + durationDays * 86400000),
               });
             }

@@ -20,8 +20,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
-const { width } = Dimensions.get('window');
-
 // ─── StudyHack Logo Component ────────────────────────────────────────────────
 function StudyHackLogo() {
   return (
@@ -536,9 +534,9 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     paddingHorizontal: 16,
-    paddingTop: 4,
+    paddingTop: 0,
     paddingBottom: 85,
-    gap: 16,
+    gap: 14,
   },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
@@ -547,8 +545,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 2,
-    paddingBottom: 2,
+    paddingTop: 0,
+    paddingBottom: 0,
   },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   logoBadge: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#0284c7', alignItems: 'center', justifyContent: 'center' },
@@ -594,16 +592,16 @@ const styles = StyleSheet.create({
   viewAllText: { fontSize: 13, fontWeight: '700', color: '#059669' },
 
   // Exam Grid
-  examGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  examCard: { width: (width - 44) / 2, borderRadius: 18, padding: 14, borderWidth: 1, gap: 4, shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 6, elevation: 1 },
+  examGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
+  examCard: { width: '48%', borderRadius: 18, padding: 14, borderWidth: 1, gap: 4, shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 6, elevation: 1 },
   examIconCircle: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   examIcon: { fontSize: 22 },
   examName: { fontSize: 17, fontWeight: '900', color: '#0f172a' },
   examSub: { fontSize: 11, fontWeight: '600', color: '#64748b' },
 
   // Features Row
-  featuresRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#f8fafc', borderRadius: 18, paddingVertical: 14, paddingHorizontal: 10, borderWidth: 1, borderColor: '#f1f5f9' },
-  featureItem: { alignItems: 'center', gap: 6, width: (width - 60) / 5 },
+  featuresRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#f8fafc', borderRadius: 18, paddingVertical: 14, paddingHorizontal: 8, borderWidth: 1, borderColor: '#f1f5f9' },
+  featureItem: { alignItems: 'center', gap: 6, flex: 1 },
   featureIconBox: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   featureLabel: { fontSize: 10, fontWeight: '700', color: '#334155', textAlign: 'center', lineHeight: 13 },
 
