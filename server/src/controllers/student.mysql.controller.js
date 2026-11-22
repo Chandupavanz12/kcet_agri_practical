@@ -508,6 +508,11 @@ export async function createPaymentOrderStudent(req, res, next) {
           plan_id: Number(pgPlan.id || 0),
           amount_paise: pricePaise,
           razorpay_order_id: String(order.id),
+          exam: String(targetExam),
+          plan_code: String(pgPlan.code),
+          plan_name: String(pgPlan.name),
+          access_modules: accessModules,
+          duration_days: durationDays,
           status: 'created',
         }).save();
 
@@ -598,30 +603,26 @@ export async function verifyPaymentStudent(req, res, next) {
     }
 
     const paymentDoc = await Payment.findOne({ razorpay_order_id: orderId }).lean();
-    const planDoc = paymentDoc
-      ? await Plan.findOne({ id: Number(paymentDoc.plan_id) }).select({ code: 1, name: 1, duration_days: 1 }).lean()
-      : null;
-    const payment = paymentDoc && planDoc
-      ? {
-        ...paymentDoc,
-        plan_code: planDoc.code,
-        plan_name: planDoc.name,
-        duration_days: planDoc.duration_days,
-      }
-      : null;
-    if (!payment) return res.status(404).json({ message: 'Payment not found' });
-    if (Number(payment.user_id) !== userId) return res.status(403).json({ message: 'Forbidden' });
+    if (!paymentDoc) return res.status(404).json({ message: 'Payment not found' });
+    if (Number(paymentDoc.user_id) !== userId) return res.status(403).json({ message: 'Forbidden' });
+
+    const planDoc = await Plan.findOne({ id: Number(paymentDoc.plan_id) }).select({ code: 1, name: 1, duration_days: 1 }).lean();
+    const planCode = paymentDoc.plan_code || planDoc?.code || '';
+    const planName = paymentDoc.plan_name || planDoc?.name || 'Premium Access';
+    const durationDays = Number(paymentDoc.duration_days || planDoc?.duration_days || 365);
+    const exam = paymentDoc.exam || 'kcet';
+    const accessModules = paymentDoc.access_modules || ['all'];
 
     if (!verifyRazorpayPaymentSignature({ orderId, paymentId, signature })) {
       return res.status(400).json({ message: 'Invalid payment signature' });
     }
 
-    if (payment.status === 'paid' || payment.status === 'free') {
+    if (paymentDoc.status === 'paid' || paymentDoc.status === 'free') {
       return res.json({ ok: true, alreadyProcessed: true });
     }
 
     await Payment.updateOne(
-      { id: Number(payment.id), status: 'created' },
+      { id: Number(paymentDoc.id) },
       {
         $set: {
           status: 'paid',
@@ -644,16 +645,42 @@ export async function verifyPaymentStudent(req, res, next) {
     _ttlCache.delete('dashboard:pdfs:v1');
     _ttlCache.delete('dashboard:pyqs:v1');
 
-    const expiry = await grantAccessForPlan(userId, String(payment.plan_code), Number(payment.duration_days || 365));
-    await createUserNotification(userId, 'Premium activated', `Your ${payment.plan_name} is active.`);
+    let expiry = null;
+    if (planDoc) {
+      expiry = await grantAccessForPlan(userId, String(planCode), durationDays);
+      await createUserNotification(userId, 'Premium activated', `Your ${planName} is active.`);
+    } else {
+      const { grantExamAccess } = await import('./exam.controller.js');
+      await grantExamAccess(userId, exam, planCode, accessModules, durationDays);
+      await createUserNotification(userId, 'Premium activated', `Your ${planName} is active.`);
+      expiry = new Date(Date.now() + durationDays * 86400000);
+    }
 
-    return res.json({ ok: true, planCode: payment.plan_code, expiry });
+    return res.json({ ok: true, planCode, expiry });
   } catch (err) {
     return next(err);
   }
 }
 
 function renderPaymentBridgeHtml({ success, targetAppUrl, androidIntentUrl = '', message, planName = 'Premium Access' }) {
+  // If redirect is a website URL (http / https), immediately redirect back to website without showing app buttons
+  if (/^https?:\/\//i.test(targetAppUrl)) {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="0; url=${targetAppUrl}">
+  <title>Payment Successful - Redirecting...</title>
+  <script>
+    window.location.replace("${targetAppUrl}");
+  </script>
+</head>
+<body style="font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f8fafc;">
+  <p style="font-size: 16px; color: #334155;">Payment successful! Redirecting to your materials... <a href="${targetAppUrl}">Click here if not redirected</a></p>
+</body>
+</html>`;
+  }
+
   const safeTitle = success ? 'Payment Successful' : 'Payment Update';
   const safeHeading = success ? '🎉 Payment Successful!' : '⏳ Payment Received';
   const btnText = success ? 'Open App & Access Premium' : 'Return to App';
@@ -797,8 +824,11 @@ export async function verifyPaymentRedirect(req, res, next) {
     const buildUrl = (base, param) => `${base}${base.includes('?') ? '&' : '?'}${param}`;
     const successAppUrl = buildUrl(targetAppBase, 'success=PremiumActivated');
     const failAppUrl = buildUrl(targetAppBase, 'error=PaymentVerificationFailed');
-    const successIntentUrl = `intent://student/premium?success=PremiumActivated#Intent;scheme=mymobileapp;package=com.chandu.kcetapp;end;`;
-    const failIntentUrl = `intent://student/premium?error=PaymentVerificationFailed#Intent;scheme=mymobileapp;package=com.chandu.kcetapp;end;`;
+    const cleanAppPath = targetAppBase.startsWith('mymobileapp://')
+      ? targetAppBase.replace('mymobileapp://', '').split('?')[0]
+      : 'student/premium';
+    const successIntentUrl = `intent://${cleanAppPath}?success=PremiumActivated#Intent;scheme=mymobileapp;package=com.chandu.kcetapp;end;`;
+    const failIntentUrl = `intent://${cleanAppPath}?error=PaymentVerificationFailed#Intent;scheme=mymobileapp;package=com.chandu.kcetapp;end;`;
 
     if (!orderId) {
       res.setHeader('Content-Type', 'text/html');
@@ -1036,6 +1066,22 @@ export async function getPaymentStatusStudent(req, res, next) {
           planName: planDoc.name,
           expiry,
         });
+      } else if ((recentPayment.exam && recentPayment.exam !== 'agri') || recentPayment.plan_code) {
+        const { grantExamAccess } = await import('./exam.controller.js');
+        const durationDays = Number(recentPayment.duration_days || 365);
+        await grantExamAccess(
+          userId,
+          recentPayment.exam || 'kcet',
+          recentPayment.plan_code || 'exam_pro',
+          recentPayment.access_modules || ['all'],
+          durationDays
+        );
+        return res.json({
+          activated: true,
+          planCode: recentPayment.plan_code,
+          planName: recentPayment.plan_name || 'Exam Premium',
+          expiry: new Date(Date.now() + durationDays * 86400000),
+        });
       }
     }
 
@@ -1075,6 +1121,22 @@ export async function getPaymentStatusStudent(req, res, next) {
               const expiry = await grantAccessForPlan(userId, String(planDoc.code), Number(planDoc.duration_days || 365));
               _ttlCache.delete(`access:status:${userId}`);
               return res.json({ activated: true, planCode: planDoc.code, planName: planDoc.name, expiry });
+            } else if ((recentPayment.exam && recentPayment.exam !== 'agri') || recentPayment.plan_code) {
+              const { grantExamAccess } = await import('./exam.controller.js');
+              const durationDays = Number(recentPayment.duration_days || 365);
+              await grantExamAccess(
+                userId,
+                recentPayment.exam || 'kcet',
+                recentPayment.plan_code || 'exam_pro',
+                recentPayment.access_modules || ['all'],
+                durationDays
+              );
+              return res.json({
+                activated: true,
+                planCode: recentPayment.plan_code,
+                planName: recentPayment.plan_name || 'Exam Premium',
+                expiry: new Date(Date.now() + durationDays * 86400000),
+              });
             }
           }
         }

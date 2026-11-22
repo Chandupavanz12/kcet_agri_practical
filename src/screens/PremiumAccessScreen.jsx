@@ -124,9 +124,18 @@ export default function PremiumAccessScreen() {
 
       // Open Hosted Web Checkout for Razorpay
       const { orderId, amountPaise, user: orderUser, plan } = orderRes;
-      const appRedirectUrl = 'mymobileapp://student/premium';
+      const isWeb = Platform.OS === 'web';
+      let appRedirectUrl = 'mymobileapp://student/premium';
+      if (isWeb && typeof window !== 'undefined') {
+        appRedirectUrl = `${window.location.origin}/student/premium?payment=success`;
+      }
       const checkoutBase = API_BASE_URL || 'https://kcet-agri-practical.onrender.com';
       const checkoutUrl = `${checkoutBase}/api/student/premium/checkout?orderId=${orderId}&amount=${amountPaise}&name=${encodeURIComponent(orderUser?.name || user?.name || '')}&email=${encodeURIComponent(orderUser?.email || user?.email || '')}&planId=${plan?.code || ''}&redirect_url=${encodeURIComponent(appRedirectUrl)}`;
+
+      if (isWeb && typeof window !== 'undefined') {
+        window.location.href = checkoutUrl;
+        return;
+      }
 
       try {
         const result = await WebBrowser.openAuthSessionAsync(checkoutUrl, appRedirectUrl);

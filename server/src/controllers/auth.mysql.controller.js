@@ -13,6 +13,10 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 }
 
+function escapeRegex(s) {
+  return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // ── Brevo HTTP sender ──────────────────────────────────────────────────────
 async function sendViaBrevoHttp({ apiKey, fromEmail, fromName, toEmail, subject, text }) {
   const payload = JSON.stringify({
@@ -428,8 +432,21 @@ export async function studentLogin(req, res, next) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    const emailLower = String(email).trim().toLowerCase();
-    const user = await User.findOne({ email: emailLower }).lean();
+    const identifier = String(email || '').trim();
+    const identifierLower = identifier.toLowerCase();
+    const isEmail = identifierLower.includes('@');
+    
+    // Find user by either email or username/name
+    const userQuery = isEmail
+      ? { email: identifierLower }
+      : {
+          $or: [
+            { email: identifierLower },
+            { name: { $regex: new RegExp(`^${escapeRegex(identifier)}$`, 'i') } },
+          ],
+        };
+
+    const user = await User.findOne(userQuery).lean();
 
     if (!user || user.role !== 'student') {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -440,14 +457,11 @@ export async function studentLogin(req, res, next) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Auto-upgrade to lightning-fast HMAC hash if it hasn't been upgraded yet
+    // Auto-upgrade to lightning-fast HMAC hash in background without blocking login
     if (user.password_hash && !user.password_hash.startsWith('hmac:')) {
-      try {
-        const newHash = await hashPassword(String(password));
-        await User.updateOne({ id: user.id }, { $set: { password_hash: newHash } }).exec();
-      } catch (e) {
-        // silently ignore background upgrade errors
-      }
+      hashPassword(String(password)).then((newHash) => {
+        User.updateOne({ id: user.id }, { $set: { password_hash: newHash } }).exec().catch(() => {});
+      }).catch(() => {});
     }
 
     const userObj = mapUserRow(user);
@@ -504,8 +518,19 @@ export async function adminLogin(req, res, next) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    const emailLower = String(email).trim().toLowerCase();
-    const user = await User.findOne({ email: emailLower }).lean();
+    const identifier = String(email || '').trim();
+    const identifierLower = identifier.toLowerCase();
+    const isEmail = identifierLower.includes('@');
+    const userQuery = isEmail
+      ? { email: identifierLower }
+      : {
+          $or: [
+            { email: identifierLower },
+            { name: { $regex: new RegExp(`^${escapeRegex(identifier)}$`, 'i') } },
+          ],
+        };
+
+    const user = await User.findOne(userQuery).lean();
 
     if (!user || user.role !== 'admin') {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -516,14 +541,11 @@ export async function adminLogin(req, res, next) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Auto-upgrade to lightning-fast HMAC hash if it hasn't been upgraded yet
+    // Auto-upgrade to lightning-fast HMAC hash in background without blocking login
     if (user.password_hash && !user.password_hash.startsWith('hmac:')) {
-      try {
-        const newHash = await hashPassword(String(password));
-        await User.updateOne({ id: user.id }, { $set: { password_hash: newHash } }).exec();
-      } catch (e) {
-        // silently ignore background upgrade errors
-      }
+      hashPassword(String(password)).then((newHash) => {
+        User.updateOne({ id: user.id }, { $set: { password_hash: newHash } }).exec().catch(() => {});
+      }).catch(() => {});
     }
 
     if (user.last_otp_verified_at) {

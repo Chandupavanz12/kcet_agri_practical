@@ -2,7 +2,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Dimensions,
   Platform,
@@ -18,8 +17,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
-
-const { width } = Dimensions.get('window');
 
 export default function ProfileScreen() {
   const { token, user, logout } = useAuth();

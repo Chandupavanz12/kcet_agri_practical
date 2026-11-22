@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -100,7 +101,9 @@ export default function StudentDashboardScreen() {
   ]);
   const [activeBannerIdx, setActiveBannerIdx] = useState(0);
   const bannerFlatListRef = useRef(null);
-  const BANNER_WIDTH = width - 32;
+  const { width: windowWidth } = useWindowDimensions();
+  const screenWidth = Math.min(windowWidth || 380, 480);
+  const BANNER_WIDTH = screenWidth - 32;
   const [progress, setProgress] = useState({
     progressPercent: 0,
     totalTestsGiven: 0,

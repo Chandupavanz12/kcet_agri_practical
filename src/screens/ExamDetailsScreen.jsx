@@ -13,10 +13,11 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { apiFetch } from '../api/client.js';
+import { apiFetch, clearApiCache } from '../api/client.js';
 import { API_BASE_URL } from '../config/env.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
@@ -115,7 +116,9 @@ export default function ExamDetailsScreen() {
   ]);
   const [activeBannerIdx, setActiveBannerIdx] = useState(0);
   const bannerFlatListRef = useRef(null);
-  const BANNER_CARD_WIDTH = width - 32;
+  const { width: windowWidth } = useWindowDimensions();
+  const screenWidth = Math.min(windowWidth || 380, 480);
+  const BANNER_CARD_WIDTH = screenWidth - 32;
   const [materials, setMaterials] = useState(cachedData?.materials || []);
   const [pyqs, setPyqs] = useState(cachedData?.pyqs || []);
   const [tests, setTests] = useState(cachedData?.tests || []);
@@ -303,6 +306,16 @@ export default function ExamDetailsScreen() {
     }
   };
 
+  // Listen for payment return redirect params
+  useEffect(() => {
+    if (params.payment === 'success' || params.success) {
+      EXAM_CLIENT_CACHE.delete(examId);
+      clearApiCache();
+      loadExamData(true);
+      Alert.alert('Payment Successful!', '🎉 Your premium access is now activated! All materials are unlocked.');
+    }
+  }, [params.payment, params.success]);
+
   // Subscribe / Payment via Razorpay (matching Agri Practical flow)
   const handleSubscribe = async (plan) => {
     try {
@@ -329,9 +342,19 @@ export default function ExamDetailsScreen() {
         throw new Error(res?.message || 'Could not initiate checkout');
       }
 
-      const appRedirectUrl = `mymobileapp://student/exam/${examId}`;
+      const isWeb = Platform.OS === 'web';
+      let appRedirectUrl = `mymobileapp://student/exam/${examId}`;
+      if (isWeb && typeof window !== 'undefined') {
+        appRedirectUrl = `${window.location.origin}/student/exam/${examId}?payment=success`;
+      }
+
       const checkoutBase = API_BASE_URL || 'https://kcet-agri-practical.onrender.com';
       const checkoutUrl = `${checkoutBase}/api/student/premium/checkout?orderId=${encodeURIComponent(res.orderId)}&amount=${res.amountPaise || 0}&name=${encodeURIComponent(res.user?.name || user?.name || '')}&email=${encodeURIComponent(res.user?.email || user?.email || '')}&planId=${encodeURIComponent(plan.code || '')}&redirect_url=${encodeURIComponent(appRedirectUrl)}`;
+
+      if (isWeb && typeof window !== 'undefined') {
+        window.location.href = checkoutUrl;
+        return;
+      }
 
       try {
         await WebBrowser.openAuthSessionAsync(checkoutUrl, appRedirectUrl);
@@ -344,8 +367,19 @@ export default function ExamDetailsScreen() {
         try {
           await apiFetch('/api/student/premium/payment-status', { token });
         } catch (_) { }
-        loadExamData();
-      }, 2500);
+        EXAM_CLIENT_CACHE.delete(examId);
+        clearApiCache();
+        loadExamData(true);
+      }, 1500);
+
+      setTimeout(async () => {
+        try {
+          await apiFetch('/api/student/premium/payment-status', { token });
+        } catch (_) { }
+        EXAM_CLIENT_CACHE.delete(examId);
+        clearApiCache();
+        loadExamData(false);
+      }, 4000);
     } catch (err) {
       Alert.alert('Payment Error', err?.message || 'Could not launch payment gateway.');
     } finally {

@@ -275,7 +275,6 @@ export async function checkUserModuleAccess(pool, userId, exam, moduleName) {
       [userId, exam]
     );
     if (res.rows.length === 0) {
-      _userAccessCache.set(cacheKey, { hasAccess: false, expiresAt: Date.now() + 20000 });
       return false;
     }
 
@@ -286,11 +285,10 @@ export async function checkUserModuleAccess(pool, userId, exam, moduleName) {
       }
       if (!Array.isArray(mods)) mods = ['all'];
       if (mods.includes('all') || mods.includes(moduleName)) {
-        _userAccessCache.set(cacheKey, { hasAccess: true, expiresAt: Date.now() + 30000 });
+        _userAccessCache.set(cacheKey, { hasAccess: true, expiresAt: Date.now() + 60000 });
         return true;
       }
     }
-    _userAccessCache.set(cacheKey, { hasAccess: false, expiresAt: Date.now() + 20000 });
     return false;
   } catch (err) {
     console.error('[checkUserModuleAccess] error:', err);
@@ -306,9 +304,8 @@ export async function grantExamAccess(userId, exam, planCode, accessModules = ['
   _userAccessCache.clear();
   clearExamCache();
 
-  const poolsToUpdate = normalizedExam === 'global'
-    ? [getPucPool(), getKcetNeetPool()]
-    : [getPoolForExam(normalizedExam) || getKcetNeetPool()];
+  // Always write access to both PostgreSQL pools so both PUC and KCET/NEET instances reflect access immediately
+  const poolsToUpdate = [getPucPool(), getKcetNeetPool()].filter(Boolean);
 
   for (const p of poolsToUpdate) {
     try {

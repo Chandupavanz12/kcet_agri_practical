@@ -1,11 +1,12 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PublicFooter from '../components/PublicFooter.jsx';
 import PublicHeader from '../components/PublicHeader.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { API_BASE_URL } from '../config/env.js';
 
 export default function LoginScreen() {
   const { loginStudent, loginAdmin, verifyAdminLoginOtp, oauthStudent } = useAuth();
@@ -19,6 +20,15 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Pre-warm the backend immediately upon entering the login screen to prevent Render spin-up wait
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/ping`).catch(() => {});
+  }, []);
+
+  const handleInputFocus = () => {
+    fetch(`${API_BASE_URL}/api/ping`).catch(() => {});
+  };
 
   async function onSubmit() {
     setError('');
@@ -107,16 +117,17 @@ export default function LoginScreen() {
             ) : (
               <>
                 <View style={styles.formGroup}>
-                  <Text style={styles.label}>Email</Text>
+                  <Text style={styles.label}>Username or Email</Text>
                   <View style={styles.inputWrapper}>
-                    <Text style={styles.inputIcon}>@</Text>
+                    <Text style={styles.inputIcon}>👤</Text>
                     <TextInput
                       style={styles.input}
-                      placeholder="Enter email"
+                      placeholder="Enter username or email"
                       value={email}
                       onChangeText={setEmail}
+                      onFocus={handleInputFocus}
                       autoCapitalize="none"
-                      keyboardType="email-address"
+                      keyboardType="default"
                     />
                   </View>
                 </View>
