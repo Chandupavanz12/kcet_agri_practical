@@ -268,32 +268,51 @@ export async function checkUserModuleAccess(pool, userId, exam, moduleName) {
     return cached.hasAccess;
   }
 
-  try {
-    const res = await pool.query(
-      `SELECT access_modules, exam, expires_at FROM user_access 
-       WHERE user_id = $1 AND (exam = $2 OR exam = 'global') AND expires_at > NOW()`,
-      [userId, exam]
-    );
-    if (res.rows.length === 0) {
-      return false;
-    }
+  const cleanExam = String(exam || '').toLowerCase().trim();
 
-    for (const row of res.rows) {
-      let mods = row.access_modules;
-      if (typeof mods === 'string') {
-        try { mods = JSON.parse(mods); } catch { mods = [mods]; }
-      }
-      if (!Array.isArray(mods)) mods = ['all'];
-      if (mods.includes('all') || mods.includes(moduleName)) {
+  // 1. Direct MongoDB Payment check (primary source of truth for payment success)
+  try {
+    const { Payment } = await import('../models/index.js');
+    const paidDoc = await Payment.findOne({
+      user_id: Number(userId),
+      status: { $in: ['paid', 'free'] },
+      $or: [
+        { exam: cleanExam },
+        { exam: 'global' },
+      ],
+    }).sort({ paid_at: -1, created_at: -1 }).lean();
+
+    if (paidDoc) {
+      const paidDate = paidDoc.paid_at || paidDoc.created_at || new Date();
+      const durationDays = Number(paidDoc.duration_days || 365);
+      const expiresAt = new Date(new Date(paidDate).getTime() + durationDays * 86400000);
+      if (expiresAt > new Date()) {
         _userAccessCache.set(cacheKey, { hasAccess: true, expiresAt: Date.now() + 60000 });
         return true;
       }
     }
-    return false;
-  } catch (err) {
-    console.error('[checkUserModuleAccess] error:', err);
-    return false;
+  } catch (mongoErr) {
+    console.warn('[checkUserModuleAccess] Mongo payment check error:', mongoErr?.message || mongoErr);
   }
+
+  // 2. PostgreSQL user_access check
+  if (pool) {
+    try {
+      const res = await pool.query(
+        `SELECT access_modules, exam, expires_at FROM user_access 
+         WHERE user_id = $1 AND (exam = $2 OR exam = 'global') AND expires_at > NOW()`,
+        [userId, cleanExam]
+      );
+      if (res.rows.length > 0) {
+        _userAccessCache.set(cacheKey, { hasAccess: true, expiresAt: Date.now() + 60000 });
+        return true;
+      }
+    } catch (err) {
+      console.error('[checkUserModuleAccess] Postgres error:', err?.message || err);
+    }
+  }
+
+  return false;
 }
 
 // Helper: Grant exam access in PostgreSQL (supports granular modules & global plans)
@@ -660,13 +679,43 @@ export async function getExamPlans(req, res, next) {
     const userId = Number(req.user?.sub || req.user?.id);
     let activeAccess = null;
     if (userId) {
-      const accessRes = await pool.query(
-        `SELECT * FROM user_access 
-         WHERE user_id = $1 AND (exam = $2 OR exam = 'global') AND expires_at > NOW()`,
-        [userId, exam]
-      );
-      if (accessRes.rows.length > 0) {
-        activeAccess = accessRes.rows[0];
+      if (pool) {
+        try {
+          const accessRes = await pool.query(
+            `SELECT * FROM user_access 
+             WHERE user_id = $1 AND (exam = $2 OR exam = 'global') AND expires_at > NOW()`,
+            [userId, exam]
+          );
+          if (accessRes.rows.length > 0) {
+            activeAccess = accessRes.rows[0];
+          }
+        } catch (_) {}
+      }
+
+      if (!activeAccess) {
+        try {
+          const { Payment } = await import('../models/index.js');
+          const paidDoc = await Payment.findOne({
+            user_id: Number(userId),
+            status: { $in: ['paid', 'free'] },
+            $or: [{ exam }, { exam: 'global' }],
+          }).sort({ paid_at: -1, created_at: -1 }).lean();
+
+          if (paidDoc) {
+            const paidDate = paidDoc.paid_at || paidDoc.created_at || new Date();
+            const durationDays = Number(paidDoc.duration_days || 365);
+            const expiresAt = new Date(new Date(paidDate).getTime() + durationDays * 86400000);
+            if (expiresAt > new Date()) {
+              activeAccess = {
+                user_id: userId,
+                exam,
+                plan_code: paidDoc.plan_code,
+                access_modules: paidDoc.access_modules || ['all'],
+                expires_at: expiresAt,
+              };
+            }
+          }
+        } catch (_) {}
       }
     }
 

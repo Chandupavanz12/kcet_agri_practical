@@ -3,16 +3,16 @@ import React, { useEffect } from 'react';
 import { useAuth } from '../../src/contexts/AuthContext';
 
 export default function StudentLayout() {
-  const { user, loading } = useAuth();
+  const { user, token, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !user && !token) {
       router.replace('/login' as any);
     }
-  }, [user, loading]);
+  }, [user, token, loading]);
 
-  if (!user) return null;
+  if (!user && !token) return null;
 
   return (
     <Stack screenOptions={{ headerShown: false }} />

@@ -4,9 +4,9 @@ let pucPool = null;
 let kcetNeetPool = null;
 
 export function getPucPool() {
-  const url = process.env.PUC_DATABASE_URL;
+  const url = process.env.PUC_DATABASE_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL;
   if (!url) {
-    console.warn('[pg-puc] PUC_DATABASE_URL environment variable is not defined.');
+    console.warn('[pg-puc] Neither PUC_DATABASE_URL nor DATABASE_URL environment variable is defined.');
     return null;
   }
   if (!pucPool) {
@@ -23,9 +23,9 @@ export function getPucPool() {
 }
 
 export function getKcetNeetPool() {
-  const url = process.env.KCET_NEET_DATABASE_URL;
+  const url = process.env.KCET_NEET_DATABASE_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL;
   if (!url) {
-    console.warn('[pg-kcet-neet] KCET_NEET_DATABASE_URL environment variable is not defined.');
+    console.warn('[pg-kcet-neet] Neither KCET_NEET_DATABASE_URL nor DATABASE_URL environment variable is defined.');
     return null;
   }
   if (!kcetNeetPool) {

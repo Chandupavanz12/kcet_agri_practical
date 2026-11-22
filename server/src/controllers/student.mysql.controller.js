@@ -329,9 +329,9 @@ export async function razorpayWebhook(req, res, next) {
 
     const payment = {
       ...paymentDoc,
-      plan_code: planDoc?.code || '',
-      plan_name: planDoc?.name || '',
-      duration_days: planDoc?.duration_days || 365,
+      plan_code: paymentDoc.plan_code || planDoc?.code || 'exam_pro',
+      plan_name: paymentDoc.plan_name || planDoc?.name || 'Exam Access Plan',
+      duration_days: paymentDoc.duration_days || planDoc?.duration_days || 365,
     };
 
     if (payment.status === 'paid' || payment.status === 'free') {
@@ -356,28 +356,33 @@ export async function razorpayWebhook(req, res, next) {
     );
 
     let expiry = null;
-    if (planDoc) {
+    const targetExam = String(paymentDoc.exam || '').toLowerCase().trim();
+    if (targetExam && ['puc', 'kcet', 'neet'].includes(targetExam)) {
+      try {
+        const { grantExamAccess } = await import('./exam.controller.js');
+        const planCode = payment.plan_code || 'all';
+        const pName = payment.plan_name || 'Exam Premium';
+        const durationDays = Number(payment.duration_days || 365);
+        const accessModules = paymentDoc.access_modules || ['all'];
+        await grantExamAccess(Number(payment.user_id), targetExam, planCode, accessModules, durationDays);
+        await createUserNotification(Number(payment.user_id), 'Premium activated', `Your ${pName} for ${targetExam.toUpperCase()} is active.`);
+        expiry = new Date(Date.now() + durationDays * 86400000);
+      } catch (examErr) {
+        console.error('[razorpayWebhook] Exam access grant error:', examErr);
+      }
+    } else if (planDoc) {
       // Existing Agri Practical MongoDB Plan
       expiry = await grantAccessForPlan(Number(payment.user_id), String(payment.plan_code), Number(payment.duration_days || 365));
       await createUserNotification(Number(payment.user_id), 'Premium activated', `Your ${payment.plan_name} is active.`);
     } else {
-      // Exam Plan in Neon Postgres (PUC, KCET, NEET, Global)
+      // Exam Plan fallback
       try {
         const { grantExamAccess } = await import('./exam.controller.js');
-        const notes = payload?.payload?.payment?.entity?.notes || payload?.payload?.order?.entity?.notes || {};
-        const exam = notes.exam || 'kcet';
-        const planCode = notes.planCode || 'exam_pro';
-        const pName = notes.planName || 'Exam Access Plan';
-        const durationDays = Number(notes.durationDays || 365);
-        let accessModules = ['all'];
-        if (notes.accessModules) {
-          try { accessModules = JSON.parse(notes.accessModules); } catch { accessModules = [notes.accessModules]; }
-        }
-
-        await grantExamAccess(Number(payment.user_id), exam, planCode, accessModules, durationDays);
-        await createUserNotification(Number(payment.user_id), 'Premium activated', `Your ${pName} for ${exam.toUpperCase()} is active.`);
+        await grantExamAccess(Number(payment.user_id), targetExam || 'puc', payment.plan_code, paymentDoc.access_modules || ['all'], Number(payment.duration_days || 365));
+        await createUserNotification(Number(payment.user_id), 'Premium activated', `Your ${payment.plan_name} is active.`);
+        expiry = new Date(Date.now() + Number(payment.duration_days || 365) * 86400000);
       } catch (examErr) {
-        console.error('[razorpayWebhook] Exam access grant error:', examErr);
+        console.error('[razorpayWebhook] Exam access grant fallback error:', examErr);
       }
     }
 
@@ -827,7 +832,26 @@ export async function verifyPaymentRedirect(req, res, next) {
     const defaultAppBase = 'mymobileapp://student/premium';
     const targetAppBase = customRedirect || defaultAppBase;
 
-    const buildUrl = (base, param) => `${base}${base.includes('?') ? '&' : '?'}${param}`;
+    let userAuthToken = '';
+    const paymentDoc = orderId ? await Payment.findOne({ razorpay_order_id: orderId }).lean() : null;
+    if (paymentDoc?.user_id) {
+      try {
+        const { signToken } = await import('../utils/auth.js');
+        const { User } = await import('../models/index.js');
+        const uDoc = await User.findOne({ id: Number(paymentDoc.user_id) }).lean();
+        if (uDoc) {
+          userAuthToken = signToken(uDoc);
+        }
+      } catch (_) {}
+    }
+
+    const buildUrl = (base, param) => {
+      let url = `${base}${base.includes('?') ? '&' : '?'}${param}`;
+      if (userAuthToken && /^https?:\/\//i.test(base)) {
+        url += `&token=${encodeURIComponent(userAuthToken)}`;
+      }
+      return url;
+    };
     const successAppUrl = buildUrl(targetAppBase, 'success=PremiumActivated');
     const failAppUrl = buildUrl(targetAppBase, 'error=PaymentVerificationFailed');
     const cleanAppPath = targetAppBase.startsWith('mymobileapp://')
@@ -846,7 +870,6 @@ export async function verifyPaymentRedirect(req, res, next) {
       }));
     }
 
-    const paymentDoc = await Payment.findOne({ razorpay_order_id: orderId }).lean();
     if (!paymentDoc) {
       res.setHeader('Content-Type', 'text/html');
       return res.status(200).send(renderPaymentBridgeHtml({

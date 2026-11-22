@@ -279,9 +279,16 @@ export default function ExamDetailsScreen() {
     setView('content');
   };
 
+  const isItemLocked = (item) => {
+    if (!item) return false;
+    if (item.isFree === true || item.is_free === true) return false;
+    if (isSubscribed) return false;
+    return Boolean(item.locked);
+  };
+
   // View PDF
   const handleOpenPdf = async (item) => {
-    if (item.locked) {
+    if (isItemLocked(item)) {
       Alert.alert(
         '🔒 Premium Content',
         'This material is exclusive to premium members. Upgrade your plan to unlock full access.',
@@ -365,7 +372,8 @@ export default function ExamDetailsScreen() {
       const isWeb = Platform.OS === 'web';
       let appRedirectUrl = `mymobileapp://student/exam/${examId}`;
       if (isWeb && typeof window !== 'undefined') {
-        appRedirectUrl = `${window.location.origin}/student/exam/${examId}?payment=success`;
+        const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+        appRedirectUrl = `${window.location.origin}/student/exam/${examId}?payment=success${tokenParam}`;
       }
 
       const checkoutBase = API_BASE_URL || 'https://kcet-agri-practical.onrender.com';
@@ -746,61 +754,64 @@ export default function ExamDetailsScreen() {
                       </Text>
                     </View>
                   ) : (
-                    displayedMaterials.map((item) => (
-                      <View key={item.id} style={styles.contentCard}>
-                        <View style={styles.contentCardTop}>
-                          <View style={styles.contentTypeIconBox}>
-                            <Text style={{ fontSize: 20 }}>📄</Text>
-                          </View>
-                          <View style={styles.contentCardTitleCol}>
-                            <Text style={styles.contentCardTitle}>{item.title}</Text>
-                            <Text style={styles.contentCardMeta}>
-                              {item.subject ? item.subject.toUpperCase() : selectedSubject} • {item.type?.toUpperCase() || 'PDF'}
-                            </Text>
-                          </View>
+                    displayedMaterials.map((item) => {
+                      const locked = isItemLocked(item);
+                      return (
+                        <View key={item.id} style={styles.contentCard}>
+                          <View style={styles.contentCardTop}>
+                            <View style={styles.contentTypeIconBox}>
+                              <Text style={{ fontSize: 20 }}>📄</Text>
+                            </View>
+                            <View style={styles.contentCardTitleCol}>
+                              <Text style={styles.contentCardTitle}>{item.title}</Text>
+                              <Text style={styles.contentCardMeta}>
+                                {item.subject ? item.subject.toUpperCase() : selectedSubject} • {item.type?.toUpperCase() || 'PDF'}
+                              </Text>
+                            </View>
 
-                          {/* Status Badge */}
-                          <View
-                            style={[
-                              styles.itemStatusBadge,
-                              item.locked ? styles.statusBadgeLocked : styles.statusBadgeFree,
-                            ]}
-                          >
-                            <Text
+                            {/* Status Badge */}
+                            <View
                               style={[
-                                styles.itemStatusBadgeText,
-                                item.locked ? styles.statusTextLocked : styles.statusTextFree,
+                                styles.itemStatusBadge,
+                                locked ? styles.statusBadgeLocked : styles.statusBadgeFree,
                               ]}
                             >
-                              {item.locked ? '🔒 Locked' : '✓ Free'}
-                            </Text>
+                              <Text
+                                style={[
+                                  styles.itemStatusBadgeText,
+                                  locked ? styles.statusTextLocked : styles.statusTextFree,
+                                ]}
+                              >
+                                {locked ? '🔒 Locked' : '✓ Unlocked'}
+                              </Text>
+                            </View>
                           </View>
+
+                          {!!item.description && (
+                            <Text style={styles.contentCardDesc}>{item.description}</Text>
+                          )}
+
+                          {/* Action Button */}
+                          {locked ? (
+                            <TouchableOpacity
+                              style={styles.unlockItemBtn}
+                              onPress={() => setView('plans')}
+                              activeOpacity={0.85}
+                            >
+                              <Text style={styles.unlockItemBtnText}>🔒 Click to Unlock with Plan 💳</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity
+                              style={styles.viewPdfBtn}
+                              onPress={() => handleOpenPdf(item)}
+                              activeOpacity={0.85}
+                            >
+                              <Text style={styles.viewPdfBtnText}>View / Download PDF 📄</Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
-
-                        {!!item.description && (
-                          <Text style={styles.contentCardDesc}>{item.description}</Text>
-                        )}
-
-                        {/* Action Button */}
-                        {item.locked ? (
-                          <TouchableOpacity
-                            style={styles.unlockItemBtn}
-                            onPress={() => setView('plans')}
-                            activeOpacity={0.85}
-                          >
-                            <Text style={styles.unlockItemBtnText}>🔒 Click to Unlock with Plan 💳</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity
-                            style={styles.viewPdfBtn}
-                            onPress={() => handleOpenPdf(item)}
-                            activeOpacity={0.85}
-                          >
-                            <Text style={styles.viewPdfBtnText}>View / Download PDF 📄</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    ))
+                      );
+                    })
                   )}
                 </View>
               )}
@@ -817,56 +828,59 @@ export default function ExamDetailsScreen() {
                       </Text>
                     </View>
                   ) : (
-                    displayedTests.map((test) => (
-                      <View key={test.id} style={styles.contentCard}>
-                        <View style={styles.contentCardTop}>
-                          <View style={[styles.contentTypeIconBox, { backgroundColor: '#dcfce7' }]}>
-                            <Text style={{ fontSize: 20 }}>🎯</Text>
-                          </View>
-                          <View style={styles.contentCardTitleCol}>
-                            <Text style={styles.contentCardTitle}>{test.title}</Text>
-                            <Text style={styles.contentCardMeta}>
-                              {test.durationMinutes || 30} mins • {test.questionCount || 0} Questions • Total {test.totalMarks || 60} marks
-                            </Text>
-                          </View>
+                    displayedTests.map((test) => {
+                      const locked = isItemLocked(test);
+                      return (
+                        <View key={test.id} style={styles.contentCard}>
+                          <View style={styles.contentCardTop}>
+                            <View style={[styles.contentTypeIconBox, { backgroundColor: '#dcfce7' }]}>
+                              <Text style={{ fontSize: 20 }}>🎯</Text>
+                            </View>
+                            <View style={styles.contentCardTitleCol}>
+                              <Text style={styles.contentCardTitle}>{test.title}</Text>
+                              <Text style={styles.contentCardMeta}>
+                                {test.durationMinutes || 30} mins • {test.questionCount || 0} Questions • Total {test.totalMarks || 60} marks
+                              </Text>
+                            </View>
 
-                          {/* Status Badge */}
-                          <View
-                            style={[
-                              styles.itemStatusBadge,
-                              test.locked ? styles.statusBadgeLocked : styles.statusBadgeFree,
-                            ]}
-                          >
-                            <Text
+                            {/* Status Badge */}
+                            <View
                               style={[
-                                styles.itemStatusBadgeText,
-                                test.locked ? styles.statusTextLocked : styles.statusTextFree,
+                                styles.itemStatusBadge,
+                                locked ? styles.statusBadgeLocked : styles.statusBadgeFree,
                               ]}
                             >
-                              {test.locked ? '🔒 Locked' : '✓ Free'}
-                            </Text>
+                              <Text
+                                style={[
+                                  styles.itemStatusBadgeText,
+                                  locked ? styles.statusTextLocked : styles.statusTextFree,
+                                ]}
+                              >
+                                {locked ? '🔒 Locked' : '✓ Unlocked'}
+                              </Text>
+                            </View>
                           </View>
-                        </View>
 
-                        {test.locked ? (
-                          <TouchableOpacity
-                            style={styles.unlockItemBtn}
-                            onPress={() => setView('plans')}
-                            activeOpacity={0.85}
-                          >
-                            <Text style={styles.unlockItemBtnText}>🔒 Click to Unlock Mock Test 💳</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity
-                            style={[styles.viewPdfBtn, { backgroundColor: config.themeColor }]}
-                            onPress={() => router.push(`/student/mock-test/${test.id}`)}
-                            activeOpacity={0.85}
-                          >
-                            <Text style={[styles.viewPdfBtnText, { color: '#ffffff' }]}>Start Mock Test 🚀</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    ))
+                          {locked ? (
+                            <TouchableOpacity
+                              style={styles.unlockItemBtn}
+                              onPress={() => setView('plans')}
+                              activeOpacity={0.85}
+                            >
+                              <Text style={styles.unlockItemBtnText}>🔒 Click to Unlock Mock Test 💳</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity
+                              style={[styles.viewPdfBtn, { backgroundColor: config.themeColor }]}
+                              onPress={() => router.push(`/student/mock-test/${test.id}`)}
+                              activeOpacity={0.85}
+                            >
+                              <Text style={[styles.viewPdfBtnText, { color: '#ffffff' }]}>Start Mock Test 🚀</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      );
+                    })
                   )}
                 </View>
               )}
@@ -883,55 +897,58 @@ export default function ExamDetailsScreen() {
                       </Text>
                     </View>
                   ) : (
-                    displayedPyqs.map((pyq) => (
-                      <View key={pyq.id} style={styles.contentCard}>
-                        <View style={styles.contentCardTop}>
-                          <View style={[styles.contentTypeIconBox, { backgroundColor: '#ffedd5' }]}>
-                            <Text style={{ fontSize: 20 }}>📅</Text>
-                          </View>
-                          <View style={styles.contentCardTitleCol}>
-                            <Text style={styles.contentCardTitle}>{pyq.title}</Text>
-                            <Text style={styles.contentCardMeta}>
-                              Exam Year: {pyq.year || 'Past Paper'} • {selectedSubject}
-                            </Text>
-                          </View>
+                    displayedPyqs.map((pyq) => {
+                      const locked = isItemLocked(pyq);
+                      return (
+                        <View key={pyq.id} style={styles.contentCard}>
+                          <View style={styles.contentCardTop}>
+                            <View style={[styles.contentTypeIconBox, { backgroundColor: '#ffedd5' }]}>
+                              <Text style={{ fontSize: 20 }}>📅</Text>
+                            </View>
+                            <View style={styles.contentCardTitleCol}>
+                              <Text style={styles.contentCardTitle}>{pyq.title}</Text>
+                              <Text style={styles.contentCardMeta}>
+                                Exam Year: {pyq.year || 'Past Paper'} • {selectedSubject}
+                              </Text>
+                            </View>
 
-                          <View
-                            style={[
-                              styles.itemStatusBadge,
-                              pyq.locked ? styles.statusBadgeLocked : styles.statusBadgeFree,
-                            ]}
-                          >
-                            <Text
+                            <View
                               style={[
-                                styles.itemStatusBadgeText,
-                                pyq.locked ? styles.statusTextLocked : styles.statusTextFree,
+                                styles.itemStatusBadge,
+                                locked ? styles.statusBadgeLocked : styles.statusBadgeFree,
                               ]}
                             >
-                              {pyq.locked ? '🔒 Locked' : '✓ Free'}
-                            </Text>
+                              <Text
+                                style={[
+                                  styles.itemStatusBadgeText,
+                                  locked ? styles.statusTextLocked : styles.statusTextFree,
+                                ]}
+                              >
+                                {locked ? '🔒 Locked' : '✓ Unlocked'}
+                              </Text>
+                            </View>
                           </View>
-                        </View>
 
-                        {pyq.locked ? (
-                          <TouchableOpacity
-                            style={styles.unlockItemBtn}
-                            onPress={() => setView('plans')}
-                            activeOpacity={0.85}
-                          >
-                            <Text style={styles.unlockItemBtnText}>🔒 Click to Unlock Paper 💳</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity
-                            style={styles.viewPdfBtn}
-                            onPress={() => handleOpenPdf(pyq)}
-                            activeOpacity={0.85}
-                          >
-                            <Text style={styles.viewPdfBtnText}>View Question Paper 📄</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    ))
+                          {locked ? (
+                            <TouchableOpacity
+                              style={styles.unlockItemBtn}
+                              onPress={() => setView('plans')}
+                              activeOpacity={0.85}
+                            >
+                              <Text style={styles.unlockItemBtnText}>🔒 Click to Unlock Paper 💳</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity
+                              style={styles.viewPdfBtn}
+                              onPress={() => handleOpenPdf(pyq)}
+                              activeOpacity={0.85}
+                            >
+                              <Text style={styles.viewPdfBtnText}>View Question Paper 📄</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      );
+                    })
                   )}
                 </View>
               )}
