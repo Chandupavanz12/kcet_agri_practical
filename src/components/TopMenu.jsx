@@ -1,6 +1,6 @@
 import { usePathname, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function TopMenu() {
@@ -8,6 +8,15 @@ export default function TopMenu() {
   const router = useRouter();
   const pathname = usePathname();
   const [openDropdown, setOpenDropdown] = useState(null);
+
+  const handleLogout = async () => {
+    await logout();
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.location.href = '/login';
+    } else {
+      router.replace('/login');
+    }
+  };
 
   const isActive = (path) => {
     return pathname === path || pathname.startsWith(path + '/');
@@ -171,7 +180,7 @@ export default function TopMenu() {
               )}
             </View>
           ))}
-          <TouchableOpacity onPress={logout} style={styles.menuBtn}>
+          <TouchableOpacity onPress={handleLogout} style={styles.menuBtn}>
             <Text style={[styles.menuLabel, { color: '#dc2626' }]}>Logout</Text>
           </TouchableOpacity>
         </ScrollView>

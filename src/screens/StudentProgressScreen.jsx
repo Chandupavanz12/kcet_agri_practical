@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
+let PROGRESS_MEM_CACHE = null;
+
 export default function StudentProgressScreen() {
   const { token, user } = useAuth();
   const router = useRouter();
@@ -23,22 +25,23 @@ export default function StudentProgressScreen() {
   const isSmall = width < 380;
   const isLarge = width > 768;
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!PROGRESS_MEM_CACHE);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [aggregated, setAggregated] = useState(null);
-  const [results, setResults] = useState([]);
+  const [aggregated, setAggregated] = useState(PROGRESS_MEM_CACHE?.aggregated || null);
+  const [results, setResults] = useState(PROGRESS_MEM_CACHE?.results || []);
   const [selectedExamFilter, setSelectedExamFilter] = useState('all'); // 'all' | 'puc' | 'kcet' | 'neet' | 'agri'
 
   const loadData = useCallback(async (isRefresh = false) => {
     if (!token) return;
     if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+    else if (!PROGRESS_MEM_CACHE) setLoading(true);
     setError('');
 
     try {
+      const aggUrl = isRefresh ? '/api/student/aggregated-progress?fresh=true' : '/api/student/aggregated-progress';
       const [aggRes, resRes] = await Promise.all([
-        apiFetch('/api/student/aggregated-progress', { token }).catch(() => null),
+        apiFetch(aggUrl, { token }).catch(() => null),
         apiFetch('/api/student/results', { token }).catch(() => null),
       ]);
 
@@ -48,6 +51,11 @@ export default function StudentProgressScreen() {
       if (resRes && Array.isArray(resRes.results)) {
         setResults(resRes.results);
       }
+
+      PROGRESS_MEM_CACHE = {
+        aggregated: (aggRes && aggRes.success) ? aggRes : PROGRESS_MEM_CACHE?.aggregated,
+        results: (resRes && Array.isArray(resRes.results)) ? resRes.results : PROGRESS_MEM_CACHE?.results || [],
+      };
     } catch (err) {
       setError(err?.message || 'Failed to load progress analytics.');
     } finally {

@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { memo, useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -144,9 +144,13 @@ export default function AdminDashboardScreen() {
 
               <TouchableOpacity
                 style={styles.heroLogoutBtn}
-                onPress={() => {
-                  logout();
-                  router.replace('/');
+                onPress={async () => {
+                  await logout();
+                  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                    window.location.href = '/login';
+                  } else {
+                    router.replace('/login');
+                  }
                 }}
               >
                 <Text style={styles.heroLogoutBtnText}>🚪 Logout</Text>

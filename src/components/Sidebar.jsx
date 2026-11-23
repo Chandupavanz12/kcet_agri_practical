@@ -1,6 +1,6 @@
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { apiFetch } from '../api/client.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
@@ -122,10 +122,14 @@ export default function Sidebar({ isOpen, onClose }) {
     return false;
   };
 
-  const handleClick = (m) => {
+  const handleClick = async (m) => {
     if (m.route === '/logout' || m.name?.toLowerCase() === 'logout') {
-      logout();
-      router.replace('/login');
+      await logout();
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.location.href = '/login';
+      } else {
+        router.replace('/login');
+      }
       onClose?.();
       return;
     }

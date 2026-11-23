@@ -122,6 +122,7 @@ export default function ExamDetailsScreen() {
   const [pyqs, setPyqs] = useState(cachedData?.pyqs || []);
   const [tests, setTests] = useState(cachedData?.tests || []);
   const [plans, setPlans] = useState(cachedData?.plans || []);
+  const [activePlanCodes, setActivePlanCodes] = useState(cachedData?.activePlanCodes || []);
   const [isSubscribed, setIsSubscribed] = useState(cachedData?.isSubscribed || false);
   const [activePlanCode, setActivePlanCode] = useState(cachedData?.activePlanCode || null);
   const [loading, setLoading] = useState(false);
@@ -185,12 +186,15 @@ export default function ExamDetailsScreen() {
         const newPlans = Array.isArray(planRes?.plans) ? planRes.plans : [];
         const newSubscribed = Boolean(planRes?.hasActivePlan);
         const activeCode = planRes?.activePlanCode || null;
+        const activeCodes = Array.isArray(planRes?.activePlanCodes) ? planRes.activePlanCodes : (activeCode ? [activeCode] : []);
         setPlans(newPlans);
+        setActivePlanCodes(activeCodes);
         setIsSubscribed(newSubscribed);
         setActivePlanCode(activeCode);
         EXAM_CLIENT_CACHE.set(examId, {
           banners: currentBanners,
           plans: newPlans,
+          activePlanCodes: activeCodes,
           isSubscribed: newSubscribed,
           activePlanCode: activeCode,
           materials: [],
@@ -213,17 +217,20 @@ export default function ExamDetailsScreen() {
         const newPlans = Array.isArray(planRes?.plans) ? planRes.plans : [];
         const newSubscribed = Boolean(planRes?.hasActivePlan || matRes?.isSubscribed);
         const activeCode = planRes?.activePlanCode || null;
+        const activeCodes = Array.isArray(planRes?.activePlanCodes) ? planRes.activePlanCodes : (activeCode ? [activeCode] : []);
 
         setMaterials(newMaterials);
         setPyqs(newPyqs);
         setTests(newTests);
         setPlans(newPlans);
+        setActivePlanCodes(activeCodes);
         setIsSubscribed(newSubscribed);
         setActivePlanCode(activeCode);
 
         EXAM_CLIENT_CACHE.set(examId, {
           banners: currentBanners,
           plans: newPlans,
+          activePlanCodes: activeCodes,
           isSubscribed: newSubscribed,
           activePlanCode: activeCode,
           materials: newMaterials,
@@ -330,14 +337,19 @@ export default function ExamDetailsScreen() {
   // Listen for payment return redirect params
   useEffect(() => {
     if (params.payment === 'success' || params.success) {
-      (async () => {
+      const syncPaymentAndRefresh = async (notify = false) => {
         try {
           await apiFetch('/api/student/premium/payment-status', { token });
         } catch (_) { }
         EXAM_CLIENT_CACHE.delete(examId);
         clearApiCache();
-        await loadExamData(true);
-      })();
+        await loadExamData(false);
+      };
+
+      syncPaymentAndRefresh(true);
+      setTimeout(() => syncPaymentAndRefresh(false), 1000);
+      setTimeout(() => syncPaymentAndRefresh(false), 2500);
+
       setView('modules');
       Alert.alert(
         'Study Material Plan Activated! 🎉',
@@ -1028,7 +1040,13 @@ export default function ExamDetailsScreen() {
                 plans.map((plan) => {
                   const priceRupees = Math.round((plan.pricePaise || plan.price_paise || 0) / 100);
                   const isPaying = payingPlanId === plan.id;
-                  const isPlanActive = activePlanCode ? plan.code === activePlanCode : (isSubscribed && plans.length === 1);
+                  const isPlanActive = Boolean(
+                    plan.isActive ||
+                    activePlanCodes.some((c) => String(c).toLowerCase() === String(plan.code || '').toLowerCase()) ||
+                    activePlanCodes.some((c) => String(c) === String(plan.id)) ||
+                    (activePlanCode && String(plan.code || '').toLowerCase() === String(activePlanCode).toLowerCase()) ||
+                    (isSubscribed && plans.length === 1)
+                  );
 
                   return (
                     <View

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Linking, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import Sidebar from './Sidebar.jsx';
@@ -12,7 +12,11 @@ export default function Layout({ children }) {
 
   async function onLogout() {
     await logout();
-    router.replace('/login');
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.location.href = '/login';
+    } else {
+      router.replace('/login');
+    }
   }
 
   return (

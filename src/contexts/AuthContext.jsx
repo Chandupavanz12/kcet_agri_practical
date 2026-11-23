@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { authApi } from '../api/auth.js';
-import { apiFetch } from '../api/client.js';
+import { apiFetch, clearApiCache } from '../api/client.js';
 
 const storage = {
   async getItem(key) {
@@ -202,8 +202,12 @@ export function AuthProvider({ children }) {
   }
 
   async function logout() {
-    await persist('', '', null);
+    setToken('');
+    setRole('');
     setUser(null);
+    setLoading(false);
+    clearApiCache();
+    await persist('', '', null);
   }
 
   useEffect(() => {

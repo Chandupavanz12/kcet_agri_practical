@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
@@ -7,6 +7,15 @@ export default function Navigation() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+
+  const handleLogout = async () => {
+    await logout();
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.location.href = '/login';
+    } else {
+      router.replace('/login');
+    }
+  };
 
   const isActive = (path) => {
     return pathname === path || pathname.startsWith(path + '/');
@@ -33,7 +42,7 @@ export default function Navigation() {
               <Text style={styles.userName}>{user?.name}</Text>
               <Text style={styles.userRole}>{user?.role}</Text>
             </View>
-            <TouchableOpacity onPress={logout}>
+            <TouchableOpacity onPress={handleLogout}>
               <Text style={styles.logoutText}>Logout</Text>
             </TouchableOpacity>
           </View>

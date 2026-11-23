@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -9,27 +9,28 @@ export default function IndexScreen() {
   const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (authLoading) return;
 
     if (!user) {
-      setTimeout(() => {
+      setLoading(false);
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.location.replace('/login');
+      } else {
         router.replace('/login');
-      }, 0);
+      }
       return;
     }
 
     // Redirect authenticated users to their native dashboards so they get the Drawer Navigation!
-    setTimeout(() => {
-      if (user.role === 'admin') {
-        router.replace('/admin/dashboard');
-      } else {
-        router.replace('/student/dashboard');
-      }
-    }, 0);
+    if (user.role === 'admin') {
+      router.replace('/admin/dashboard');
+    } else {
+      router.replace('/student/dashboard');
+    }
   }, [user, authLoading]);
 
   const fetchDashboardData = async () => {

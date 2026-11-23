@@ -405,17 +405,43 @@ export async function razorpayWebhook(req, res, next) {
 
 export async function listPlansStudent(req, res, next) {
   try {
+    const userId = Number(req.user?.sub || req.user?.id);
     const rows = await listActivePlans();
-    const plans = rows.map((p) => ({
-      id: p.id,
-      code: p.code,
-      name: p.name,
-      pricePaise: Number(p.price_paise || 0),
-      durationDays: Number(p.duration_days || 365),
-      isFree: toBool(p.is_free),
-      status: p.status,
-    }));
-    return res.json({ plans });
+
+    let activePlanCodes = [];
+    if (Number.isFinite(userId)) {
+      try {
+        const accessRow = await ensureUserAccessRow(userId);
+        const active = computeActiveAccess(accessRow);
+        if (active.pyqActive) activePlanCodes.push('pyq');
+        if (active.materialActive) activePlanCodes.push('materials');
+        if (active.comboActive) {
+          activePlanCodes.push('combo', 'pyq', 'materials');
+        }
+      } catch (_) {}
+    }
+    activePlanCodes = [...new Set(activePlanCodes)];
+
+    const plans = rows.map((p) => {
+      const pCode = String(p.code || '').toLowerCase().trim();
+      const isActive = activePlanCodes.includes(pCode) || toBool(p.is_free);
+      return {
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        pricePaise: Number(p.price_paise || 0),
+        durationDays: Number(p.duration_days || 365),
+        isFree: toBool(p.is_free),
+        status: p.status,
+        isActive: Boolean(isActive),
+      };
+    });
+    return res.json({
+      plans,
+      activePlanCodes,
+      hasActivePlan: activePlanCodes.length > 0,
+      activePlanCode: activePlanCodes[0] || null,
+    });
   } catch (err) {
     return next(err);
   }

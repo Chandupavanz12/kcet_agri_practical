@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
@@ -8,6 +8,15 @@ export default function SimpleMenuBar() {
   const router = useRouter();
   const pathname = usePathname();
   const [openDropdown, setOpenDropdown] = useState(null);
+
+  const handleLogout = async () => {
+    await logout();
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.location.href = '/login';
+    } else {
+      router.replace('/login');
+    }
+  };
 
   if (!user) return null;
 
@@ -31,7 +40,7 @@ export default function SimpleMenuBar() {
           </TouchableOpacity>
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{user.name}</Text>
-            <TouchableOpacity onPress={logout}>
+            <TouchableOpacity onPress={handleLogout}>
               <Text style={styles.logoutBtn}>Logout</Text>
             </TouchableOpacity>
           </View>

@@ -818,39 +818,48 @@ export async function getExamPlans(req, res, next) {
         [exam, 'active']
       );
       plansRows = result.rows;
-      setCached(cacheKey, plansRows, 60000);
+      setCached(cacheKey, plansRows, 30000);
     }
 
     const userId = Number(req.user?.sub || req.user?.id);
     let activeAccess = null;
+    let activePlanCodes = [];
+    let activePlanIds = [];
+
     if (userId) {
-      if (pool) {
+      // 1. Check PostgreSQL user_access across all pools
+      const poolsToCheck = [pool, getPucPool(), getKcetNeetPool()].filter(Boolean);
+      for (const p of poolsToCheck) {
         try {
-          const accessRes = await pool.query(
+          const accessRes = await p.query(
             `SELECT * FROM user_access 
-             WHERE user_id = $1 AND (exam = $2 OR exam = 'global') AND expires_at > NOW()`,
+             WHERE user_id = $1 AND (exam = $2 OR exam = 'global' OR exam IS NULL) AND expires_at > NOW()`,
             [userId, exam]
           );
-          if (accessRes.rows.length > 0) {
-            activeAccess = accessRes.rows[0];
+          for (const r of accessRes.rows) {
+            if (!activeAccess) activeAccess = r;
+            if (r.plan_code) activePlanCodes.push(String(r.plan_code).toLowerCase().trim());
           }
         } catch (_) {}
       }
 
-      if (!activeAccess) {
-        try {
-          const { Payment } = await import('../models/index.js');
-          const paidDoc = await Payment.findOne({
-            user_id: Number(userId),
-            status: { $in: ['paid', 'free'] },
-            $or: [{ exam }, { exam: 'global' }],
-          }).sort({ paid_at: -1, created_at: -1 }).lean();
+      // 2. Check MongoDB Payment records for active purchases
+      try {
+        const { Payment } = await import('../models/index.js');
+        const paidDocs = await Payment.find({
+          user_id: Number(userId),
+          status: { $in: ['paid', 'free'] },
+          $or: [{ exam }, { exam: 'global' }, { exam: null }, { exam: '' }],
+        }).sort({ paid_at: -1, created_at: -1 }).lean();
 
-          if (paidDoc) {
-            const paidDate = paidDoc.paid_at || paidDoc.created_at || new Date();
-            const durationDays = Number(paidDoc.duration_days || 365);
-            const expiresAt = new Date(new Date(paidDate).getTime() + durationDays * 86400000);
-            if (expiresAt > new Date()) {
+        for (const paidDoc of paidDocs) {
+          const paidDate = paidDoc.paid_at || paidDoc.created_at || new Date();
+          const durationDays = Number(paidDoc.duration_days || 365);
+          const expiresAt = new Date(new Date(paidDate).getTime() + durationDays * 86400000);
+          if (expiresAt > new Date()) {
+            if (paidDoc.plan_code) activePlanCodes.push(String(paidDoc.plan_code).toLowerCase().trim());
+            if (paidDoc.plan_id) activePlanIds.push(Number(paidDoc.plan_id));
+            if (!activeAccess) {
               activeAccess = {
                 user_id: userId,
                 exam,
@@ -860,13 +869,20 @@ export async function getExamPlans(req, res, next) {
               };
             }
           }
-        } catch (_) {}
-      }
+        }
+      } catch (_) {}
     }
 
-    return res.json({
-      success: true,
-      plans: plansRows.map((p) => ({
+    activePlanCodes = [...new Set(activePlanCodes)];
+    activePlanIds = [...new Set(activePlanIds)];
+
+    const hasAnyActive = !!activeAccess || activePlanCodes.length > 0;
+
+    const mappedPlans = plansRows.map((p) => {
+      const pCode = String(p.code || '').toLowerCase().trim();
+      const pId = Number(p.id || 0);
+      const isPlanActive = activePlanCodes.includes(pCode) || activePlanIds.includes(pId) || (hasAnyActive && plansRows.length === 1);
+      return {
         id: p.id,
         code: p.code,
         name: p.name,
@@ -876,8 +892,17 @@ export async function getExamPlans(req, res, next) {
         accessModules: Array.isArray(p.access_modules) ? p.access_modules : (typeof p.access_modules === 'string' ? JSON.parse(p.access_modules || '["all"]') : ['all']),
         targetExams: Array.isArray(p.target_exams) ? p.target_exams : (typeof p.target_exams === 'string' ? JSON.parse(p.target_exams || '[]') : []),
         features: Array.isArray(p.features) ? p.features : typeof p.features === 'string' ? JSON.parse(p.features || '[]') : [],
-      })),
-      hasActivePlan: !!activeAccess,
+        isActive: Boolean(isPlanActive),
+      };
+    });
+
+    return res.json({
+      success: true,
+      plans: mappedPlans,
+      hasActivePlan: hasAnyActive,
+      activePlanCodes,
+      activePlanIds,
+      activePlanCode: activeAccess?.plan_code || activePlanCodes[0] || null,
       activePlanExpiresAt: activeAccess?.expires_at || null,
       activeAccessModules: activeAccess?.access_modules || null,
     });
@@ -945,11 +970,28 @@ function getExamMotivation(examName, testsAttended, accuracy) {
   return `Keep Going! 🚀 Every practice test builds memory and test-taking stamina.`;
 }
 
+const _aggProgressCache = new Map();
+
+function withTimeout(promise, ms = 3500, fallback = null) {
+  let timer;
+  const timeoutPromise = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+}
+
 export async function getAggregatedProgress(req, res, next) {
   try {
     const userId = Number(req.user?.sub || req.user?.id);
     if (!Number.isFinite(userId)) {
       return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const isFresh = req.query.fresh === 'true' || req.query.refresh === 'true';
+    const cacheKey = `agg_prog:${userId}`;
+    const cached = _aggProgressCache.get(cacheKey);
+    if (!isFresh && cached && Date.now() - cached.ts < 20000) {
+      return res.json(cached.data);
     }
 
     // Default subject configurations for each exam
@@ -977,321 +1019,347 @@ export async function getAggregatedProgress(req, res, next) {
       { name: 'Farm Implements', icon: '🚜', color: '#ea580c' },
     ];
 
-    // 1. PUC Progress from Neon PG 1
-    let pucData = {
-      exam: 'puc',
-      name: 'PUC (Class 12)',
-      tagline: 'Study • Practice • Ace',
-      icon: '📄',
-      themeColor: '#4f46e5',
-      bgColor: '#e0e7ff',
-      testsAttended: 0,
-      totalScore: 0,
-      correctCount: 0,
-      wrongCount: 0,
-      totalQuestions: 0,
-      avgAccuracy: 0,
-      progressPercent: 0,
-      motivationMessage: '',
-      subjects: [],
-    };
-    try {
-      const pool1 = getPucPool();
-      if (pool1) {
-        const r1 = await pool1.query(
-          `SELECT 
-             COUNT(DISTINCT r.test_id) as cnt, 
-             COALESCE(SUM(r.score), 0) as total_score, 
-             COALESCE(SUM(r.correct_count), 0) as correct_count,
-             COALESCE(SUM(r.wrong_count), 0) as wrong_count,
-             COALESCE(SUM(r.total_questions), 0) as total_questions,
-             COALESCE(AVG(r.accuracy), 0) as avg_acc 
-           FROM mock_results r
-           WHERE r.user_id = $1 AND r.exam = $2`,
-          [userId, 'puc']
-        );
-        const cnt = Number(r1.rows[0]?.cnt || 0);
-        const acc = Number(r1.rows[0]?.avg_acc || 0);
-        pucData.testsAttended = cnt;
-        pucData.totalScore = Number(r1.rows[0]?.total_score || 0);
-        pucData.correctCount = Number(r1.rows[0]?.correct_count || 0);
-        pucData.wrongCount = Number(r1.rows[0]?.wrong_count || 0);
-        pucData.totalQuestions = Number(r1.rows[0]?.total_questions || 0);
-        pucData.avgAccuracy = Number(acc.toFixed(1));
-        pucData.progressPercent = cnt > 0 ? Math.min(100, Math.round(acc * 0.7 + Math.min(cnt * 10, 30))) : 0;
+    // 1. Parallel Task: PUC Progress
+    const fetchPuc = async () => {
+      let pucData = {
+        exam: 'puc',
+        name: 'PUC (Class 12)',
+        tagline: 'Study • Practice • Ace',
+        icon: '📄',
+        themeColor: '#4f46e5',
+        bgColor: '#e0e7ff',
+        testsAttended: 0,
+        totalScore: 0,
+        correctCount: 0,
+        wrongCount: 0,
+        totalQuestions: 0,
+        avgAccuracy: 0,
+        progressPercent: 0,
+        motivationMessage: '',
+        subjects: [],
+      };
+      try {
+        const pool1 = getPucPool();
+        if (pool1) {
+          const [r1, subjRows] = await Promise.all([
+            pool1.query(
+              `SELECT 
+                 COUNT(DISTINCT r.test_id) as cnt, 
+                 COALESCE(SUM(r.score), 0) as total_score, 
+                 COALESCE(SUM(r.correct_count), 0) as correct_count,
+                 COALESCE(SUM(r.wrong_count), 0) as wrong_count,
+                 COALESCE(SUM(r.total_questions), 0) as total_questions,
+                 COALESCE(AVG(r.accuracy), 0) as avg_acc 
+               FROM mock_results r
+               WHERE r.user_id = $1 AND r.exam = $2`,
+              [userId, 'puc']
+            ),
+            pool1.query(
+              `SELECT 
+                 LOWER(TRIM(t.subject)) as subj,
+                 COUNT(DISTINCT r.test_id) as cnt,
+                 COALESCE(SUM(r.score), 0) as total_score,
+                 COALESCE(SUM(r.correct_count), 0) as correct_count,
+                 COALESCE(SUM(r.wrong_count), 0) as wrong_count,
+                 COALESCE(SUM(r.total_questions), 0) as total_questions,
+                 COALESCE(AVG(r.accuracy), 0) as avg_acc
+               FROM mock_results r
+               JOIN mock_tests t ON r.test_id = t.id
+               WHERE r.user_id = $1 AND (r.exam = $2 OR t.exam = $2)
+               GROUP BY LOWER(TRIM(t.subject))`,
+              [userId, 'puc']
+            ),
+          ]);
 
-        // Subject breakdown
-        const subjRows = await pool1.query(
-          `SELECT 
-             LOWER(TRIM(t.subject)) as subj,
-             COUNT(DISTINCT r.test_id) as cnt,
-             COALESCE(SUM(r.score), 0) as total_score,
-             COALESCE(SUM(r.correct_count), 0) as correct_count,
-             COALESCE(SUM(r.wrong_count), 0) as wrong_count,
-             COALESCE(SUM(r.total_questions), 0) as total_questions,
-             COALESCE(AVG(r.accuracy), 0) as avg_acc
-           FROM mock_results r
-           JOIN mock_tests t ON r.test_id = t.id
-           WHERE r.user_id = $1 AND (r.exam = $2 OR t.exam = $2)
-           GROUP BY LOWER(TRIM(t.subject))`,
-          [userId, 'puc']
-        );
-        const subjMap = {};
-        for (const row of subjRows.rows) {
-          subjMap[row.subj] = {
-            testsAttended: Number(row.cnt || 0),
-            totalScore: Number(row.total_score || 0),
-            correctCount: Number(row.correct_count || 0),
-            wrongCount: Number(row.wrong_count || 0),
-            totalQuestions: Number(row.total_questions || 0),
-            accuracy: Number(row.avg_acc || 0),
-          };
+          const cnt = Number(r1.rows[0]?.cnt || 0);
+          const acc = Number(r1.rows[0]?.avg_acc || 0);
+          pucData.testsAttended = cnt;
+          pucData.totalScore = Number(r1.rows[0]?.total_score || 0);
+          pucData.correctCount = Number(r1.rows[0]?.correct_count || 0);
+          pucData.wrongCount = Number(r1.rows[0]?.wrong_count || 0);
+          pucData.totalQuestions = Number(r1.rows[0]?.total_questions || 0);
+          pucData.avgAccuracy = Number(acc.toFixed(1));
+          pucData.progressPercent = cnt > 0 ? Math.min(100, Math.round(acc * 0.7 + Math.min(cnt * 10, 30))) : 0;
+
+          const subjMap = {};
+          for (const row of subjRows.rows) {
+            subjMap[row.subj] = {
+              testsAttended: Number(row.cnt || 0),
+              totalScore: Number(row.total_score || 0),
+              correctCount: Number(row.correct_count || 0),
+              wrongCount: Number(row.wrong_count || 0),
+              totalQuestions: Number(row.total_questions || 0),
+              accuracy: Number(row.avg_acc || 0),
+            };
+          }
+          pucData.subjects = buildSubjectBreakdown(PUC_SUBJECTS, subjMap);
         }
-        pucData.subjects = buildSubjectBreakdown(PUC_SUBJECTS, subjMap);
+      } catch (_) {}
+      if (pucData.subjects.length === 0) {
+        pucData.subjects = buildSubjectBreakdown(PUC_SUBJECTS, {});
       }
-    } catch (_) {}
-    if (pucData.subjects.length === 0) {
-      pucData.subjects = buildSubjectBreakdown(PUC_SUBJECTS, {});
-    }
-    pucData.motivationMessage = getExamMotivation('PUC', pucData.testsAttended, pucData.avgAccuracy);
-
-    // 2. KCET Progress from Neon PG 2
-    let kcetData = {
-      exam: 'kcet',
-      name: 'KCET Engineering',
-      tagline: 'Target Your Rank',
-      icon: '🎯',
-      themeColor: '#0284c7',
-      bgColor: '#e0f2fe',
-      testsAttended: 0,
-      totalScore: 0,
-      correctCount: 0,
-      wrongCount: 0,
-      totalQuestions: 0,
-      avgAccuracy: 0,
-      progressPercent: 0,
-      motivationMessage: '',
-      subjects: [],
+      pucData.motivationMessage = getExamMotivation('PUC', pucData.testsAttended, pucData.avgAccuracy);
+      return pucData;
     };
-    try {
-      const pool2 = getKcetNeetPool();
-      if (pool2) {
-        const r2 = await pool2.query(
-          `SELECT 
-             COUNT(DISTINCT r.test_id) as cnt, 
-             COALESCE(SUM(r.score), 0) as total_score, 
-             COALESCE(SUM(r.correct_count), 0) as correct_count,
-             COALESCE(SUM(r.wrong_count), 0) as wrong_count,
-             COALESCE(SUM(r.total_questions), 0) as total_questions,
-             COALESCE(AVG(r.accuracy), 0) as avg_acc 
-           FROM mock_results r
-           WHERE r.user_id = $1 AND r.exam = $2`,
-          [userId, 'kcet']
-        );
-        const cnt = Number(r2.rows[0]?.cnt || 0);
-        const acc = Number(r2.rows[0]?.avg_acc || 0);
-        kcetData.testsAttended = cnt;
-        kcetData.totalScore = Number(r2.rows[0]?.total_score || 0);
-        kcetData.correctCount = Number(r2.rows[0]?.correct_count || 0);
-        kcetData.wrongCount = Number(r2.rows[0]?.wrong_count || 0);
-        kcetData.totalQuestions = Number(r2.rows[0]?.total_questions || 0);
-        kcetData.avgAccuracy = Number(acc.toFixed(1));
-        kcetData.progressPercent = cnt > 0 ? Math.min(100, Math.round(acc * 0.7 + Math.min(cnt * 10, 30))) : 0;
 
-        const subjRows2 = await pool2.query(
-          `SELECT 
-             LOWER(TRIM(t.subject)) as subj,
-             COUNT(DISTINCT r.test_id) as cnt,
-             COALESCE(SUM(r.score), 0) as total_score,
-             COALESCE(SUM(r.correct_count), 0) as correct_count,
-             COALESCE(SUM(r.wrong_count), 0) as wrong_count,
-             COALESCE(SUM(r.total_questions), 0) as total_questions,
-             COALESCE(AVG(r.accuracy), 0) as avg_acc
-           FROM mock_results r
-           JOIN mock_tests t ON r.test_id = t.id
-           WHERE r.user_id = $1 AND (r.exam = $2 OR t.exam = $2)
-           GROUP BY LOWER(TRIM(t.subject))`,
-          [userId, 'kcet']
-        );
-        const subjMap2 = {};
-        for (const row of subjRows2.rows) {
-          subjMap2[row.subj] = {
-            testsAttended: Number(row.cnt || 0),
-            totalScore: Number(row.total_score || 0),
-            correctCount: Number(row.correct_count || 0),
-            wrongCount: Number(row.wrong_count || 0),
-            totalQuestions: Number(row.total_questions || 0),
-            accuracy: Number(row.avg_acc || 0),
-          };
+    // 2. Parallel Task: KCET Progress
+    const fetchKcet = async () => {
+      let kcetData = {
+        exam: 'kcet',
+        name: 'KCET Engineering',
+        tagline: 'Target Your Rank',
+        icon: '🎯',
+        themeColor: '#0284c7',
+        bgColor: '#e0e7ff',
+        testsAttended: 0,
+        totalScore: 0,
+        correctCount: 0,
+        wrongCount: 0,
+        totalQuestions: 0,
+        avgAccuracy: 0,
+        progressPercent: 0,
+        motivationMessage: '',
+        subjects: [],
+      };
+      try {
+        const pool2 = getKcetNeetPool();
+        if (pool2) {
+          const [r2, subjRows2] = await Promise.all([
+            pool2.query(
+              `SELECT 
+                 COUNT(DISTINCT r.test_id) as cnt, 
+                 COALESCE(SUM(r.score), 0) as total_score, 
+                 COALESCE(SUM(r.correct_count), 0) as correct_count,
+                 COALESCE(SUM(r.wrong_count), 0) as wrong_count,
+                 COALESCE(SUM(r.total_questions), 0) as total_questions,
+                 COALESCE(AVG(r.accuracy), 0) as avg_acc 
+               FROM mock_results r
+               WHERE r.user_id = $1 AND r.exam = $2`,
+              [userId, 'kcet']
+            ),
+            pool2.query(
+              `SELECT 
+                 LOWER(TRIM(t.subject)) as subj,
+                 COUNT(DISTINCT r.test_id) as cnt,
+                 COALESCE(SUM(r.score), 0) as total_score,
+                 COALESCE(SUM(r.correct_count), 0) as correct_count,
+                 COALESCE(SUM(r.wrong_count), 0) as wrong_count,
+                 COALESCE(SUM(r.total_questions), 0) as total_questions,
+                 COALESCE(AVG(r.accuracy), 0) as avg_acc
+               FROM mock_results r
+               JOIN mock_tests t ON r.test_id = t.id
+               WHERE r.user_id = $1 AND (r.exam = $2 OR t.exam = $2)
+               GROUP BY LOWER(TRIM(t.subject))`,
+              [userId, 'kcet']
+            ),
+          ]);
+
+          const cnt = Number(r2.rows[0]?.cnt || 0);
+          const acc = Number(r2.rows[0]?.avg_acc || 0);
+          kcetData.testsAttended = cnt;
+          kcetData.totalScore = Number(r2.rows[0]?.total_score || 0);
+          kcetData.correctCount = Number(r2.rows[0]?.correct_count || 0);
+          kcetData.wrongCount = Number(r2.rows[0]?.wrong_count || 0);
+          kcetData.totalQuestions = Number(r2.rows[0]?.total_questions || 0);
+          kcetData.avgAccuracy = Number(acc.toFixed(1));
+          kcetData.progressPercent = cnt > 0 ? Math.min(100, Math.round(acc * 0.7 + Math.min(cnt * 10, 30))) : 0;
+
+          const subjMap2 = {};
+          for (const row of subjRows2.rows) {
+            subjMap2[row.subj] = {
+              testsAttended: Number(row.cnt || 0),
+              totalScore: Number(row.total_score || 0),
+              correctCount: Number(row.correct_count || 0),
+              wrongCount: Number(row.wrong_count || 0),
+              totalQuestions: Number(row.total_questions || 0),
+              accuracy: Number(row.avg_acc || 0),
+            };
+          }
+          kcetData.subjects = buildSubjectBreakdown(KCET_SUBJECTS, subjMap2);
         }
-        kcetData.subjects = buildSubjectBreakdown(KCET_SUBJECTS, subjMap2);
+      } catch (_) {}
+      if (kcetData.subjects.length === 0) {
+        kcetData.subjects = buildSubjectBreakdown(KCET_SUBJECTS, {});
       }
-    } catch (_) {}
-    if (kcetData.subjects.length === 0) {
-      kcetData.subjects = buildSubjectBreakdown(KCET_SUBJECTS, {});
-    }
-    kcetData.motivationMessage = getExamMotivation('KCET', kcetData.testsAttended, kcetData.avgAccuracy);
-
-    // 3. NEET Progress from Neon PG 2
-    let neetData = {
-      exam: 'neet',
-      name: 'NEET Medical',
-      tagline: 'Prepare for Success',
-      icon: '🩺',
-      themeColor: '#e11d48',
-      bgColor: '#ffe4e6',
-      testsAttended: 0,
-      totalScore: 0,
-      correctCount: 0,
-      wrongCount: 0,
-      totalQuestions: 0,
-      avgAccuracy: 0,
-      progressPercent: 0,
-      motivationMessage: '',
-      subjects: [],
+      kcetData.motivationMessage = getExamMotivation('KCET', kcetData.testsAttended, kcetData.avgAccuracy);
+      return kcetData;
     };
-    try {
-      const pool2 = getKcetNeetPool();
-      if (pool2) {
-        const r3 = await pool2.query(
-          `SELECT 
-             COUNT(DISTINCT r.test_id) as cnt, 
-             COALESCE(SUM(r.score), 0) as total_score, 
-             COALESCE(SUM(r.correct_count), 0) as correct_count,
-             COALESCE(SUM(r.wrong_count), 0) as wrong_count,
-             COALESCE(SUM(r.total_questions), 0) as total_questions,
-             COALESCE(AVG(r.accuracy), 0) as avg_acc 
-           FROM mock_results r
-           WHERE r.user_id = $1 AND r.exam = $2`,
-          [userId, 'neet']
-        );
-        const cnt = Number(r3.rows[0]?.cnt || 0);
-        const acc = Number(r3.rows[0]?.avg_acc || 0);
-        neetData.testsAttended = cnt;
-        neetData.totalScore = Number(r3.rows[0]?.total_score || 0);
-        neetData.correctCount = Number(r3.rows[0]?.correct_count || 0);
-        neetData.wrongCount = Number(r3.rows[0]?.wrong_count || 0);
-        neetData.totalQuestions = Number(r3.rows[0]?.total_questions || 0);
-        neetData.avgAccuracy = Number(acc.toFixed(1));
-        neetData.progressPercent = cnt > 0 ? Math.min(100, Math.round(acc * 0.7 + Math.min(cnt * 10, 30))) : 0;
 
-        const subjRows3 = await pool2.query(
-          `SELECT 
-             LOWER(TRIM(t.subject)) as subj,
-             COUNT(DISTINCT r.test_id) as cnt,
-             COALESCE(SUM(r.score), 0) as total_score,
-             COALESCE(SUM(r.correct_count), 0) as correct_count,
-             COALESCE(SUM(r.wrong_count), 0) as wrong_count,
-             COALESCE(SUM(r.total_questions), 0) as total_questions,
-             COALESCE(AVG(r.accuracy), 0) as avg_acc
-           FROM mock_results r
-           JOIN mock_tests t ON r.test_id = t.id
-           WHERE r.user_id = $1 AND (r.exam = $2 OR t.exam = $2)
-           GROUP BY LOWER(TRIM(t.subject))`,
-          [userId, 'neet']
-        );
-        const subjMap3 = {};
-        for (const row of subjRows3.rows) {
-          subjMap3[row.subj] = {
-            testsAttended: Number(row.cnt || 0),
-            totalScore: Number(row.total_score || 0),
-            correctCount: Number(row.correct_count || 0),
-            wrongCount: Number(row.wrong_count || 0),
-            totalQuestions: Number(row.total_questions || 0),
-            accuracy: Number(row.avg_acc || 0),
-          };
+    // 3. Parallel Task: NEET Progress
+    const fetchNeet = async () => {
+      let neetData = {
+        exam: 'neet',
+        name: 'NEET Medical',
+        tagline: 'Prepare for Success',
+        icon: '🩺',
+        themeColor: '#e11d48',
+        bgColor: '#ffe4e6',
+        testsAttended: 0,
+        totalScore: 0,
+        correctCount: 0,
+        wrongCount: 0,
+        totalQuestions: 0,
+        avgAccuracy: 0,
+        progressPercent: 0,
+        motivationMessage: '',
+        subjects: [],
+      };
+      try {
+        const pool2 = getKcetNeetPool();
+        if (pool2) {
+          const [r3, subjRows3] = await Promise.all([
+            pool2.query(
+              `SELECT 
+                 COUNT(DISTINCT r.test_id) as cnt, 
+                 COALESCE(SUM(r.score), 0) as total_score, 
+                 COALESCE(SUM(r.correct_count), 0) as correct_count,
+                 COALESCE(SUM(r.wrong_count), 0) as wrong_count,
+                 COALESCE(SUM(r.total_questions), 0) as total_questions,
+                 COALESCE(AVG(r.accuracy), 0) as avg_acc 
+               FROM mock_results r
+               WHERE r.user_id = $1 AND r.exam = $2`,
+              [userId, 'neet']
+            ),
+            pool2.query(
+              `SELECT 
+                 LOWER(TRIM(t.subject)) as subj,
+                 COUNT(DISTINCT r.test_id) as cnt,
+                 COALESCE(SUM(r.score), 0) as total_score,
+                 COALESCE(SUM(r.correct_count), 0) as correct_count,
+                 COALESCE(SUM(r.wrong_count), 0) as wrong_count,
+                 COALESCE(SUM(r.total_questions), 0) as total_questions,
+                 COALESCE(AVG(r.accuracy), 0) as avg_acc
+               FROM mock_results r
+               JOIN mock_tests t ON r.test_id = t.id
+               WHERE r.user_id = $1 AND (r.exam = $2 OR t.exam = $2)
+               GROUP BY LOWER(TRIM(t.subject))`,
+              [userId, 'neet']
+            ),
+          ]);
+
+          const cnt = Number(r3.rows[0]?.cnt || 0);
+          const acc = Number(r3.rows[0]?.avg_acc || 0);
+          neetData.testsAttended = cnt;
+          neetData.totalScore = Number(r3.rows[0]?.total_score || 0);
+          neetData.correctCount = Number(r3.rows[0]?.correct_count || 0);
+          neetData.wrongCount = Number(r3.rows[0]?.wrong_count || 0);
+          neetData.totalQuestions = Number(r3.rows[0]?.total_questions || 0);
+          neetData.avgAccuracy = Number(acc.toFixed(1));
+          neetData.progressPercent = cnt > 0 ? Math.min(100, Math.round(acc * 0.7 + Math.min(cnt * 10, 30))) : 0;
+
+          const subjMap3 = {};
+          for (const row of subjRows3.rows) {
+            subjMap3[row.subj] = {
+              testsAttended: Number(row.cnt || 0),
+              totalScore: Number(row.total_score || 0),
+              correctCount: Number(row.correct_count || 0),
+              wrongCount: Number(row.wrong_count || 0),
+              totalQuestions: Number(row.total_questions || 0),
+              accuracy: Number(row.avg_acc || 0),
+            };
+          }
+          neetData.subjects = buildSubjectBreakdown(NEET_SUBJECTS, subjMap3);
         }
-        neetData.subjects = buildSubjectBreakdown(NEET_SUBJECTS, subjMap3);
+      } catch (_) {}
+      if (neetData.subjects.length === 0) {
+        neetData.subjects = buildSubjectBreakdown(NEET_SUBJECTS, {});
       }
-    } catch (_) {}
-    if (neetData.subjects.length === 0) {
-      neetData.subjects = buildSubjectBreakdown(NEET_SUBJECTS, {});
-    }
-    neetData.motivationMessage = getExamMotivation('NEET', neetData.testsAttended, neetData.avgAccuracy);
-
-    // 4. Agri Practical Progress from Mongo Atlas
-    let agriData = {
-      exam: 'agri',
-      name: 'Agri Practical',
-      tagline: 'Grow Your Future',
-      icon: '🌱',
-      themeColor: '#16a34a',
-      bgColor: '#dcfce7',
-      testsAttended: 0,
-      totalScore: 0,
-      correctCount: 0,
-      wrongCount: 0,
-      totalQuestions: 0,
-      avgAccuracy: 0,
-      progressPercent: 0,
-      motivationMessage: '',
-      subjects: [],
+      neetData.motivationMessage = getExamMotivation('NEET', neetData.testsAttended, neetData.avgAccuracy);
+      return neetData;
     };
-    try {
-      const MockResult = await getMockResultModel();
-      const MockTest = await getMockTestModel();
-      const resultsList = await MockResult.find({ user_id: userId }).lean();
 
-      if (Array.isArray(resultsList) && resultsList.length > 0) {
-        // Filter Agri tests (where exam is 'agri' or null/undefined)
-        const agriResults = resultsList.filter((r) => !r.exam || r.exam === 'agri');
-        const uniqueTestIds = [...new Set(agriResults.map((r) => r.test_id))];
-        const cnt = uniqueTestIds.length;
+    // 4. Parallel Task: Agri Practical Progress
+    const fetchAgri = async () => {
+      let agriData = {
+        exam: 'agri',
+        name: 'Agri Practical',
+        tagline: 'Grow Your Future',
+        icon: '🌱',
+        themeColor: '#16a34a',
+        bgColor: '#dcfce7',
+        testsAttended: 0,
+        totalScore: 0,
+        correctCount: 0,
+        wrongCount: 0,
+        totalQuestions: 0,
+        avgAccuracy: 0,
+        progressPercent: 0,
+        motivationMessage: '',
+        subjects: [],
+      };
+      try {
+        const MockResult = await getMockResultModel();
+        const MockTest = await getMockTestModel();
+        const resultsList = await MockResult.find({ user_id: userId }).lean();
 
-        if (cnt > 0) {
-          const totalScore = agriResults.reduce((sum, r) => sum + Number(r.score || 0), 0);
-          const correctCount = agriResults.reduce((sum, r) => sum + Number(r.correct_count || 0), 0);
-          const wrongCount = agriResults.reduce((sum, r) => sum + Number(r.wrong_count || 0), 0);
-          const totalQuestions = agriResults.reduce((sum, r) => sum + Number(r.total_questions || 0), 0);
-          const avgAcc = agriResults.reduce((sum, r) => sum + Number(r.accuracy || 0), 0) / agriResults.length;
+        if (Array.isArray(resultsList) && resultsList.length > 0) {
+          const agriResults = resultsList.filter((r) => !r.exam || r.exam === 'agri');
+          const uniqueTestIds = [...new Set(agriResults.map((r) => r.test_id))];
+          const cnt = uniqueTestIds.length;
 
-          agriData.testsAttended = cnt;
-          agriData.totalScore = totalScore;
-          agriData.correctCount = correctCount;
-          agriData.wrongCount = wrongCount;
-          agriData.totalQuestions = totalQuestions;
-          agriData.avgAccuracy = Number(avgAcc.toFixed(1));
-          agriData.progressPercent = Math.min(100, Math.round(avgAcc * 0.7 + Math.min(cnt * 10, 30)));
+          if (cnt > 0) {
+            const totalScore = agriResults.reduce((sum, r) => sum + Number(r.score || 0), 0);
+            const correctCount = agriResults.reduce((sum, r) => sum + Number(r.correct_count || 0), 0);
+            const wrongCount = agriResults.reduce((sum, r) => sum + Number(r.wrong_count || 0), 0);
+            const totalQuestions = agriResults.reduce((sum, r) => sum + Number(r.total_questions || 0), 0);
+            const avgAcc = agriResults.reduce((sum, r) => sum + Number(r.accuracy || 0), 0) / agriResults.length;
 
-          // Subject breakdown from MockTest
-          const testDocs = await MockTest.find({ id: { $in: uniqueTestIds } }).lean();
-          const testSubjectMap = new Map((testDocs || []).map((t) => [Number(t.id), String(t.subject || t.title || 'Field Agriculture').toLowerCase()]));
+            agriData.testsAttended = cnt;
+            agriData.totalScore = totalScore;
+            agriData.correctCount = correctCount;
+            agriData.wrongCount = wrongCount;
+            agriData.totalQuestions = totalQuestions;
+            agriData.avgAccuracy = Number(avgAcc.toFixed(1));
+            agriData.progressPercent = Math.min(100, Math.round(avgAcc * 0.7 + Math.min(cnt * 10, 30)));
 
-          const agriSubjMap = {};
-          for (const res of agriResults) {
-            const subj = testSubjectMap.get(Number(res.test_id)) || 'field agriculture';
-            if (!agriSubjMap[subj]) {
-              agriSubjMap[subj] = {
-                testsAttended: 0,
-                totalScore: 0,
-                correctCount: 0,
-                wrongCount: 0,
-                totalQuestions: 0,
-                accuracy: 0,
-                accList: [],
-              };
+            const testDocs = await MockTest.find({ id: { $in: uniqueTestIds } }).lean();
+            const testSubjectMap = new Map((testDocs || []).map((t) => [Number(t.id), String(t.subject || t.title || 'Field Agriculture').toLowerCase()]));
+
+            const agriSubjMap = {};
+            for (const res of agriResults) {
+              const subj = testSubjectMap.get(Number(res.test_id)) || 'field agriculture';
+              if (!agriSubjMap[subj]) {
+                agriSubjMap[subj] = {
+                  testsAttended: 0,
+                  totalScore: 0,
+                  correctCount: 0,
+                  wrongCount: 0,
+                  totalQuestions: 0,
+                  accuracy: 0,
+                  accList: [],
+                };
+              }
+              agriSubjMap[subj].testsAttended += 1;
+              agriSubjMap[subj].totalScore += Number(res.score || 0);
+              agriSubjMap[subj].correctCount += Number(res.correct_count || 0);
+              agriSubjMap[subj].wrongCount += Number(res.wrong_count || 0);
+              agriSubjMap[subj].totalQuestions += Number(res.total_questions || 0);
+              agriSubjMap[subj].accList.push(Number(res.accuracy || 0));
             }
-            agriSubjMap[subj].testsAttended += 1;
-            agriSubjMap[subj].totalScore += Number(res.score || 0);
-            agriSubjMap[subj].correctCount += Number(res.correct_count || 0);
-            agriSubjMap[subj].wrongCount += Number(res.wrong_count || 0);
-            agriSubjMap[subj].totalQuestions += Number(res.total_questions || 0);
-            agriSubjMap[subj].accList.push(Number(res.accuracy || 0));
-          }
 
-          for (const k of Object.keys(agriSubjMap)) {
-            const list = agriSubjMap[k].accList;
-            agriSubjMap[k].accuracy = list.length > 0 ? list.reduce((a, b) => a + b, 0) / list.length : 0;
+            for (const k of Object.keys(agriSubjMap)) {
+              const list = agriSubjMap[k].accList;
+              agriSubjMap[k].accuracy = list.length > 0 ? list.reduce((a, b) => a + b, 0) / list.length : 0;
+            }
+            agriData.subjects = buildSubjectBreakdown(AGRI_SUBJECTS, agriSubjMap);
           }
-          agriData.subjects = buildSubjectBreakdown(AGRI_SUBJECTS, agriSubjMap);
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
 
-    if (agriData.subjects.length === 0) {
-      agriData.subjects = buildSubjectBreakdown(AGRI_SUBJECTS, {});
-    }
-    agriData.motivationMessage = getExamMotivation('Agri Practical', agriData.testsAttended, agriData.avgAccuracy);
+      if (agriData.subjects.length === 0) {
+        agriData.subjects = buildSubjectBreakdown(AGRI_SUBJECTS, {});
+      }
+      agriData.motivationMessage = getExamMotivation('Agri Practical', agriData.testsAttended, agriData.avgAccuracy);
+      return agriData;
+    };
+
+    // Run all 4 exam calculations concurrently in parallel with 3.5s timeout protection
+    const [pucData, kcetData, neetData, agriData] = await Promise.all([
+      withTimeout(fetchPuc(), 3500, fetchPuc()),
+      withTimeout(fetchKcet(), 3500, fetchKcet()),
+      withTimeout(fetchNeet(), 3500, fetchNeet()),
+      withTimeout(fetchAgri(), 3500, fetchAgri()),
+    ]);
 
     const allExams = [pucData, kcetData, neetData, agriData];
     const totalTests = allExams.reduce((s, e) => s + e.testsAttended, 0);
@@ -1317,7 +1385,7 @@ export async function getAggregatedProgress(req, res, next) {
       motivationalQuote = "🚀 Solid Start! Every mock test attended strengthens your memory and boosts your speed.";
     }
 
-    return res.json({
+    const payload = {
       success: true,
       overall: {
         progressPercent: overallProgressPercent,
@@ -1330,7 +1398,11 @@ export async function getAggregatedProgress(req, res, next) {
         motivationalQuote,
       },
       exams: allExams,
-    });
+    };
+
+    _aggProgressCache.set(cacheKey, { ts: Date.now(), data: payload });
+
+    return res.json(payload);
   } catch (err) {
     return next(err);
   }
