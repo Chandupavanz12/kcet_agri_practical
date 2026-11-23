@@ -7,7 +7,6 @@ import {
   Alert,
   AppState,
   BackHandler,
-  Dimensions,
   FlatList,
   Platform,
   RefreshControl,
@@ -334,7 +333,7 @@ export default function ExamDetailsScreen() {
       (async () => {
         try {
           await apiFetch('/api/student/premium/payment-status', { token });
-        } catch (_) {}
+        } catch (_) { }
         EXAM_CLIENT_CACHE.delete(examId);
         clearApiCache();
         await loadExamData(true);
@@ -354,7 +353,7 @@ export default function ExamDetailsScreen() {
       if (nextState === 'active') {
         try {
           await apiFetch('/api/student/premium/payment-status', { token });
-        } catch (_) {}
+        } catch (_) { }
         EXAM_CLIENT_CACHE.delete(examId);
         clearApiCache();
         loadExamData(false);

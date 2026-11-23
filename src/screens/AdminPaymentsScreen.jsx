@@ -196,7 +196,7 @@ export default function AdminPaymentsScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.pUser}>{p.userName}</Text>
                         <Text style={styles.pEmail}>{p.userEmail}</Text>
-                        
+
                         {/* Exam & Plan Info */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                           {(() => {

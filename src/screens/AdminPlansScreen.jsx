@@ -1,9 +1,9 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { apiFetch } from '../api/client.js';
 import AdminCRUDPage from '../components/AdminCRUDPage.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import { apiFetch } from '../api/client.js';
 
 const AVAILABLE_MODULES = [
   { id: 'all', label: '🌟 All Modules (Complete Access)' },
@@ -134,8 +134,8 @@ export default function AdminPlansScreen() {
             const featArr = Array.isArray(rawFeat)
               ? rawFeat
               : typeof rawFeat === 'string'
-              ? JSON.parse(rawFeat || '[]')
-              : [];
+                ? JSON.parse(rawFeat || '[]')
+                : [];
 
             return {
               id: p.id,

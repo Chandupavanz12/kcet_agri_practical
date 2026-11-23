@@ -402,50 +402,58 @@ export default function StudentDashboardScreen() {
         </View>
 
         {/* 4. "Your Progress" Section Card */}
-        <LinearGradient
-          colors={['#0f172a', '#1e293b']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.progressCard}
+        <TouchableOpacity
+          activeOpacity={0.88}
+          onPress={() => router.push('/student/progress')}
         >
-          <View style={styles.progressHeaderRow}>
-            <View style={styles.progressTitleBox}>
-              <Text style={{ fontSize: 18 }}>📊</Text>
-              <Text style={styles.progressTitle}>Your Progress</Text>
-            </View>
-            <Text style={styles.keepGoingText}>Keep Going! 🔥</Text>
-          </View>
-
-          <View style={styles.progressBodyRow}>
-            {/* Left Circular Meter */}
-            <View style={styles.circleContainer}>
-              <View style={styles.circleRing}>
-                <Text style={styles.circlePercentText}>{progress.progressPercent}%</Text>
+          <LinearGradient
+            colors={['#0f172a', '#1e293b']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.progressCard}
+          >
+            <View style={styles.progressHeaderRow}>
+              <View style={styles.progressTitleBox}>
+                <Text style={{ fontSize: 18 }}>📊</Text>
+                <Text style={styles.progressTitle}>Your Progress</Text>
               </View>
-              <View style={styles.circleLabelCol}>
-                <Text style={styles.overallPrepText}>Overall Preparation</Text>
-                <Text style={styles.doingGreatText}>
-                  {progress.progressPercent > 60 ? "You're doing great!" : 'Keep practicing daily!'}
-                </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={styles.keepGoingText}>Keep Going! 🔥</Text>
+                <Text style={{ color: '#38bdf8', fontSize: 11, fontWeight: '700' }}>View Details ➔</Text>
               </View>
             </View>
 
-            {/* Right Metrics */}
-            <View style={styles.metricsCol}>
-              <View style={styles.metricItem}>
-                <Text style={{ fontSize: 22 }}>🏆</Text>
-                <Text style={styles.metricVal}>{progress.totalTestsGiven}</Text>
-                <Text style={styles.metricSub}>Tests Given</Text>
+            <View style={styles.progressBodyRow}>
+              {/* Left Circular Meter */}
+              <View style={styles.circleContainer}>
+                <View style={styles.circleRing}>
+                  <Text style={styles.circlePercentText}>{progress.progressPercent}%</Text>
+                </View>
+                <View style={styles.circleLabelCol}>
+                  <Text style={styles.overallPrepText}>Overall Preparation</Text>
+                  <Text style={styles.doingGreatText}>
+                    {progress.progressPercent > 60 ? "You're doing great!" : 'Keep practicing daily!'}
+                  </Text>
+                </View>
               </View>
 
-              <View style={styles.metricItem}>
-                <Text style={{ fontSize: 22 }}>⭐</Text>
-                <Text style={styles.metricVal}>{progress.totalScore}</Text>
-                <Text style={styles.metricSub}>Total Score</Text>
+              {/* Right Metrics */}
+              <View style={styles.metricsCol}>
+                <View style={styles.metricItem}>
+                  <Text style={{ fontSize: 22 }}>🏆</Text>
+                  <Text style={styles.metricVal}>{progress.totalTestsGiven}</Text>
+                  <Text style={styles.metricSub}>Tests Given</Text>
+                </View>
+
+                <View style={styles.metricItem}>
+                  <Text style={{ fontSize: 22 }}>⭐</Text>
+                  <Text style={styles.metricVal}>{progress.totalScore}</Text>
+                  <Text style={styles.metricSub}>Total Score</Text>
+                </View>
               </View>
             </View>
-          </View>
-        </LinearGradient>
+          </LinearGradient>
+        </TouchableOpacity>
 
         {/* 5. "Quick Access" Section */}
         <View style={styles.sectionHeaderRow}>

@@ -842,7 +842,7 @@ export async function verifyPaymentRedirect(req, res, next) {
         if (uDoc) {
           userAuthToken = signToken(uDoc);
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     const buildUrl = (base, param) => {
@@ -942,7 +942,7 @@ export async function verifyPaymentRedirect(req, res, next) {
             );
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     if (verified) {
@@ -1538,7 +1538,7 @@ export async function startTest(req, res, next) {
             pgQuestions = qRes.rows;
             break;
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       if (!pgTest) {
@@ -1723,7 +1723,7 @@ export async function submitTest(req, res, next) {
             pgQuestions = qRes.rows;
             break;
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       if (!pgTest) {
@@ -2316,7 +2316,7 @@ export async function streamPyqPdf(req, res, next) {
             break;
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     if (!p || p.status !== 'active') return res.status(404).json({ message: 'PYQ not found' });
@@ -2332,7 +2332,7 @@ export async function streamPyqPdf(req, res, next) {
           const { checkUserModuleAccess } = await import('./exam.controller.js');
           const exam = String(p.exam || 'puc').toLowerCase();
           ok = await checkUserModuleAccess(null, userId, exam, 'pyqs');
-        } catch (_) {}
+        } catch (_) { }
       }
       if (!ok) return res.status(403).json({ message: 'Premium access required' });
     }
@@ -2464,7 +2464,7 @@ export async function streamMaterialFile(req, res, next) {
             break;
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     if (!m) return res.status(404).json({ message: 'Material not found' });
@@ -2482,7 +2482,7 @@ export async function streamMaterialFile(req, res, next) {
           const exam = String(m.exam || 'puc').toLowerCase();
           const targetModule = String(m.type || '').toLowerCase() === 'pyq' ? 'pyqs' : 'materials';
           ok = await checkUserModuleAccess(null, userId, exam, targetModule);
-        } catch (_) {}
+        } catch (_) { }
       }
       if (!ok) return res.status(403).json({ message: 'Premium access required' });
     }

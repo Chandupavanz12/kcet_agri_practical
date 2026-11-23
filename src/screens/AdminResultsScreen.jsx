@@ -1,8 +1,8 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Modal, FlatList } from 'react-native';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { ActivityIndicator, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 // ─── Native-compatible dropdown (no @react-native-picker/picker) ─────────────
 function DropdownPicker({ label, value, options, onSelect }) {
@@ -50,7 +50,7 @@ export default function AdminResultsScreen() {
   const [tests, setTests] = useState([]);
   const [testId, setTestId] = useState('');
   const [examFilter, setExamFilter] = useState('all'); // 'all' | 'puc' | 'kcet' | 'neet' | 'agri'
-  
+
   const [allStudents, setAllStudents] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
 
@@ -128,7 +128,7 @@ export default function AdminResultsScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
-        
+
         <View style={styles.heroCard}>
           <View style={styles.heroHeader}>
             <View style={{ flex: 1 }}>
@@ -334,39 +334,4 @@ const styles = StyleSheet.create({
   missingIndex: { width: 30, fontSize: 12, color: '#fb923c', fontWeight: 'bold' },
   missingName: { fontSize: 14, fontWeight: '600', color: '#1e293b' },
   missingEmail: { fontSize: 12, color: '#64748b' },
-  // Filter tabs
-  filterRow: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-  },
-  filterChipActive: {
-    backgroundColor: '#4f46e5',
-    borderColor: '#4338ca',
-  },
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  filterChipTextActive: {
-    color: '#ffffff',
-    fontWeight: '800',
-  },
-  // Table Exam Badge
-  examBadgePill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    alignSelf: 'flex-start',
-  },
-  examBadgePillText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-  },
 });
