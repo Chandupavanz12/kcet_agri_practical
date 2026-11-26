@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 
 export default function PublicHeader() {
@@ -10,10 +10,11 @@ export default function PublicHeader() {
       <View style={styles.container}>
         {/* StudyHack Brand Logo */}
         <TouchableOpacity style={styles.logoRow} onPress={() => router.push('/login')} activeOpacity={0.8}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoGradCap}>🎓</Text>
-            <Text style={styles.logoS}>S</Text>
-          </View>
+          <Image
+            source={require('../../assets/images/studyhack-emblem.png')}
+            style={{ width: 42, height: 42, borderRadius: 10 }}
+            resizeMode="contain"
+          />
           <View style={styles.logoTextCol}>
             <Text style={styles.logoTitle}>
               Study<Text style={styles.logoTitleGreen}>Hack</Text>

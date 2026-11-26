@@ -1,6 +1,6 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView,  } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function AboutScreen() {
   return (
@@ -14,7 +14,7 @@ export default function AboutScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Our Mission</Text>
               <Text style={styles.text}>
-                StudyHack is dedicated to empowering students to excel in PUC, KCET, NEET, and Agriculture Practical examinations. Learn Smart. Score Higher. 
+                StudyHack is dedicated to empowering students to excel in PUC, KCET, NEET, and Agriculture Practical examinations. Learn Smart. Score Higher.
                 We provide comprehensive study materials, practice tests, and interactive learning resources to ensure your success.
               </Text>
             </View>

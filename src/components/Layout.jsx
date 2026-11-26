@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Linking, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import Sidebar from './Sidebar.jsx';
@@ -30,9 +30,11 @@ export default function Layout({ children }) {
               <TouchableOpacity onPress={() => setSidebarOpen((v) => !v)} style={styles.menuButton}>
                 <Text style={styles.menuIcon}>☰</Text>
               </TouchableOpacity>
-              <View style={styles.logoBox}>
-                <Text style={styles.logoText}>SH</Text>
-              </View>
+              <Image
+                source={require('../../assets/images/studyhack-emblem.png')}
+                style={{ width: 38, height: 38, borderRadius: 10 }}
+                resizeMode="contain"
+              />
               <View>
                 <Text style={styles.brandTitle}>StudyHack</Text>
                 <Text style={styles.brandSubtitle}>Learn Smart. Score Higher.</Text>

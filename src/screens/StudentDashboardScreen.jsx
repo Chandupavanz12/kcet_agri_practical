@@ -24,11 +24,11 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 function StudyHackLogo() {
   return (
     <View style={styles.logoRow}>
-      {/* Stylized S Cap Badge */}
-      <View style={styles.logoBadge}>
-        <Text style={styles.logoGradCap}>🎓</Text>
-        <Text style={styles.logoS}>S</Text>
-      </View>
+      <Image
+        source={require('../../assets/images/studyhack-emblem.png')}
+        style={{ width: 42, height: 42, borderRadius: 10 }}
+        resizeMode="contain"
+      />
       <View style={styles.logoTextCol}>
         <Text style={styles.logoTitle}>
           Study<Text style={styles.logoTitleGreen}>Hack</Text>
