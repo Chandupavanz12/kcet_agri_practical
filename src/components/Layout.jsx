@@ -31,11 +31,11 @@ export default function Layout({ children }) {
                 <Text style={styles.menuIcon}>☰</Text>
               </TouchableOpacity>
               <View style={styles.logoBox}>
-                <Text style={styles.logoText}>KA</Text>
+                <Text style={styles.logoText}>SH</Text>
               </View>
               <View>
-                <Text style={styles.brandTitle}>KCET Agri Practical</Text>
-                <Text style={styles.brandSubtitle}>Student learning + mock tests</Text>
+                <Text style={styles.brandTitle}>StudyHack</Text>
+                <Text style={styles.brandSubtitle}>Learn Smart. Score Higher.</Text>
               </View>
             </View>
 

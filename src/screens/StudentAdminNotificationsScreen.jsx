@@ -36,7 +36,7 @@ export default function StudentAdminNotificationsScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>ADMIN ALERTS</Text>
-        <Text style={styles.headerSubtitle}>Official Messages from KCET Agri</Text>
+        <Text style={styles.headerSubtitle}>Official Messages from StudyHack</Text>
       </View>
 
       {!!error && (

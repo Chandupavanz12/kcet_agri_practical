@@ -8,13 +8,13 @@ export default function AboutScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.title}>About KCET Agriculture Prep</Text>
+            <Text style={styles.title}>About StudyHack</Text>
           </View>
           <View style={styles.cardBody}>
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Our Mission</Text>
               <Text style={styles.text}>
-                KCET Agriculture Prep is dedicated to helping students excel in the Karnataka Common Entrance Test for Agriculture courses. 
+                StudyHack is dedicated to empowering students to excel in PUC, KCET, NEET, and Agriculture Practical examinations. Learn Smart. Score Higher. 
                 We provide comprehensive study materials, practice tests, and interactive learning resources to ensure your success.
               </Text>
             </View>
@@ -22,7 +22,7 @@ export default function AboutScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>What We Offer</Text>
               <View style={styles.list}>
-                <Text style={styles.listItem}>• Comprehensive study materials for all KCET Agriculture subjects</Text>
+                <Text style={styles.listItem}>• Comprehensive study materials for PUC, KCET, NEET, and Agriculture Practical</Text>
                 <Text style={styles.listItem}>• Interactive mock tests with instant feedback</Text>
                 <Text style={styles.listItem}>• Previous year question papers with solutions</Text>
                 <Text style={styles.listItem}>• Video tutorials and learning resources</Text>

@@ -152,10 +152,10 @@ export default function Sidebar({ isOpen, onClose }) {
         <View style={styles.header}>
           <View style={styles.brandGroup}>
             <View style={styles.logoBox}>
-              <Text style={styles.logoText}>KA</Text>
+              <Text style={styles.logoText}>SH</Text>
             </View>
             <View>
-              <Text style={styles.brandTitle}>KCET Agri</Text>
+              <Text style={styles.brandTitle}>StudyHack</Text>
               <Text style={styles.brandSubtitle}>Navigation</Text>
             </View>
           </View>

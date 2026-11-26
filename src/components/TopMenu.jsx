@@ -130,11 +130,11 @@ export default function TopMenu() {
         <View style={styles.row}>
           <TouchableOpacity onPress={() => router.push('/')} style={styles.logoGroup}>
             <View style={styles.logoBox}>
-              <Text style={styles.logoText}>KC</Text>
+              <Text style={styles.logoText}>SH</Text>
             </View>
             <View>
-              <Text style={styles.brandTitle}>KCET Agriculture</Text>
-              <Text style={styles.brandSubtitle}>Learning Platform</Text>
+              <Text style={styles.brandTitle}>StudyHack</Text>
+              <Text style={styles.brandSubtitle}>Learn Smart. Score Higher.</Text>
             </View>
           </TouchableOpacity>
 

@@ -27,7 +27,7 @@ export default function NewLayout({ children }) {
               <TouchableOpacity onPress={toggleSidebar} style={styles.menuButton}>
                 <Text style={styles.menuIcon}>☰</Text>
               </TouchableOpacity>
-              <Text style={styles.brandTitle}>KCET Agriculture</Text>
+              <Text style={styles.brandTitle}>StudyHack</Text>
             </View>
             <View style={styles.rightGroup}>
               <Text style={styles.welcomeText}>Welcome back!</Text>

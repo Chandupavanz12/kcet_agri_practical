@@ -10,9 +10,9 @@ export default function Footer() {
       <View style={styles.container}>
         <View style={styles.grid}>
           <View style={styles.column}>
-            <Text style={styles.brand}>KCET Agri Practical</Text>
+            <Text style={styles.brand}>StudyHack</Text>
             <Text style={styles.description}>
-              Student-friendly preparation platform for Agriculture practical learning, materials, videos and mock tests.
+              Learn Smart. Score Higher. Comprehensive preparation platform for PUC, KCET, NEET, and Agriculture Practical exams.
             </Text>
           </View>
 
@@ -44,7 +44,7 @@ export default function Footer() {
         </View>
 
         <View style={styles.bottomBar}>
-          <Text style={styles.bottomText}>© {new Date().getFullYear()} KCET Agri Practical. All rights reserved.</Text>
+          <Text style={styles.bottomText}>© {new Date().getFullYear()} StudyHack. All rights reserved.</Text>
           <Text style={styles.bottomText}>Built for students • Clean • Fast • Secure</Text>
         </View>
       </View>

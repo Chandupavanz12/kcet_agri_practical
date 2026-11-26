@@ -727,7 +727,7 @@ function renderPaymentBridgeHtml({ success, targetAppUrl, androidIntentUrl = '',
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>${safeTitle} - KCET Agri Practical</title>
+  <title>${safeTitle} - StudyHack</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -2695,7 +2695,7 @@ export async function serveRazorpayCheckoutHtml(req, res) {
                 "key": "${razorpayKey}",
                 "amount": "${amount}", 
                 "currency": "INR",
-                "name": "KCET Agriculture Practical",
+                "name": "StudyHack",
                 "description": "Premium Access Upgrade",
                 "image": "https://kcet-agri-practical.onrender.com/assets/images/favicon.png",
                 "order_id": "${orderId}",

@@ -28,9 +28,9 @@ export default function Navigation() {
           {/* Logo */}
           <TouchableOpacity onPress={() => router.push('/')} style={styles.logoGroup}>
             <View style={styles.logoBox}>
-              <Text style={styles.logoText}>KC</Text>
+              <Text style={styles.logoText}>SH</Text>
             </View>
-            <Text style={styles.brandTitle}>KCET Agriculture</Text>
+            <Text style={styles.brandTitle}>StudyHack</Text>
           </TouchableOpacity>
 
           {/* User Menu */}
