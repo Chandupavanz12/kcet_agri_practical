@@ -4,14 +4,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
+let STUDENTS_CLIENT_CACHE = null;
+
 export default function AdminStudentsScreen() {
   const { token } = useAuth();
-  const [students, setStudents] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [students, setStudents] = useState(STUDENTS_CLIENT_CACHE || []);
+  const [loading, setLoading] = useState(!STUDENTS_CLIENT_CACHE);
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterYear, setFilterYear] = useState('All');
   const [filterPlan, setFilterPlan] = useState('All');
+  const [onlyOnline, setOnlyOnline] = useState(false);
 
   const plans = [
     { code: 'puc', label: '📄 PUC (Class 12) Plan', exam: 'puc' },
@@ -30,11 +33,13 @@ export default function AdminStudentsScreen() {
 
   const fetchStudents = async () => {
     try {
-      setLoading(true);
+      if (!STUDENTS_CLIENT_CACHE) setLoading(true);
       const res = await apiFetch('/api/admin/students', { token });
-      setStudents(res?.students || []);
+      const list = res?.students || [];
+      STUDENTS_CLIENT_CACHE = list;
+      setStudents(list);
     } catch (err) {
-      setMessage(err?.message || 'Failed to fetch students.');
+      if (!STUDENTS_CLIENT_CACHE) setMessage(err?.message || 'Failed to fetch students.');
     } finally {
       setLoading(false);
     }
@@ -167,7 +172,8 @@ export default function AdminStudentsScreen() {
       else if (filterPlan === 'materials') matchPlan = pStat.includes('materials');
       else matchPlan = pStat.includes(filterPlan);
     }
-    return matchSearch && matchYear && matchPlan;
+    const matchOnline = !onlyOnline || Boolean(s.isOnline);
+    return matchSearch && matchYear && matchPlan && matchOnline;
   });
 
   return (
@@ -219,7 +225,22 @@ export default function AdminStudentsScreen() {
         {/* Student List */}
         <View style={[styles.card, { flex: 1 }]}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>All Registered Students</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.cardTitle}>All Registered Students</Text>
+              <TouchableOpacity
+                onPress={() => setOnlyOnline((v) => !v)}
+                style={{
+                  backgroundColor: onlyOnline ? '#16a34a' : '#dcfce7',
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 999,
+                }}
+              >
+                <Text style={{ fontSize: 11.5, fontWeight: '800', color: onlyOnline ? '#fff' : '#15803d' }}>
+                  🟢 {students.filter((x) => x.isOnline).length} Online
+                </Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.badge}><Text style={styles.badgeText}>{filteredStudents.length}</Text></View>
           </View>
           <View style={[styles.cardBody, { flex: 1, paddingBottom: 0 }]}>
@@ -240,7 +261,32 @@ export default function AdminStudentsScreen() {
                   return (
                     <View style={styles.studentItem}>
                       <View style={styles.studentInfoBox}>
-                        <Text style={styles.studentName}>{s.name || 'Unnamed'}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <Text style={styles.studentName}>{s.name || 'Unnamed'}</Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                              backgroundColor: s.isOnline ? '#dcfce7' : '#f1f5f9',
+                              paddingHorizontal: 7,
+                              paddingVertical: 2,
+                              borderRadius: 999,
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: 4,
+                                backgroundColor: s.isOnline ? '#16a34a' : '#94a3b8',
+                              }}
+                            />
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: s.isOnline ? '#15803d' : '#64748b' }}>
+                              {s.isOnline ? 'Online' : 'Offline'}
+                            </Text>
+                          </View>
+                        </View>
                         <Text style={styles.studentEmail}>{s.email || 'No email'}</Text>
                         <Text style={styles.studentMeta}>ID #{s.id} • {new Date(s.createdAt || s.created_at || Date.now()).toLocaleDateString()}</Text>
                       </View>

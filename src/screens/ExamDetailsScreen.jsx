@@ -130,6 +130,7 @@ export default function ExamDetailsScreen() {
   const [plans, setPlans] = useState(cachedData?.plans || []);
   const [activePlanCodes, setActivePlanCodes] = useState(cachedData?.activePlanCodes || []);
   const [isSubscribed, setIsSubscribed] = useState(cachedData?.isSubscribed || false);
+  const [justActivated, setJustActivated] = useState(false);
   const [subscriptionDisabled, setSubscriptionDisabled] = useState(cachedData?.subscriptionDisabled || false);
   const [activePlanCode, setActivePlanCode] = useState(cachedData?.activePlanCode || null);
   const [loading, setLoading] = useState(false);
@@ -369,6 +370,7 @@ export default function ExamDetailsScreen() {
       setTimeout(() => syncPaymentAndRefresh(false), 1000);
       setTimeout(() => syncPaymentAndRefresh(false), 2500);
 
+      setJustActivated(true);
       setView('modules');
       Alert.alert(
         'Study Material Plan Activated! 🎉',
@@ -410,6 +412,7 @@ export default function ExamDetailsScreen() {
       }
 
       if (res?.free) {
+        setJustActivated(true);
         Alert.alert('Success', 'Plan activated successfully!');
         await loadExamData();
         return;
@@ -1039,22 +1042,25 @@ export default function ExamDetailsScreen() {
         {/* ─── LEVEL 4: EXAM SUBSCRIPTION PLANS PAGE ──────────────────────────── */}
         {view === 'plans' && !subscriptionDisabled && (
           <View style={styles.pageSection}>
-            {isSubscribed && (
+            {justActivated && (
               <View style={styles.activePlanBannerCard}>
                 <View style={styles.activePlanBannerRow}>
                   <View style={styles.activePlanBannerIconBox}>
                     <Text style={styles.activePlanBannerEmoji}>🎉</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.activePlanBannerTitle}>{config.name} Plan Active & Unlocked</Text>
+                    <Text style={styles.activePlanBannerTitle}>{config.name} Plan Activated!</Text>
                     <Text style={styles.activePlanBannerSub}>
-                      Your plan is active! All chapter study materials, mock tests, and previous year question papers are unlocked.
+                      Your plan is active! Your selected study materials, mock tests, and previous year question papers are unlocked.
                     </Text>
                   </View>
                 </View>
                 <TouchableOpacity
                   style={[styles.activePlanBannerBtn, { backgroundColor: config.themeColor }]}
-                  onPress={() => setView('modules')}
+                  onPress={() => {
+                    setJustActivated(false);
+                    setView('modules');
+                  }}
                   activeOpacity={0.85}
                 >
                   <Text style={styles.activePlanBannerBtnText}>Access Unlocked Materials ➔</Text>
@@ -1063,16 +1069,9 @@ export default function ExamDetailsScreen() {
             )}
 
             <View style={styles.sectionHeaderCol}>
-              <View style={[styles.subHeaderBadge, { backgroundColor: isSubscribed ? '#dcfce7' : '#fef08a' }]}>
-                <Text style={[styles.subHeaderBadgeText, { color: isSubscribed ? '#15803d' : '#854d0e' }]}>
-                  {isSubscribed ? '✓ SUBSCRIPTION ACTIVE' : 'PREMIUM UNLOCK'}
-                </Text>
-              </View>
               <Text style={styles.sectionHeading}>{config.name} Subscription Plans</Text>
               <Text style={styles.sectionSubHeading}>
-                {isSubscribed
-                  ? `Your account has active full access for ${config.fullName}.`
-                  : `Select an official plan to unlock all subjects, tests and premium materials for ${config.fullName}`}
+                Select an official plan to unlock subjects, tests and premium materials for {config.fullName}
               </Text>
             </View>
 

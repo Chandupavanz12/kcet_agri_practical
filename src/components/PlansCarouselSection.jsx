@@ -1,13 +1,5 @@
-import React, { useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import React from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function PlansCarouselSection({
   plans = [],
@@ -19,15 +11,6 @@ export default function PlansCarouselSection({
   onViewAllPlans,
   payingPlanId = null,
 }) {
-  const { width: windowWidth } = useWindowDimensions();
-  const containerWidth = Math.min(windowWidth || 380, 480) - 32;
-  // Size cards so ~2.35 cards fit side-by-side (at least 3 plans visible/peeking at once)
-  const cardWidth = Math.max(150, Math.min(195, Math.floor((containerWidth - 16) / 2.25)));
-  const snapStep = cardWidth + 10;
-
-  const listRef = useRef(null);
-  const [activeIdx, setActiveIdx] = useState(0);
-
   if (!plans || plans.length === 0) {
     return (
       <View style={styles.emptyCard}>
@@ -40,24 +23,13 @@ export default function PlansCarouselSection({
     );
   }
 
-  const scrollToIndex = (idx) => {
-    const clamped = Math.max(0, Math.min(plans.length - 1, idx));
-    setActiveIdx(clamped);
-    listRef.current?.scrollToOffset({ offset: clamped * snapStep, animated: true });
-  };
-
   return (
     <View style={styles.wrapper}>
-      {/* Top Row: Scroll Hint + View All Plans */}
+      {/* Top Bar: Plan Count & View All Plans (2-per-row page) */}
       <View style={styles.topControlsRow}>
-        <View style={styles.scrollHintPill}>
-          <Text style={styles.scrollHintText}>
-            {plans.length > 1
-              ? `👉 Swipe plans (${plans.length} available)`
-              : `${plans.length} Plan Available`}
-          </Text>
-        </View>
-
+        <Text style={styles.countText}>
+          {plans.length} {plans.length === 1 ? 'Plan' : 'Plans'} Available
+        </Text>
         {onViewAllPlans && (
           <TouchableOpacity style={styles.viewAllBtn} onPress={onViewAllPlans} activeOpacity={0.8}>
             <Text style={[styles.viewAllBtnText, { color: themeColor }]}>View All Plans →</Text>
@@ -65,35 +37,24 @@ export default function PlansCarouselSection({
         )}
       </View>
 
-      {/* Smooth Horizontal Carousel */}
-      <FlatList
-        ref={listRef}
-        data={plans}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        decelerationRate="fast"
-        snapToInterval={snapStep}
-        snapToAlignment="start"
-        contentContainerStyle={styles.carouselContent}
-        keyExtractor={(item, idx) => String(item.id || item.code || idx)}
-        onMomentumScrollEnd={(e) => {
-          const offsetX = e.nativeEvent.contentOffset.x;
-          const idx = Math.round(offsetX / snapStep);
-          setActiveIdx(Math.max(0, Math.min(plans.length - 1, idx)));
-        }}
-        renderItem={({ item: plan, index }) => {
+      {/* Vertical Stacked Plan Cards (one below the other) */}
+      <View style={styles.plansStack}>
+        {plans.map((plan, index) => {
           const priceRupees = Math.round((plan.pricePaise ?? plan.price_paise ?? 0) / 100);
           const isPaying = payingPlanId === plan.id || payingPlanId === plan.code;
           const active = isPlanActiveFn ? isPlanActiveFn(plan) : Boolean(plan.isActive);
           const features = Array.isArray(plan.features) ? plan.features : [];
-          const isPopular = index === 0 || String(plan.code || '').includes('combo') || String(plan.code || '').includes('all');
+          const isPopular =
+            index === 0 ||
+            String(plan.code || '').includes('combo') ||
+            String(plan.code || '').includes('all');
           const accent = active ? '#10b981' : isPopular ? themeColor : '#0284c7';
 
           return (
             <View
+              key={plan.id || plan.code || index}
               style={[
                 styles.planCard,
-                { width: cardWidth },
                 isPopular && !active && { borderColor: themeColor, borderWidth: 1.8 },
                 active && styles.planCardActive,
               ]}
@@ -105,37 +66,36 @@ export default function PlansCarouselSection({
                 </View>
                 <View style={[styles.badge, active ? styles.badgeActive : styles.badgeNormal]}>
                   <Text style={[styles.badgeText, active ? styles.badgeTextActive : styles.badgeTextNormal]}>
-                    {active ? '✓ Active' : isPopular ? 'Popular' : 'Plan'}
+                    {active ? '✓ Active' : isPopular ? '⭐ Most Popular' : 'Plan'}
                   </Text>
                 </View>
               </View>
 
               {/* Plan Name & Price */}
-              <Text style={styles.planName} numberOfLines={2}>{plan.name}</Text>
+              <Text style={styles.planName}>{plan.name}</Text>
               <View style={styles.priceRow}>
                 <Text style={[styles.priceText, { color: accent }]}>
                   {priceRupees <= 0 ? 'Free' : `₹${priceRupees}`}
                 </Text>
-                {priceRupees > 0 && <Text style={styles.periodText}>/yr</Text>}
+                {priceRupees > 0 && <Text style={styles.periodText}>/year</Text>}
               </View>
-              <Text style={styles.durationText}>{plan.durationDays || plan.duration_days || 365} days access</Text>
+              <Text style={styles.durationText}>
+                {plan.durationDays || plan.duration_days || 365} days full access
+              </Text>
 
-              {/* Compact Feature Bullets */}
-              <View style={styles.featuresList}>
-                {features.slice(0, 3).map((feat, fIdx) => (
-                  <View key={fIdx} style={styles.featRow}>
-                    <Text style={[styles.featCheck, { color: accent }]}>✓</Text>
-                    <Text style={styles.featText} numberOfLines={2}>{feat}</Text>
-                  </View>
-                ))}
-                {features.length > 3 && (
-                  <Text style={[styles.moreFeatText, { color: accent }]}>
-                    +{features.length - 3} more benefits
-                  </Text>
-                )}
-              </View>
+              {/* Features List */}
+              {features.length > 0 && (
+                <View style={styles.featuresList}>
+                  {features.map((feat, fIdx) => (
+                    <View key={fIdx} style={styles.featRow}>
+                      <Text style={[styles.featCheck, { color: accent }]}>✓</Text>
+                      <Text style={styles.featText}>{feat}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
 
-              {/* CTA Button */}
+              {/* Action Button */}
               <View style={styles.ctaWrap}>
                 {active ? (
                   <TouchableOpacity
@@ -143,7 +103,7 @@ export default function PlansCarouselSection({
                     onPress={onAccessUnlocked}
                     activeOpacity={0.85}
                   >
-                    <Text style={styles.ctaBtnText}>✓ Active</Text>
+                    <Text style={styles.ctaBtnText}>✓ Plan Activated • Access Unlocked 📚</Text>
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
@@ -156,7 +116,7 @@ export default function PlansCarouselSection({
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
                       <Text style={styles.ctaBtnText}>
-                        {priceRupees <= 0 ? '🚀 Activate' : '💳 Unlock'}
+                        {priceRupees <= 0 ? '🚀 Activate Free' : `💳 Unlock ${examName} Now`}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -164,52 +124,30 @@ export default function PlansCarouselSection({
               </View>
             </View>
           );
-        }}
-      />
+        })}
+      </View>
 
-      {/* Bottom Scroll Hint Bar with Dots & Next Button */}
-      {plans.length > 1 && (
-        <View style={styles.bottomHintBar}>
-          <View style={styles.dotsRow}>
-            {plans.map((_, idx) => (
-              <TouchableOpacity
-                key={idx}
-                onPress={() => scrollToIndex(idx)}
-                style={[
-                  styles.dot,
-                  idx === activeIdx && [styles.dotActive, { backgroundColor: themeColor }],
-                ]}
-              />
-            ))}
-          </View>
-          <TouchableOpacity
-            style={styles.nextHintBtn}
-            onPress={() => scrollToIndex((activeIdx + 1) % plans.length)}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.nextHintText, { color: themeColor }]}>More Plans →</Text>
-          </TouchableOpacity>
-        </View>
+      {/* Bottom Hint for More Plans & View All */}
+      {plans.length > 1 && onViewAllPlans && (
+        <TouchableOpacity style={styles.bottomHintBox} onPress={onViewAllPlans} activeOpacity={0.8}>
+          <Text style={styles.bottomHintText}>
+            ✨ Want to compare all {plans.length} plans side-by-side?
+          </Text>
+          <Text style={[styles.bottomHintLink, { color: themeColor }]}>View All Plans (2 per row) →</Text>
+        </TouchableOpacity>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: { gap: 10 },
+  wrapper: { gap: 12 },
   topControlsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
   },
-  scrollHintPill: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-  },
-  scrollHintText: { fontSize: 11.5, fontWeight: '700', color: '#475569' },
+  countText: { fontSize: 13, fontWeight: '700', color: '#475569' },
   viewAllBtn: {
     backgroundColor: '#ffffff',
     borderWidth: 1,
@@ -218,19 +156,18 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
   },
-  viewAllBtnText: { fontSize: 12, fontWeight: '800' },
-  carouselContent: { gap: 10, paddingVertical: 4, paddingRight: 16 },
+  viewAllBtnText: { fontSize: 12.5, fontWeight: '800' },
+  plansStack: { gap: 16 },
   planCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 14,
+    borderRadius: 22,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
     shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowRadius: 10,
     elevation: 2,
-    justifyContent: 'space-between',
   },
   planCardActive: {
     borderColor: '#10b981',
@@ -241,46 +178,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   iconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconEmoji: { fontSize: 16, color: '#fff', fontWeight: '800' },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  iconEmoji: { fontSize: 21, color: '#fff', fontWeight: '800' },
+  badge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999 },
   badgeNormal: { backgroundColor: '#f1f5f9' },
   badgeActive: { backgroundColor: '#dcfce7' },
-  badgeText: { fontSize: 10, fontWeight: '800' },
+  badgeText: { fontSize: 11.5, fontWeight: '800' },
   badgeTextNormal: { color: '#475569' },
   badgeTextActive: { color: '#15803d' },
-  planName: { fontSize: 14.5, fontWeight: '800', color: '#0f172a', minHeight: 36 },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2, marginTop: 4 },
-  priceText: { fontSize: 22, fontWeight: '900' },
-  periodText: { fontSize: 11, fontWeight: '600', color: '#64748b' },
-  durationText: { fontSize: 11, fontWeight: '600', color: '#64748b', marginTop: 2 },
-  featuresList: { marginTop: 10, marginBottom: 12, gap: 5, flex: 1 },
-  featRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
-  featCheck: { fontSize: 11, fontWeight: '900', marginTop: 1 },
-  featText: { fontSize: 11.5, color: '#475569', flex: 1, lineHeight: 15 },
-  moreFeatText: { fontSize: 11, fontWeight: '700', marginTop: 2 },
-  ctaWrap: { marginTop: 'auto' },
-  ctaBtn: { paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  ctaBtnText: { color: '#fff', fontSize: 12.5, fontWeight: '800' },
-  bottomHintBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  planName: { fontSize: 19, fontWeight: '900', color: '#0f172a' },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 6 },
+  priceText: { fontSize: 30, fontWeight: '900' },
+  periodText: { fontSize: 13.5, fontWeight: '600', color: '#64748b' },
+  durationText: { fontSize: 13, fontWeight: '600', color: '#64748b', marginTop: 4 },
+  featuresList: { marginTop: 16, marginBottom: 18, gap: 9 },
+  featRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  featCheck: { fontSize: 13, fontWeight: '900', marginTop: 2 },
+  featText: { fontSize: 13.5, color: '#475569', flex: 1, lineHeight: 19 },
+  ctaWrap: { marginTop: 4 },
+  ctaBtn: {
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
-    paddingHorizontal: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  dotsRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#cbd5e1' },
-  dotActive: { width: 18 },
-  nextHintBtn: { paddingVertical: 4, paddingHorizontal: 8 },
-  nextHintText: { fontSize: 12, fontWeight: '800' },
+  ctaBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  bottomHintBox: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    padding: 14,
+    alignItems: 'center',
+    gap: 4,
+  },
+  bottomHintText: { fontSize: 12.5, color: '#64748b', fontWeight: '600' },
+  bottomHintLink: { fontSize: 13, fontWeight: '800' },
   emptyCard: {
     backgroundColor: '#fff',
     borderRadius: 18,

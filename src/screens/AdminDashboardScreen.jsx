@@ -138,8 +138,14 @@ export default function AdminDashboardScreen() {
                   <Text style={styles.heroStatLabelBrand}>STATUS</Text>
                 </LinearGradient>
                 <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.heroStatBoxBrand}>
-                  <Text style={styles.heroStatValueWhite}>200+</Text>
-                  <Text style={styles.heroStatLabelBrand}>USERS</Text>
+                  <Text style={styles.heroStatValueWhite}>
+                    {counts.students >= 500
+                      ? `${Math.floor(counts.students / 500) * 500}+`
+                      : counts.students >= 100
+                        ? `${Math.floor(counts.students / 100) * 100}+`
+                        : String(counts.students)}
+                  </Text>
+                  <Text style={styles.heroStatLabelBrand}>STUDENTS</Text>
                 </LinearGradient>
               </View>
 

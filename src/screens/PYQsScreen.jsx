@@ -9,6 +9,8 @@ import ExamSelectorView, { EXAM_OPTIONS } from '../components/ExamSelectorView.j
 import { API_BASE_URL as apiBaseUrl } from '../config/env';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
+const PYQS_CLIENT_CACHE = new Map();
+
 const SUBJECTS_BY_EXAM = {
   puc: ['All', 'Physics', 'Chemistry', 'Mathematics', 'Biology'],
   kcet: ['All', 'Physics', 'Chemistry', 'Mathematics', 'Biology'],
@@ -66,26 +68,38 @@ export default function PYQsScreen() {
   useEffect(() => {
     if (!selectedExam) return;
     let alive = true;
+    const cacheKey = `${selectedExam}:${selectedSubject}`;
+    const cached = PYQS_CLIENT_CACHE.get(cacheKey);
+    if (cached) {
+      if (selectedExam === 'agri') setCentres(cached);
+      else setPyqs(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     (async () => {
       try {
         setError('');
-        setLoading(true);
         if (selectedExam === 'agri') {
           const res = await apiFetch('/api/student/exam-centres', { token });
+          const list = Array.isArray(res?.centres) ? res.centres : [];
           if (!alive) return;
-          setCentres(Array.isArray(res?.centres) ? res.centres : []);
+          PYQS_CLIENT_CACHE.set(cacheKey, list);
+          setCentres(list);
         } else {
           const subjParam =
             selectedSubject && selectedSubject !== 'All'
               ? `&subject=${encodeURIComponent(selectedSubject.toLowerCase())}`
               : '';
           const res = await apiFetch(`/api/student/exam/pyqs?exam=${selectedExam}${subjParam}`, { token });
+          const list = Array.isArray(res?.pyqs) ? res.pyqs : [];
           if (!alive) return;
-          setPyqs(Array.isArray(res?.pyqs) ? res.pyqs : []);
+          PYQS_CLIENT_CACHE.set(cacheKey, list);
+          setPyqs(list);
         }
       } catch (err) {
         if (!alive) return;
-        setError(err?.message || 'Failed to load PYQs');
+        if (!cached) setError(err?.message || 'Failed to load PYQs');
       } finally {
         if (alive) setLoading(false);
       }

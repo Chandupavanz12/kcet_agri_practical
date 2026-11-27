@@ -432,7 +432,7 @@ export async function listPlansStudent(req, res, next) {
     }
 
     const userId = Number(req.user?.sub || req.user?.id);
-    const rows = await listActivePlans();
+    const rows = await getOrSetCached('plans:agri:v1', 30000, () => listActivePlans());
 
     let activePlanCodes = [];
     if (Number.isFinite(userId)) {
@@ -1325,7 +1325,7 @@ export async function listMaterialsStudent(req, res, next) {
 
     const dbFilter = { ...filter, status: 'active' };
     const cacheKey = `materials:list:v1:${dbFilter.type || 'all'}:${dbFilter.access_type || 'all'}`;
-    const rows = await getOrSetCached(cacheKey, 800, async () => (await getMaterialModel()).find(dbFilter)
+    const rows = await getOrSetCached(cacheKey, 45000, async () => (await getMaterialModel()).find(dbFilter)
       .sort({ created_at: -1, id: -1 })
       .select({ id: 1, title: 1, pdf_url: 1, subject: 1, type: 1, access_type: 1, created_at: 1 })
       .lean()
@@ -1626,20 +1626,24 @@ export async function listActiveTests(req, res, next) {
     const userId = Number(req.user?.sub || req.user?.id);
     const role = String(req.user?.role || 'student');
     const { getUserBulkAllowedItems, isItemUnlockedByBulk } = await import('./exam.controller.js');
-    const [isSubscribed, bulkItems] = await Promise.all([
-      Promise.resolve(Boolean(userId)).then(async (ok) => ok && (
-        await canAccessPlan(userId, role, 'combo') ||
-        await canAccessPlan(userId, role, 'materials') ||
-        await canAccessPlan(userId, role, 'pyq')
-      )),
+    const [accessChecks, bulkItems, rows] = await Promise.all([
+      userId
+        ? Promise.all([
+            canAccessPlan(userId, role, 'combo'),
+            canAccessPlan(userId, role, 'materials'),
+            canAccessPlan(userId, role, 'pyq'),
+          ])
+        : Promise.resolve([false, false, false]),
       Number.isFinite(userId) ? getUserBulkAllowedItems(userId) : Promise.resolve(null),
+      getOrSetCached('tests:active:agri:v1', 45000, async () => {
+        const MockTest = await getMockTestModel();
+        return MockTest.find({ is_active: true, question_count: { $gt: 0 } })
+          .sort({ created_at: -1, id: -1 })
+          .select({ id: 1, title: 1, is_active: 1, is_free: 1, question_count: 1, per_question_seconds: 1, marks_correct: 1 })
+          .lean();
+      }),
     ]);
-
-    const MockTest = await getMockTestModel();
-    const rows = await MockTest.find({ is_active: true, question_count: { $gt: 0 } })
-      .sort({ created_at: -1, id: -1 })
-      .select({ id: 1, title: 1, is_active: 1, is_free: 1, question_count: 1, per_question_seconds: 1, marks_correct: 1 })
-      .lean();
+    const isSubscribed = Boolean(accessChecks[0] || accessChecks[1] || accessChecks[2]);
 
     const tests = (rows || []).map((t) => {
       const isFree = t.is_free === true || t.is_free === null || t.is_free === undefined ? (t.is_free !== false) : false;
@@ -2430,7 +2434,7 @@ export async function listPyqsByCentreYear(req, res, next) {
     const PyqModel = await getPyqModel();
     const rows = await getOrSetCached(
       cacheKey,
-      800,
+      45000,
       () => PyqModel.find({ status: 'active', centre_id: centreId, year })
         .sort({ created_at: -1, id: -1 })
         .select({ id: 1, title: 1, subject: 1, year: 1, access_type: 1 })

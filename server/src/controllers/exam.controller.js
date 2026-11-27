@@ -8,6 +8,7 @@ import { getMockResultModel } from '../config/mockTestDb.js';
 // IN-MEMORY TTL CACHE FOR ULTRA-FAST SUB-SECOND RESPONSES
 // ─────────────────────────────────────────────────────────────────────────────
 const _examMemCache = new Map();
+const _bulkItemsCache = new Map();
 export function getCached(key, ttlMs = 45000) {
   const item = _examMemCache.get(key);
   if (!item) return null;
@@ -25,6 +26,7 @@ export function setCached(key, data, ttlMs = 45000) {
 export function clearExamCache(pattern) {
   if (!pattern) {
     _examMemCache.clear();
+    _bulkItemsCache.clear();
     return;
   }
   for (const k of _examMemCache.keys()) {
@@ -301,6 +303,11 @@ export function hasBulkAllowedItems(obj) {
 
 // Helper: Fetch merged item-level unlocks across all active Bulk Plans for a user
 export async function getUserBulkAllowedItems(userId) {
+  const uid = Number(userId);
+  if (uid) {
+    const cached = _bulkItemsCache.get(uid);
+    if (cached && Date.now() < cached.expiresAt) return cached.data;
+  }
   const result = {
     materials: new Set(),
     pyqs: new Set(),
@@ -357,6 +364,9 @@ export async function getUserBulkAllowedItems(userId) {
     } catch (_) {}
   }
 
+  if (uid) {
+    _bulkItemsCache.set(uid, { data: result, expiresAt: Date.now() + 30000 });
+  }
   return result;
 }
 

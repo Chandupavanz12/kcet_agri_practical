@@ -286,3 +286,4 @@ const styles = StyleSheet.create({
   ctaBtn: { paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   ctaBtnText: { color: '#fff', fontSize: 12, fontWeight: '800' },
 });
+

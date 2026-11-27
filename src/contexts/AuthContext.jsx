@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { AppState } from 'react-native';
 import { authApi } from '../api/auth.js';
 import { apiFetch, clearApiCache } from '../api/client.js';
 
@@ -92,6 +93,24 @@ export function AuthProvider({ children }) {
     }
     loadStored();
   }, []);
+
+  // Keep student online status updated while app is active
+  useEffect(() => {
+    if (!token || role !== 'student') return;
+    const pingPresence = () => {
+      authApi.me(token).catch(() => {});
+    };
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') pingPresence();
+    });
+    const timer = setInterval(() => {
+      if (AppState.currentState === 'active') pingPresence();
+    }, 2 * 60 * 1000);
+    return () => {
+      sub.remove();
+      clearInterval(timer);
+    };
+  }, [token, role]);
 
   async function persist(nextToken, nextRole, nextUser = null) {
     setToken(nextToken);

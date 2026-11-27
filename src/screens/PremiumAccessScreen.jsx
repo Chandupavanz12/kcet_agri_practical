@@ -34,6 +34,7 @@ export default function PremiumAccessScreen() {
 
   const [plans, setPlans] = useState([]);
   const [status, setStatus] = useState(null);
+  const [subscriptionDisabled, setSubscriptionDisabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [checkingPayment, setCheckingPayment] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -47,6 +48,7 @@ export default function PremiumAccessScreen() {
       apiFetch('/api/student/premium/status', { token }),
     ]);
     setPlans(Array.isArray(p?.plans) ? p.plans : []);
+    setSubscriptionDisabled(Boolean(p?.subscriptionDisabled));
     setStatus(s?.access || null);
   };
 
@@ -75,24 +77,21 @@ export default function PremiumAccessScreen() {
         setLoading(true);
         setError('');
 
-        if (params.success === 'PremiumActivated' || params.payment === 'success' || params.success) {
+        const isJustPaid = Boolean(params.success === 'PremiumActivated' || params.payment === 'success' || params.success);
+        if (isJustPaid) {
           setMessage('🎉 Payment successful! Study material plan activated.');
           Alert.alert(
             'Study Material Plan Activated! 🎉',
             'Your study materials and mock tests are now fully unlocked!'
           );
+          setCheckingPayment(true);
+          try {
+            await apiFetch('/api/student/premium/payment-status', { token });
+          } catch (_) { } finally {
+            if (alive) setCheckingPayment(false);
+          }
         } else if (params.error) {
           setError('Payment verification failed. Please contact support if amount was deducted.');
-        }
-
-        setCheckingPayment(true);
-        try {
-          const payCheck = await apiFetch('/api/student/premium/payment-status', { token });
-          if (alive && payCheck?.activated) {
-            setMessage(`🎉 Your payment was found! ${payCheck.planName} is now active.`);
-          }
-        } catch (_) { } finally {
-          if (alive) setCheckingPayment(false);
         }
 
         await bustAndRefresh();
@@ -226,39 +225,47 @@ export default function PremiumAccessScreen() {
           </View>
         )}
 
-        {!hasAnyAccess && !checkingPayment && (
-          <View style={styles.recoveryBox}>
-            <Text style={styles.recoveryText}><Text style={{ fontWeight: 'bold' }}>Already paid?</Text> If you completed payment in your UPI / bank app but this page still shows locked, tap the button — we&apos;ll recover your access instantly without charging you again.</Text>
-            <TouchableOpacity style={styles.btnRecovery} onPress={checkMyPayment} disabled={checkingPayment}>
-              <Text style={styles.btnRecoveryText}>🔍 Check My Payment</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         <View style={styles.header}>
           <Text style={styles.headerTitle}>💳 Choose Your Plan</Text>
           <Text style={styles.headerSubtitle}>Get unlimited access to all 20 chapter materials, PYQs, and everything you need to score top marks.</Text>
         </View>
 
-        <PlansCarouselSection
-          plans={plans.map((p) => {
-            const code = String(p.code || '').toLowerCase();
-            return {
-              ...p,
-              features: PLAN_BULLETS[code] || (Array.isArray(p.features) ? p.features : []),
-            };
-          })}
-          examName="Agri Practical"
-          themeColor="#059669"
-          payingPlanId={busy ? 'processing' : null}
-          isPlanActiveFn={(p) => {
-            const code = String(p.code || '').toLowerCase();
-            return Boolean(p.isActive || status?.[code]?.unlocked);
-          }}
-          onSelectPlan={(p) => buy(String(p.code || '').toLowerCase())}
-          onAccessUnlocked={() => router.push('/student/materials?exam=agri')}
-          onViewAllPlans={() => router.push('/student/all-plans?exam=agri')}
-        />
+        {subscriptionDisabled ? (
+          <View style={styles.recoveryBox}>
+            <Text style={styles.recoveryText}>Subscription plans are currently unavailable.</Text>
+          </View>
+        ) : (
+          <>
+            <PlansCarouselSection
+              plans={plans.map((p) => {
+                const code = String(p.code || '').toLowerCase();
+                return {
+                  ...p,
+                  features: PLAN_BULLETS[code] || (Array.isArray(p.features) ? p.features : []),
+                };
+              })}
+              examName="Agri Practical"
+              themeColor="#059669"
+              payingPlanId={busy ? 'processing' : null}
+              isPlanActiveFn={(p) => {
+                const code = String(p.code || '').toLowerCase();
+                return Boolean(p.isActive || status?.[code]?.unlocked);
+              }}
+              onSelectPlan={(p) => buy(String(p.code || '').toLowerCase())}
+              onAccessUnlocked={() => router.push('/student/materials?exam=agri')}
+              onViewAllPlans={() => router.push('/student/all-plans?exam=agri')}
+            />
+
+            {!hasAnyAccess && !checkingPayment && (
+              <View style={styles.recoveryBox}>
+                <Text style={styles.recoveryText}><Text style={{ fontWeight: 'bold' }}>Already paid?</Text> If you completed payment in your UPI / bank app but this page still shows locked, tap the button — we&apos;ll recover your access instantly without charging you again.</Text>
+                <TouchableOpacity style={styles.btnRecovery} onPress={checkMyPayment} disabled={checkingPayment}>
+                  <Text style={styles.btnRecoveryText}>🔍 Check My Payment</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

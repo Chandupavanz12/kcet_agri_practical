@@ -7,6 +7,8 @@ import { apiFetch } from '../api/client.js';
 import ExamSelectorView, { EXAM_OPTIONS } from '../components/ExamSelectorView.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
+const TESTS_CLIENT_CACHE = new Map();
+
 const SUBJECTS_BY_EXAM = {
   puc: ['All', 'Physics', 'Chemistry', 'Mathematics', 'Biology'],
   kcet: ['All', 'Physics', 'Chemistry', 'Mathematics', 'Biology'],
@@ -45,26 +47,35 @@ export default function StudentTestsScreen() {
   useEffect(() => {
     if (!selectedExam) return;
     let alive = true;
+    const cacheKey = `${selectedExam}:${selectedSubject}`;
+    const cached = TESTS_CLIENT_CACHE.get(cacheKey);
+    if (cached) {
+      setTests(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     (async () => {
       try {
-        setLoading(true);
         setError('');
+        let list = [];
         if (selectedExam === 'agri') {
           const res = await apiFetch('/api/student/tests', { token });
-          if (!alive) return;
-          setTests(Array.isArray(res?.tests) ? res.tests : []);
+          list = Array.isArray(res?.tests) ? res.tests : [];
         } else {
           const subjParam =
             selectedSubject && selectedSubject !== 'All'
               ? `&subject=${encodeURIComponent(selectedSubject.toLowerCase())}`
               : '';
           const res = await apiFetch(`/api/student/exam/tests?exam=${selectedExam}${subjParam}`, { token });
-          if (!alive) return;
-          setTests(Array.isArray(res?.tests) ? res.tests : []);
+          list = Array.isArray(res?.tests) ? res.tests : [];
         }
+        if (!alive) return;
+        TESTS_CLIENT_CACHE.set(cacheKey, list);
+        setTests(list);
       } catch (e) {
         if (!alive) return;
-        setError(e?.message || 'Failed to load tests');
+        if (!cached) setError(e?.message || 'Failed to load tests');
       } finally {
         if (alive) setLoading(false);
       }

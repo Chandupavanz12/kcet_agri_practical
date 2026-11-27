@@ -9,6 +9,8 @@ import ExamSelectorView, { EXAM_OPTIONS } from '../components/ExamSelectorView.j
 import { API_BASE_URL as apiBaseUrl } from '../config/env';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
+const MATERIALS_CLIENT_CACHE = new Map();
+
 const SUBJECTS_BY_EXAM = {
   puc: ['All', 'Physics', 'Chemistry', 'Mathematics', 'Biology'],
   kcet: ['All', 'Physics', 'Chemistry', 'Mathematics', 'Biology'],
@@ -77,26 +79,35 @@ export default function StudentMaterialsScreen() {
   useEffect(() => {
     if (!selectedExam) return;
     let alive = true;
+    const cacheKey = `${selectedExam}:${selectedSubject}`;
+    const cached = MATERIALS_CLIENT_CACHE.get(cacheKey);
+    if (cached) {
+      setPdfs(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     (async () => {
       try {
-        setLoading(true);
         setError('');
+        let list = [];
         if (selectedExam === 'agri') {
           const res = await apiFetch('/api/student/materials?type=pdf', { token });
-          if (!alive) return;
-          setPdfs(Array.isArray(res?.materials) ? res.materials : []);
+          list = Array.isArray(res?.materials) ? res.materials : [];
         } else {
           const subjParam =
             selectedSubject && selectedSubject !== 'All'
               ? `&subject=${encodeURIComponent(selectedSubject.toLowerCase())}`
               : '';
           const res = await apiFetch(`/api/student/exam/materials?exam=${selectedExam}${subjParam}`, { token });
-          if (!alive) return;
-          setPdfs(Array.isArray(res?.materials) ? res.materials : []);
+          list = Array.isArray(res?.materials) ? res.materials : [];
         }
+        if (!alive) return;
+        MATERIALS_CLIENT_CACHE.set(cacheKey, list);
+        setPdfs(list);
       } catch (e) {
         if (!alive) return;
-        setError(e?.message || 'Failed to load materials');
+        if (!cached) setError(e?.message || 'Failed to load materials');
       } finally {
         if (alive) setLoading(false);
       }

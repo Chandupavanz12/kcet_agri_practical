@@ -514,28 +514,64 @@ export async function deleteExamCentreYear(req, res, next) {
   }
 }
 
+let _studentsListCache = null;
+
+export function clearAdminStudentsCache() {
+  _studentsListCache = null;
+}
+
 export async function listStudents(req, res, next) {
   try {
-    const rows = await User.find(
-      { role: 'student' },
-      { _id: 0, id: 1, name: 1, email: 1, created_at: 1 }
-    )
-      .sort({ created_at: -1, id: -1 })
-      .lean();
+    const { getOnlineUsersMap } = await import('../middleware/auth.js');
+    const onlineMap = getOnlineUsersMap();
+    const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+    const nowMs = Date.now();
 
-    const userIds = rows.map((u) => Number(u.id));
+    const attachOnlineStatus = (list) => {
+      let onlineCount = 0;
+      const enriched = list.map((s) => {
+        const uid = Number(s.id);
+        const memMs = onlineMap.get(uid) || 0;
+        const dbMs = s.lastActiveAt ? new Date(s.lastActiveAt).getTime() : 0;
+        const lastMs = Math.max(memMs, dbMs);
+        const isOnline = lastMs > 0 && nowMs - lastMs < ONLINE_WINDOW_MS;
+        if (isOnline) onlineCount += 1;
+        return {
+          ...s,
+          isOnline,
+          lastActiveAt: lastMs > 0 ? new Date(lastMs).toISOString() : null,
+        };
+      });
+      return { students: enriched, onlineCount };
+    };
+
+    if (_studentsListCache && nowMs < _studentsListCache.expiresAt) {
+      return res.json(attachOnlineStatus(_studentsListCache.data));
+    }
+
+    const { getPucPool, getKcetNeetPool } = await import('../config/examPgs.js');
+    const pgPools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+
+    const [rows, accessRows, paidDocs, ...pgResults] = await Promise.all([
+      User.find(
+        { role: 'student' },
+        { _id: 0, id: 1, name: 1, email: 1, created_at: 1, last_active_at: 1 }
+      )
+        .sort({ created_at: -1, id: -1 })
+        .lean(),
+      UserAccess.find({}).lean(),
+      Payment.find({
+        status: { $in: ['paid', 'free'] },
+        admin_revoked: { $ne: true },
+      }).lean(),
+      ...pgPools.map((pool) =>
+        pool.query(`SELECT user_id, exam, plan_code, expires_at FROM user_access WHERE expires_at > NOW()`).catch(() => ({ rows: [] }))
+      ),
+    ]);
+
     const now = new Date();
-
-    // 1. Mongo Agri Access
-    const accessRows = await UserAccess.find({ user_id: { $in: userIds } }).lean();
     const accessByUserId = new Map(accessRows.map((a) => [Number(a.user_id), a]));
 
-    // 2. Active MongoDB Payments across all exams
-    const paidDocs = await Payment.find({
-      user_id: { $in: userIds },
-      status: { $in: ['paid', 'free'] },
-      admin_revoked: { $ne: true },
-    }).lean();
     const paymentsByUser = new Map();
     for (const p of paidDocs) {
       const uid = Number(p.user_id);
@@ -548,22 +584,14 @@ export async function listStudents(req, res, next) {
       }
     }
 
-    // 3. PostgreSQL Neon user_access
     const pgAccessByUser = new Map();
-    try {
-      const { getPucPool, getKcetNeetPool } = await import('../config/examPgs.js');
-      const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
-      for (const pool of pools) {
-        const res = await pool.query(
-          `SELECT user_id, exam, plan_code, expires_at FROM user_access WHERE expires_at > NOW()`
-        );
-        for (const row of res.rows) {
-          const uid = Number(row.user_id);
-          if (!pgAccessByUser.has(uid)) pgAccessByUser.set(uid, new Set());
-          pgAccessByUser.get(uid).add(String(row.exam).toLowerCase());
-        }
+    for (const pgRes of pgResults) {
+      for (const row of pgRes?.rows || []) {
+        const uid = Number(row.user_id);
+        if (!pgAccessByUser.has(uid)) pgAccessByUser.set(uid, new Set());
+        pgAccessByUser.get(uid).add(String(row.exam).toLowerCase());
       }
-    } catch (_) {}
+    }
 
     const students = rows.map((u) => {
       const uid = Number(u.id);
@@ -581,7 +609,6 @@ export async function listStudents(req, res, next) {
       else if (hasPyq) activeExamSet.add('Agri PYQ');
       else if (hasMaterial) activeExamSet.add('Agri Notes');
 
-      // Check PUC, KCET, NEET
       for (const p of uPayments) {
         const ex = String(p.exam || '').toLowerCase();
         if (ex === 'puc') activeExamSet.add('PUC');
@@ -616,12 +643,14 @@ export async function listStudents(req, res, next) {
         name: u.name,
         email: u.email,
         createdAt: u.created_at,
+        lastActiveAt: u.last_active_at || null,
         premiumStatus,
         activePlans,
       };
     });
 
-    return res.json({ students });
+    _studentsListCache = { data: students, expiresAt: nowMs + 15000 };
+    return res.json(attachOnlineStatus(students));
   } catch (err) {
     return next(err);
   }
@@ -632,6 +661,7 @@ export async function manageStudentSubscription(req, res, next) {
     const { id } = req.params;
     const { planCode, action, exam } = req.body; // action: 'subscribe' | 'unsubscribe'
     const userId = Number(id);
+    clearAdminStudentsCache();
 
     if (!['subscribe', 'unsubscribe'].includes(action)) {
       return res.status(400).json({ message: 'action must be subscribe or unsubscribe' });
