@@ -35,10 +35,19 @@ export default function PYQsScreen() {
 
   // Shared PYQs state
   const [pyqs, setPyqs] = useState([]);
+  const [subscriptionsDisabled, setSubscriptionsDisabled] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingYears, setLoadingYears] = useState(false);
   const [loadingPyqs, setLoadingPyqs] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    apiFetch('/api/student/subscription-settings', { token })
+      .then((res) => {
+        if (Array.isArray(res?.subscriptionsDisabled)) setSubscriptionsDisabled(res.subscriptionsDisabled);
+      })
+      .catch(() => {});
+  }, [token]);
 
   useEffect(() => {
     if (params.exam) {
@@ -347,9 +356,11 @@ export default function PYQsScreen() {
                           <Text style={styles.pyqSubject}>{p.subject} • {p.year}</Text>
                           <View style={styles.pyqFooter}>
                             {p.locked ? (
-                              <TouchableOpacity style={styles.btnUnlock} onPress={() => router.push('/student/premium')}>
-                                <Text style={styles.btnUnlockText}>🔒 Unlock with Agri Plan 💳</Text>
-                              </TouchableOpacity>
+                              !(subscriptionsDisabled.includes('all') || subscriptionsDisabled.includes(selectedExam)) ? (
+                                <TouchableOpacity style={styles.btnUnlock} onPress={() => router.push('/student/premium')}>
+                                  <Text style={styles.btnUnlockText}>🔒 Unlock with Agri Plan 💳</Text>
+                                </TouchableOpacity>
+                              ) : null
                             ) : (
                               <TouchableOpacity style={[styles.btnView, { backgroundColor: examInfo.color }]} onPress={() => openPyq(p)}>
                                 <Text style={styles.btnViewText}>📑 View Document</Text>
@@ -395,12 +406,14 @@ export default function PYQsScreen() {
                   </Text>
                   <View style={styles.pyqFooter}>
                     {p.locked ? (
-                      <TouchableOpacity
-                        style={styles.btnUnlock}
-                        onPress={() => router.push(`/student/exam/${selectedExam}?module=plans`)}
-                      >
-                        <Text style={styles.btnUnlockText}>🔒 Unlock with {examInfo.name} Plan 💳</Text>
-                      </TouchableOpacity>
+                      !(subscriptionsDisabled.includes('all') || subscriptionsDisabled.includes(selectedExam)) ? (
+                        <TouchableOpacity
+                          style={styles.btnUnlock}
+                          onPress={() => router.push(`/student/exam/${selectedExam}?module=plans`)}
+                        >
+                          <Text style={styles.btnUnlockText}>🔒 Unlock with {examInfo.name} Plan 💳</Text>
+                        </TouchableOpacity>
+                      ) : null
                     ) : (
                       <TouchableOpacity
                         style={[styles.btnView, { backgroundColor: examInfo.color }]}

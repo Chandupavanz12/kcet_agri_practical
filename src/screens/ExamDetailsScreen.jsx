@@ -129,6 +129,7 @@ export default function ExamDetailsScreen() {
   const [plans, setPlans] = useState(cachedData?.plans || []);
   const [activePlanCodes, setActivePlanCodes] = useState(cachedData?.activePlanCodes || []);
   const [isSubscribed, setIsSubscribed] = useState(cachedData?.isSubscribed || false);
+  const [subscriptionDisabled, setSubscriptionDisabled] = useState(cachedData?.subscriptionDisabled || false);
   const [activePlanCode, setActivePlanCode] = useState(cachedData?.activePlanCode || null);
   const [loading, setLoading] = useState(false);
   const [fetchingContent, setFetchingContent] = useState(false);
@@ -190,17 +191,20 @@ export default function ExamDetailsScreen() {
         ]);
         const newPlans = Array.isArray(planRes?.plans) ? planRes.plans : [];
         const newSubscribed = Boolean(planRes?.hasActivePlan);
+        const subDisabled = Boolean(planRes?.subscriptionDisabled);
         const activeCode = planRes?.activePlanCode || null;
         const activeCodes = Array.isArray(planRes?.activePlanCodes) ? planRes.activePlanCodes : (activeCode ? [activeCode] : []);
         setPlans(newPlans);
         setActivePlanCodes(activeCodes);
         setIsSubscribed(newSubscribed);
+        setSubscriptionDisabled(subDisabled);
         setActivePlanCode(activeCode);
         EXAM_CLIENT_CACHE.set(examId, {
           banners: currentBanners,
           plans: newPlans,
           activePlanCodes: activeCodes,
           isSubscribed: newSubscribed,
+          subscriptionDisabled: subDisabled,
           activePlanCode: activeCode,
           materials: [],
           pyqs: [],
@@ -221,6 +225,7 @@ export default function ExamDetailsScreen() {
         const newTests = Array.isArray(testRes?.tests) ? testRes.tests : [];
         const newPlans = Array.isArray(planRes?.plans) ? planRes.plans : [];
         const newSubscribed = Boolean(planRes?.hasActivePlan || matRes?.isSubscribed);
+        const subDisabled = Boolean(planRes?.subscriptionDisabled);
         const activeCode = planRes?.activePlanCode || null;
         const activeCodes = Array.isArray(planRes?.activePlanCodes) ? planRes.activePlanCodes : (activeCode ? [activeCode] : []);
 
@@ -230,6 +235,7 @@ export default function ExamDetailsScreen() {
         setPlans(newPlans);
         setActivePlanCodes(activeCodes);
         setIsSubscribed(newSubscribed);
+        setSubscriptionDisabled(subDisabled);
         setActivePlanCode(activeCode);
 
         EXAM_CLIENT_CACHE.set(examId, {
@@ -237,6 +243,7 @@ export default function ExamDetailsScreen() {
           plans: newPlans,
           activePlanCodes: activeCodes,
           isSubscribed: newSubscribed,
+          subscriptionDisabled: subDisabled,
           activePlanCode: activeCode,
           materials: newMaterials,
           pyqs: newPyqs,
@@ -308,6 +315,10 @@ export default function ExamDetailsScreen() {
   // View PDF
   const handleOpenPdf = async (item) => {
     if (isItemLocked(item)) {
+      if (subscriptionDisabled) {
+        Alert.alert('Notice', 'This content is currently locked.');
+        return;
+      }
       Alert.alert(
         '🔒 Premium Content',
         'This material is exclusive to premium members. Upgrade your plan to unlock full access.',
@@ -688,26 +699,28 @@ export default function ExamDetailsScreen() {
                 <Text style={styles.moduleArrow}>→</Text>
               </TouchableOpacity>
 
-              {/* Module: Subscription Plans (LAST MODULE) */}
-              <TouchableOpacity
-                style={[styles.moduleCard, { borderColor: '#fef08a' }]}
-                onPress={() => handleSelectModule('plans')}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.moduleIconBox, { backgroundColor: '#fef9c3' }]}>
-                  <Text style={styles.moduleIcon}>⭐</Text>
-                </View>
-                <View style={styles.moduleInfo}>
-                  <View style={styles.moduleTitleRow}>
-                    <Text style={styles.moduleTitle}>Subscription Plans</Text>
-                    <View style={[styles.moduleTag, { backgroundColor: '#fefce8' }]}>
-                      <Text style={[styles.moduleTagText, { color: '#ca8a04' }]}>VIP Access</Text>
-                    </View>
+              {/* Module: Subscription Plans (LAST MODULE - hidden if disabled by admin) */}
+              {!subscriptionDisabled && (
+                <TouchableOpacity
+                  style={[styles.moduleCard, { borderColor: '#fef08a' }]}
+                  onPress={() => handleSelectModule('plans')}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.moduleIconBox, { backgroundColor: '#fef9c3' }]}>
+                    <Text style={styles.moduleIcon}>⭐</Text>
                   </View>
-                  <Text style={styles.moduleDesc}>Unlock all locked chapters, mocks & premium content</Text>
-                </View>
-                <Text style={styles.moduleArrow}>→</Text>
-              </TouchableOpacity>
+                  <View style={styles.moduleInfo}>
+                    <View style={styles.moduleTitleRow}>
+                      <Text style={styles.moduleTitle}>Subscription Plans</Text>
+                      <View style={[styles.moduleTag, { backgroundColor: '#fefce8' }]}>
+                        <Text style={[styles.moduleTagText, { color: '#ca8a04' }]}>VIP Access</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.moduleDesc}>Unlock all locked chapters, mocks & premium content</Text>
+                  </View>
+                  <Text style={styles.moduleArrow}>→</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         )}
@@ -786,7 +799,7 @@ export default function ExamDetailsScreen() {
                   </Text>
                 </View>
 
-                {!isSubscribed && (
+                {!isSubscribed && !subscriptionDisabled && (
                   <TouchableOpacity
                     style={styles.unlockTopBanner}
                     onPress={() => setView('plans')}
@@ -853,13 +866,15 @@ export default function ExamDetailsScreen() {
 
                           {/* Action Button */}
                           {locked ? (
-                            <TouchableOpacity
-                              style={styles.unlockItemBtn}
-                              onPress={() => setView('plans')}
-                              activeOpacity={0.85}
-                            >
-                              <Text style={styles.unlockItemBtnText}>🔒 Click to Unlock with Plan 💳</Text>
-                            </TouchableOpacity>
+                            !subscriptionDisabled ? (
+                              <TouchableOpacity
+                                style={styles.unlockItemBtn}
+                                onPress={() => setView('plans')}
+                                activeOpacity={0.85}
+                              >
+                                <Text style={styles.unlockItemBtnText}>🔒 Click to Unlock with Plan 💳</Text>
+                              </TouchableOpacity>
+                            ) : null
                           ) : (
                             <TouchableOpacity
                               style={styles.viewPdfBtn}
@@ -922,13 +937,15 @@ export default function ExamDetailsScreen() {
                           </View>
 
                           {locked ? (
-                            <TouchableOpacity
-                              style={styles.unlockItemBtn}
-                              onPress={() => setView('plans')}
-                              activeOpacity={0.85}
-                            >
-                              <Text style={styles.unlockItemBtnText}>🔒 Click to Unlock Mock Test 💳</Text>
-                            </TouchableOpacity>
+                            !subscriptionDisabled ? (
+                              <TouchableOpacity
+                                style={styles.unlockItemBtn}
+                                onPress={() => setView('plans')}
+                                activeOpacity={0.85}
+                              >
+                                <Text style={styles.unlockItemBtnText}>🔒 Click to Unlock Mock Test 💳</Text>
+                              </TouchableOpacity>
+                            ) : null
                           ) : (
                             <TouchableOpacity
                               style={[styles.viewPdfBtn, { backgroundColor: config.themeColor }]}
@@ -990,13 +1007,15 @@ export default function ExamDetailsScreen() {
                           </View>
 
                           {locked ? (
-                            <TouchableOpacity
-                              style={styles.unlockItemBtn}
-                              onPress={() => setView('plans')}
-                              activeOpacity={0.85}
-                            >
-                              <Text style={styles.unlockItemBtnText}>🔒 Click to Unlock Paper 💳</Text>
-                            </TouchableOpacity>
+                            !subscriptionDisabled ? (
+                              <TouchableOpacity
+                                style={styles.unlockItemBtn}
+                                onPress={() => setView('plans')}
+                                activeOpacity={0.85}
+                              >
+                                <Text style={styles.unlockItemBtnText}>🔒 Click to Unlock Paper 💳</Text>
+                              </TouchableOpacity>
+                            ) : null
                           ) : (
                             <TouchableOpacity
                               style={styles.viewPdfBtn}
@@ -1017,7 +1036,7 @@ export default function ExamDetailsScreen() {
         })()}
 
         {/* ─── LEVEL 4: EXAM SUBSCRIPTION PLANS PAGE ──────────────────────────── */}
-        {view === 'plans' && (
+        {view === 'plans' && !subscriptionDisabled && (
           <View style={styles.pageSection}>
             {isSubscribed && (
               <View style={styles.activePlanBannerCard}>

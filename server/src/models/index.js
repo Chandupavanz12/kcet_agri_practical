@@ -65,6 +65,7 @@ const SettingsSchema = new Schema(
     pdfs_enabled: { type: Boolean, default: true },
     pyqs_enabled: { type: Boolean, default: true },
     notifications_enabled: { type: Boolean, default: true },
+    subscriptions_disabled: { type: [String], default: [] },
     created_at: { type: Date, default: () => new Date() },
     updated_at: { type: Date, default: () => new Date() },
   },

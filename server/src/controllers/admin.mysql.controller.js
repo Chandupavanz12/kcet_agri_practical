@@ -130,6 +130,9 @@ function mapSettingsRow(row) {
     pdfsEnabled: toBool(row.pdfs_enabled),
     pyqsEnabled: toBool(row.pyqs_enabled),
     notificationsEnabled: toBool(row.notifications_enabled),
+    subscriptionsDisabled: Array.isArray(row.subscriptions_disabled)
+      ? row.subscriptions_disabled.map((x) => String(x).toLowerCase().trim())
+      : [],
   };
 }
 
@@ -148,13 +151,16 @@ function buildUpdate(fields, mapping) {
 }
 
 function extractYouTubeId(url) {
+  const s = String(url || '').trim();
+  if (!s) return null;
+  if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
   const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-    /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/,
+    /[?&]v=([a-zA-Z0-9_-]{11})/,
   ];
 
   for (const pattern of patterns) {
-    const match = url.match(pattern);
+    const match = s.match(pattern);
     if (match) return match[1];
   }
   return null;
@@ -857,7 +863,11 @@ export async function createVideo(req, res, next) {
     const body = req.body || {};
     const title = asNonEmptyString(body.title);
     const rawYoutubeId = asNonEmptyString(body.youtubeId);
-    const videoUrl = asNonEmptyString(body.videoUrl) || (rawYoutubeId ? `https://www.youtube.com/watch?v=${rawYoutubeId}` : '');
+    const rawVideoUrl = asNonEmptyString(body.videoUrl);
+    const extractedId = extractYouTubeId(rawVideoUrl || rawYoutubeId);
+    const videoUrl = extractedId
+      ? `https://www.youtube.com/watch?v=${extractedId}`
+      : rawVideoUrl || (rawYoutubeId && /^https?:\/\//i.test(rawYoutubeId) ? rawYoutubeId : rawYoutubeId ? `https://www.youtube.com/watch?v=${rawYoutubeId}` : '');
     const exam = String(body.exam || 'agri').toLowerCase().trim();
     const subject = asNonEmptyString(body.subject) || 'General';
     const status = normalizeStatus(body.status, ['active', 'inactive']) || 'active';
@@ -2023,6 +2033,13 @@ export async function updateSettings(req, res, next) {
       if (Object.prototype.hasOwnProperty.call(req.body || {}, k)) {
         updates[col] = toBool(req.body[k]);
       }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'subscriptionsDisabled')) {
+      const raw = req.body.subscriptionsDisabled;
+      updates.subscriptions_disabled = Array.isArray(raw)
+        ? [...new Set(raw.map((x) => String(x || '').toLowerCase().trim()).filter(Boolean))]
+        : [];
     }
 
     if (Object.keys(updates).length > 0) {

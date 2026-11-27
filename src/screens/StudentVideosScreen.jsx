@@ -48,12 +48,15 @@ export default function StudentVideosScreen() {
   }, [token, selectedExam]);
 
   const extractYouTubeId = (url) => {
+    const s = String(url || '').trim();
+    if (!s) return null;
+    if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
     const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-      /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/,
+      /[?&]v=([a-zA-Z0-9_-]{11})/,
     ];
     for (const pattern of patterns) {
-      const match = String(url || '').match(pattern);
+      const match = s.match(pattern);
       if (match) return match[1];
     }
     return null;

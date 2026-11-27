@@ -13,6 +13,7 @@ import {
   getMenus,
   getPaymentStatusStudent,
   getProfile,
+  getSubscriptionSettingsStudent,
   listActiveTests,
   listExamCentresStudent,
   listExamCentreYearsStudent,
@@ -78,6 +79,7 @@ studentRouter.get('/exam/tests', getExamTests);
 studentRouter.get('/exam/tests/:id/start', startExamTest);
 studentRouter.post('/exam/tests/:id/submit', submitExamTest);
 studentRouter.get('/exam/plans', getExamPlans);
+studentRouter.get('/subscription-settings', getSubscriptionSettingsStudent);
 studentRouter.get('/aggregated-progress', getAggregatedProgress);
 
 studentRouter.get('/dashboard', getDashboard);

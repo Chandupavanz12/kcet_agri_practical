@@ -43,12 +43,27 @@ export default function AdminSettingsScreen() {
     }
   };
 
+  const toggleSubscriptionDisabled = (examKey) => {
+    const current = Array.isArray(settings.subscriptionsDisabled) ? settings.subscriptionsDisabled : [];
+    const exists = current.includes(examKey);
+    const next = exists ? current.filter((x) => x !== examKey) : [...current, examKey];
+    handleChange('subscriptionsDisabled', next);
+  };
+
   const fields = [
     { key: 'videosEnabled', label: 'Videos' },
     { key: 'testsEnabled', label: 'Tests' },
     { key: 'pdfsEnabled', label: 'PDFs' },
     { key: 'pyqsEnabled', label: 'PYQs' },
     { key: 'notificationsEnabled', label: 'Notifications' },
+  ];
+
+  const subscriptionTargets = [
+    { key: 'all', label: 'Disable Subscriptions for ALL Exams' },
+    { key: 'puc', label: 'Disable PUC Subscription' },
+    { key: 'kcet', label: 'Disable KCET Subscription' },
+    { key: 'neet', label: 'Disable NEET Subscription' },
+    { key: 'agri', label: 'Disable Agri Practical Subscription' },
   ];
 
   return (
@@ -80,6 +95,30 @@ export default function AdminSettingsScreen() {
                     </TouchableOpacity>
                   </View>
                 ))}
+
+                <View style={{ borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 14, marginTop: 4, gap: 12 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#0f172a' }}>
+                    Disable Subscription Plans (Student App)
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#64748b' }}>
+                    Checked exams will hide all Subscription Plans & Unlock messages from the student dashboard.
+                  </Text>
+                  {subscriptionTargets.map((item) => {
+                    const checked = Array.isArray(settings.subscriptionsDisabled) && settings.subscriptionsDisabled.includes(item.key);
+                    return (
+                      <View key={item.key} style={styles.switchRow}>
+                        <Text style={styles.label}>{item.label}</Text>
+                        <TouchableOpacity
+                          style={[styles.checkbox, checked && { backgroundColor: '#dc2626', borderColor: '#dc2626' }]}
+                          onPress={() => toggleSubscriptionDisabled(item.key)}
+                        >
+                          {checked && <Text style={styles.checkboxTick}>✓</Text>}
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+
                 <TouchableOpacity style={styles.btnPrimary} onPress={handleSave}>
                   <Text style={styles.btnPrimaryText}>Save Settings</Text>
                 </TouchableOpacity>

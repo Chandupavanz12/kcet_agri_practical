@@ -2,14 +2,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Dimensions,
   FlatList,
   Image,
-  Platform,
   RefreshControl,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -109,6 +105,7 @@ export default function StudentDashboardScreen() {
     overallAccuracy: 0,
   });
   const [notifications, setNotifications] = useState([]);
+  const [subscriptionsDisabled, setSubscriptionsDisabled] = useState([]);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -118,11 +115,16 @@ export default function StudentDashboardScreen() {
     if (showLoading) setLoading(true);
     try {
       setError('');
-      const [bannerRes, progRes, notifRes] = await Promise.all([
+      const [bannerRes, progRes, notifRes, subSetRes] = await Promise.all([
         apiFetch('/api/student/banners?exam=global', { token }).catch(() => null),
         apiFetch('/api/student/aggregated-progress', { token }).catch(() => null),
         apiFetch('/api/student/notifications', { token }).catch(() => null),
+        apiFetch('/api/student/subscription-settings', { token }).catch(() => null),
       ]);
+
+      if (Array.isArray(subSetRes?.subscriptionsDisabled)) {
+        setSubscriptionsDisabled(subSetRes.subscriptionsDisabled);
+      }
 
       if (Array.isArray(bannerRes?.banners) && bannerRes.banners.length > 0) {
         setBanners(bannerRes.banners);
@@ -492,25 +494,27 @@ export default function StudentDashboardScreen() {
             <Text style={styles.quickArrow}>→</Text>
           </TouchableOpacity>
 
-          {/* Study Rewards */}
-          <TouchableOpacity
-            style={[styles.quickCard, { backgroundColor: '#fff1f2', borderColor: '#ffe4e6' }]}
-            onPress={() => router.push('/student/premium')}
-            activeOpacity={0.8}
-          >
-            <View style={styles.quickIconRow}>
-              <Text style={{ fontSize: 22 }}>🎁</Text>
-              <Text style={styles.quickTitle}>Rewards</Text>
-            </View>
-            <Text style={styles.quickSub}>Earn & Unlock</Text>
-            <Text style={styles.quickArrow}>→</Text>
-          </TouchableOpacity>
+          {/* Study Rewards (hidden if Agri/All subscriptions are disabled) */}
+          {!subscriptionsDisabled.includes('all') && !subscriptionsDisabled.includes('agri') && (
+            <TouchableOpacity
+              style={[styles.quickCard, { backgroundColor: '#fff1f2', borderColor: '#ffe4e6' }]}
+              onPress={() => router.push('/student/premium')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.quickIconRow}>
+                <Text style={{ fontSize: 22 }}>🎁</Text>
+                <Text style={styles.quickTitle}>Rewards</Text>
+              </View>
+              <Text style={styles.quickSub}>Earn & Unlock</Text>
+              <Text style={styles.quickArrow}>→</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
       {/* 6. Bottom Navigation Bar */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.bottomNavItem} onPress={() => {}}>
+        <TouchableOpacity style={styles.bottomNavItem} onPress={() => { }}>
           <Text style={[styles.bottomNavIcon, { color: '#16a34a' }]}>🏠</Text>
           <Text style={[styles.bottomNavLabel, { color: '#16a34a', fontWeight: '800' }]}>Home</Text>
           <View style={styles.bottomActiveBar} />

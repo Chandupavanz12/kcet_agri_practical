@@ -24,6 +24,7 @@ export default function StudentTestsScreen() {
   );
   const [selectedSubject, setSelectedSubject] = useState('All');
   const [tests, setTests] = useState([]);
+  const [subscriptionsDisabled, setSubscriptionsDisabled] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -32,6 +33,14 @@ export default function StudentTestsScreen() {
       setSelectedExam(String(params.exam).toLowerCase().trim());
     }
   }, [params.exam]);
+
+  useEffect(() => {
+    apiFetch('/api/student/subscription-settings', { token })
+      .then((res) => {
+        if (Array.isArray(res?.subscriptionsDisabled)) setSubscriptionsDisabled(res.subscriptionsDisabled);
+      })
+      .catch(() => {});
+  }, [token]);
 
   useEffect(() => {
     if (!selectedExam) return;
@@ -186,15 +195,17 @@ export default function StudentTestsScreen() {
                   </View>
 
                   {t.locked ? (
-                    <TouchableOpacity
-                      style={styles.btnUnlock}
-                      onPress={() =>
-                        router.push(selectedExam === 'agri' ? '/student/premium' : `/student/exam/${selectedExam}?module=plans`)
-                      }
-                      activeOpacity={0.85}
-                    >
-                      <Text style={styles.btnUnlockText}>🔒 Unlock with {examInfo.name} Plan 💳</Text>
-                    </TouchableOpacity>
+                    !(subscriptionsDisabled.includes('all') || subscriptionsDisabled.includes(selectedExam)) ? (
+                      <TouchableOpacity
+                        style={styles.btnUnlock}
+                        onPress={() =>
+                          router.push(selectedExam === 'agri' ? '/student/premium' : `/student/exam/${selectedExam}?module=plans`)
+                        }
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.btnUnlockText}>🔒 Unlock with {examInfo.name} Plan 💳</Text>
+                      </TouchableOpacity>
+                    ) : null
                   ) : (
                     <TouchableOpacity
                       style={[styles.btnPrimary, { backgroundColor: examInfo.color }]}

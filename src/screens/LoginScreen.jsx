@@ -37,7 +37,7 @@ export default function LoginScreen() {
     const now = Date.now();
     if (!force && now - lastWarmRef.current < 20000) return;
     lastWarmRef.current = now;
-    fetch(`${API_BASE_URL}/api/ping`).catch(() => {});
+    fetch(`${API_BASE_URL}/api/ping`).catch(() => { });
   };
 
   // Pre-warm the backend on mount and whenever returning from background inactivity
@@ -243,8 +243,8 @@ export default function LoginScreen() {
                         {mode === 'admin' && adminStep === 'details'
                           ? 'Send Admin OTP ➔'
                           : mode === 'admin' && adminStep === 'otp'
-                          ? 'Verify & Open Admin Dashboard ➔'
-                          : 'Login to StudyHack ➔'}
+                            ? 'Verify & Open Admin Dashboard ➔'
+                            : 'Login to StudyHack ➔'}
                       </Text>
                     )}
                   </LinearGradient>

@@ -26,6 +26,7 @@ export default function StudentMaterialsScreen() {
   );
   const [selectedSubject, setSelectedSubject] = useState('All');
   const [pdfs, setPdfs] = useState([]);
+  const [subscriptionsDisabled, setSubscriptionsDisabled] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -64,6 +65,14 @@ export default function StudentMaterialsScreen() {
       Alert.alert('Error', 'Failed to open PDF. Please try again.');
     });
   };
+
+  useEffect(() => {
+    apiFetch('/api/student/subscription-settings', { token })
+      .then((res) => {
+        if (Array.isArray(res?.subscriptionsDisabled)) setSubscriptionsDisabled(res.subscriptionsDisabled);
+      })
+      .catch(() => {});
+  }, [token]);
 
   useEffect(() => {
     if (!selectedExam) return;
@@ -217,15 +226,17 @@ export default function StudentMaterialsScreen() {
 
                   <View style={styles.materialFooter}>
                     {m.locked ? (
-                      <TouchableOpacity
-                        style={styles.btnUnlock}
-                        onPress={() =>
-                          router.push(selectedExam === 'agri' ? '/student/premium' : `/student/exam/${selectedExam}?module=plans`)
-                        }
-                        activeOpacity={0.85}
-                      >
-                        <Text style={styles.btnUnlockText}>🔒 Unlock with {examInfo.name} Plan 💳</Text>
-                      </TouchableOpacity>
+                      !(subscriptionsDisabled.includes('all') || subscriptionsDisabled.includes(selectedExam)) ? (
+                        <TouchableOpacity
+                          style={styles.btnUnlock}
+                          onPress={() =>
+                            router.push(selectedExam === 'agri' ? '/student/premium' : `/student/exam/${selectedExam}?module=plans`)
+                          }
+                          activeOpacity={0.85}
+                        >
+                          <Text style={styles.btnUnlockText}>🔒 Unlock with {examInfo.name} Plan 💳</Text>
+                        </TouchableOpacity>
+                      ) : null
                     ) : (
                       <TouchableOpacity
                         style={[styles.btnView, { backgroundColor: examInfo.color }]}

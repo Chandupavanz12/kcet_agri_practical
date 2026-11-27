@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
 import AdminCRUDPage from '../components/AdminCRUDPage.jsx';
@@ -25,6 +25,39 @@ export default function AdminPlansScreen() {
   const [accessModule, setAccessModule] = useState('all'); // 'all' | 'materials' | 'tests' | 'pyqs'
   const [globalCoveredExams, setGlobalCoveredExams] = useState(['puc', 'kcet', 'neet', 'agri']);
   const [customFeaturesText, setCustomFeaturesText] = useState('');
+  const [subscriptionsDisabled, setSubscriptionsDisabled] = useState([]);
+  const [savingToggle, setSavingToggle] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiFetch('/api/admin/settings', { token });
+        if (Array.isArray(res?.settings?.subscriptionsDisabled)) {
+          setSubscriptionsDisabled(res.settings.subscriptionsDisabled);
+        }
+      } catch (_) {}
+    })();
+  }, [token]);
+
+  const toggleSubDisable = async (examKey) => {
+    const prev = subscriptionsDisabled;
+    const exists = prev.includes(examKey);
+    const next = exists ? prev.filter((x) => x !== examKey) : [...prev, examKey];
+    setSubscriptionsDisabled(next);
+    try {
+      setSavingToggle(true);
+      await apiFetch('/api/admin/settings', {
+        token,
+        method: 'PUT',
+        body: { subscriptionsDisabled: next },
+      });
+    } catch (e) {
+      setSubscriptionsDisabled(prev);
+      Alert.alert('Error', e?.message || 'Failed to update subscription setting');
+    } finally {
+      setSavingToggle(false);
+    }
+  };
 
   const toggleGlobalExam = (exId) => {
     if (globalCoveredExams.includes(exId)) {
@@ -48,6 +81,46 @@ export default function AdminPlansScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* Subscription Visibility Controls */}
+        <View style={styles.card}>
+          <Text style={styles.label}>Subscription Visibility (Hide from Student Dashboard)</Text>
+          <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
+            Turn ON to disable & hide Subscription Plans and Unlock messages for an exam or all exams.
+          </Text>
+          {[
+            { id: 'all', label: 'Disable All Exams Subscriptions' },
+            { id: 'puc', label: 'Disable PUC Subscription' },
+            { id: 'kcet', label: 'Disable KCET Subscription' },
+            { id: 'neet', label: 'Disable NEET Subscription' },
+            { id: 'agri', label: 'Disable Agri Practical Subscription' },
+          ].map((opt) => {
+            const disabled = subscriptionsDisabled.includes(opt.id);
+            return (
+              <View
+                key={opt.id}
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingVertical: 6,
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#f1f5f9',
+                }}
+              >
+                <Text style={{ fontSize: 13.5, fontWeight: '600', color: disabled ? '#dc2626' : '#0f172a' }}>
+                  {opt.label}
+                </Text>
+                <Switch
+                  value={disabled}
+                  disabled={savingToggle}
+                  onValueChange={() => toggleSubDisable(opt.id)}
+                  trackColor={{ false: '#cbd5e1', true: '#ef4444' }}
+                />
+              </View>
+            );
+          })}
+        </View>
+
         {/* Exam Selector Header Card */}
         <View style={styles.card}>
           <Text style={styles.label}>1. Select Target Exam for Plan</Text>

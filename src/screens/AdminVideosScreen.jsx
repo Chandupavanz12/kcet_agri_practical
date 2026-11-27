@@ -1,8 +1,8 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Image } from 'react-native';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function AdminVideosScreen() {
   const { token } = useAuth();
@@ -73,7 +73,7 @@ export default function AdminVideosScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
-        
+
         {/* Form Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -181,13 +181,17 @@ export default function AdminVideosScreen() {
               <Text style={styles.emptyText}>No videos found.</Text>
             ) : (
               <View style={styles.list}>
-                {items.map((v) => (
+                {items.map((v) => {
+                  const raw = String(v.videoUrl || v.youtubeId || '').trim();
+                  const ytMatch = raw.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtube\.com\/live\/|[?&]v=)([a-zA-Z0-9_-]{11})/) || (/^[a-zA-Z0-9_-]{11}$/.test(raw) ? [null, raw] : null);
+                  const ytId = ytMatch ? ytMatch[1] : null;
+                  return (
                   <View key={v.id} style={styles.videoItem}>
                     <View style={styles.videoHeader}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.videoTitle}>{v.title}</Text>
                         <Text style={styles.videoSubject}>{(v.exam || 'agri').toUpperCase()} • {v.subject}</Text>
-                        <Text style={styles.videoMeta}>URL: {v.videoUrl || `https://www.youtube.com/watch?v=${v.youtubeId}`}</Text>
+                        <Text style={styles.videoMeta}>URL: {v.videoUrl || `https://www.youtube.com/watch?v=${ytId || v.youtubeId}`}</Text>
                       </View>
                       <View style={[styles.badge, v.status === 'active' && styles.badgeSuccess]}>
                         <Text style={[styles.badgeText, v.status === 'active' && styles.badgeSuccessText]}>{v.status}</Text>
@@ -196,17 +200,18 @@ export default function AdminVideosScreen() {
 
                     <View style={styles.videoContent}>
                       <Image
-                        source={{ uri: `https://i.ytimg.com/vi/${v.youtubeId}/mqdefault.jpg` }}
+                        source={{ uri: ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : undefined }}
                         style={styles.thumbnail}
                       />
                       <View style={styles.videoInfo}>
                         <Text style={styles.linkTextLabel}>Embed link:</Text>
-                        <Text style={styles.linkText}>https://www.youtube.com/watch?v={v.youtubeId}</Text>
+                        <Text style={styles.linkText}>{v.videoUrl || `https://www.youtube.com/watch?v=${ytId || v.youtubeId}`}</Text>
                         <Text style={styles.fallbackText}>* iframe embedding not supported natively in this view yet.</Text>
                       </View>
                     </View>
                   </View>
-                ))}
+                  );
+                })}
               </View>
             )}
           </View>

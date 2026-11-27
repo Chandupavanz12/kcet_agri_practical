@@ -900,6 +900,25 @@ export async function submitExamTest(req, res, next) {
 export async function getExamPlans(req, res, next) {
   try {
     const exam = String(req.query.exam || '').toLowerCase().trim();
+    // Check if subscription is disabled for this exam or all exams
+    try {
+      const { Settings } = await import('../models/index.js');
+      const settingsRow = await Settings.findOne({ id: 1 }).select({ subscriptions_disabled: 1 }).lean();
+      const disabledList = Array.isArray(settingsRow?.subscriptions_disabled)
+        ? settingsRow.subscriptions_disabled.map((x) => String(x).toLowerCase().trim())
+        : [];
+      if (disabledList.includes('all') || disabledList.includes(exam)) {
+        return res.json({
+          success: true,
+          plans: [],
+          subscriptionDisabled: true,
+          hasActivePlan: false,
+          activePlanCodes: [],
+          activePlanIds: [],
+        });
+      }
+    } catch (_) {}
+
     const pool = getPoolForExam(exam) || getKcetNeetPool();
     if (!pool) return res.json({ plans: [] });
 
@@ -1923,8 +1942,14 @@ export async function getBulkPlanCatalog(req, res, next) {
   try {
     const pucPool = getPucPool();
     const kcetPool = getKcetNeetPool();
-    const { getTestModel } = await import('../config/mockTestDb.js');
-    const AgriTest = await getTestModel();
+    const { getMockTestModel, connectMockTestDb } = await import('../config/mockTestDb.js');
+    const { getMaterialModel, getPyqModel } = await import('../models/index.js');
+    await connectMockTestDb();
+    const [AgriTest, AgriMaterial, AgriPyq] = await Promise.all([
+      getMockTestModel(),
+      getMaterialModel(),
+      getPyqModel(),
+    ]);
 
     const [
       pucMats, pucPyqs, pucTests,
@@ -1937,8 +1962,8 @@ export async function getBulkPlanCatalog(req, res, next) {
       kcetPool ? kcetPool.query(`SELECT id, exam, subject, title, is_free FROM materials WHERE status = 'active' ORDER BY id DESC`).catch(() => ({ rows: [] })) : { rows: [] },
       kcetPool ? kcetPool.query(`SELECT id, exam, subject, year, title, is_free FROM pyqs WHERE status = 'active' ORDER BY id DESC`).catch(() => ({ rows: [] })) : { rows: [] },
       kcetPool ? kcetPool.query(`SELECT id, exam, subject, title, is_free FROM mock_tests WHERE is_active = true ORDER BY id DESC`).catch(() => ({ rows: [] })) : { rows: [] },
-      Material.find({ status: 'active' }).select({ id: 1, title: 1, subject: 1, access_type: 1 }).sort({ id: -1 }).lean().catch(() => []),
-      Pyq.find({ status: 'active' }).select({ id: 1, title: 1, subject: 1, year: 1, access_type: 1 }).sort({ id: -1 }).lean().catch(() => []),
+      AgriMaterial.find({ status: 'active' }).select({ id: 1, title: 1, subject: 1, access_type: 1 }).sort({ id: -1 }).lean().catch(() => []),
+      AgriPyq.find({ status: 'active' }).select({ id: 1, title: 1, subject: 1, year: 1, access_type: 1 }).sort({ id: -1 }).lean().catch(() => []),
       AgriTest.find({ is_active: true }).select({ id: 1, title: 1 }).sort({ id: -1 }).lean().catch(() => []),
     ]);
 

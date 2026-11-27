@@ -403,8 +403,34 @@ export async function razorpayWebhook(req, res, next) {
   }
 }
 
+export async function getSubscriptionSettingsStudent(req, res, next) {
+  try {
+    const row = await ensureSettings();
+    const disabled = Array.isArray(row?.subscriptions_disabled)
+      ? row.subscriptions_disabled.map((x) => String(x || '').toLowerCase().trim()).filter(Boolean)
+      : [];
+    return res.json({ subscriptionsDisabled: disabled });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 export async function listPlansStudent(req, res, next) {
   try {
+    const settingsRow = await ensureSettings();
+    const disabledList = Array.isArray(settingsRow?.subscriptions_disabled)
+      ? settingsRow.subscriptions_disabled.map((x) => String(x || '').toLowerCase().trim())
+      : [];
+    if (disabledList.includes('all') || disabledList.includes('agri')) {
+      return res.json({
+        plans: [],
+        subscriptionDisabled: true,
+        activePlanCodes: [],
+        hasActivePlan: false,
+        activePlanCode: null,
+      });
+    }
+
     const userId = Number(req.user?.sub || req.user?.id);
     const rows = await listActivePlans();
 
