@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch, clearApiCache } from '../api/client.js';
+import PlansCarouselSection from '../components/PlansCarouselSection.jsx';
 import { API_BASE_URL } from '../config/env.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
@@ -239,82 +240,25 @@ export default function PremiumAccessScreen() {
           <Text style={styles.headerSubtitle}>Get unlimited access to all 20 chapter materials, PYQs, and everything you need to score top marks.</Text>
         </View>
 
-        <View style={styles.plansGrid}>
-          {plans.map((p) => {
+        <PlansCarouselSection
+          plans={plans.map((p) => {
             const code = String(p.code || '').toLowerCase();
-            const unlocked = Boolean(status?.[code]?.unlocked);
-            const expiry = status?.[code]?.expiry;
-            const bullets = PLAN_BULLETS[code] || [];
-            const meta = PLAN_META[code] || { icon: '📦', color: '#64748b', badge: 'Plan', highlight: false };
-            const isHighlight = meta.highlight;
-
-            return (
-              <View key={p.id} style={[styles.planCard, isHighlight && styles.planCardHighlight]}>
-                {isHighlight && (
-                  <View style={styles.highlightBadge}>
-                    <Text style={styles.highlightBadgeText}>⭐ Most Popular</Text>
-                  </View>
-                )}
-
-                <View style={styles.planHeader}>
-                  <View style={[styles.planIconBox, { backgroundColor: meta.color }]}>
-                    <Text style={styles.planIcon}>{meta.icon}</Text>
-                  </View>
-                  {unlocked ? (
-                    <View style={styles.statusBadgeActive}>
-                      <Text style={styles.statusBadgeActiveText}>✓ Active</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.statusBadge}>
-                      <Text style={styles.statusBadgeText}>{meta.badge}</Text>
-                    </View>
-                  )}
-                </View>
-
-                <Text style={styles.planName}>{p.name}</Text>
-                {p.isFree ? (
-                  <Text style={styles.planPrice}>Free</Text>
-                ) : (
-                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                    <Text style={[styles.planPrice, { color: meta.color }]}>{formatINR(p.pricePaise)}</Text>
-                    <Text style={styles.planPricePeriod}>/year</Text>
-                  </View>
-                )}
-                <Text style={styles.planDuration}>{p.durationDays} days access</Text>
-                {expiry && <Text style={styles.planExpiry}>Expires: {new Date(expiry).toLocaleDateString('en-IN')}</Text>}
-
-                <View style={styles.planBullets}>
-                  {bullets.map((b) => (
-                    <View key={b} style={styles.bulletRow}>
-                      <Text style={[styles.bulletIcon, { color: meta.color }]}>✓</Text>
-                      <Text style={styles.bulletText}>{b}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                <View style={styles.planActions}>
-                  {unlocked ? (
-                    <TouchableOpacity
-                      style={[styles.btnBuy, { backgroundColor: '#10b981' }]}
-                      onPress={() => router.push('/student/materials')}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={styles.btnBuyText}>✓ Plan Active • View Materials ➔</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      style={[styles.btnBuy, { backgroundColor: meta.color }]}
-                      onPress={() => buy(code)}
-                      disabled={busy}
-                    >
-                      <Text style={styles.btnBuyText}>{busy ? '⏳ Processing...' : p.isFree ? '🚀 Activate Free' : '💳 Unlock Now'}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            );
+            return {
+              ...p,
+              features: PLAN_BULLETS[code] || (Array.isArray(p.features) ? p.features : []),
+            };
           })}
-        </View>
+          examName="Agri Practical"
+          themeColor="#059669"
+          payingPlanId={busy ? 'processing' : null}
+          isPlanActiveFn={(p) => {
+            const code = String(p.code || '').toLowerCase();
+            return Boolean(p.isActive || status?.[code]?.unlocked);
+          }}
+          onSelectPlan={(p) => buy(String(p.code || '').toLowerCase())}
+          onAccessUnlocked={() => router.push('/student/materials?exam=agri')}
+          onViewAllPlans={() => router.push('/student/all-plans?exam=agri')}
+        />
       </ScrollView>
     </SafeAreaView>
   );

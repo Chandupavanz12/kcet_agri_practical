@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch, clearApiCache } from '../api/client.js';
+import PlansCarouselSection from '../components/PlansCarouselSection.jsx';
 import { API_BASE_URL } from '../config/env.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
@@ -1075,93 +1076,24 @@ export default function ExamDetailsScreen() {
               </Text>
             </View>
 
-            <View style={styles.plansList}>
-              {plans.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <Text style={styles.emptyIcon}>⭐</Text>
-                  <Text style={styles.emptyTitle}>Plans Coming Soon</Text>
-                  <Text style={styles.emptySub}>
-                    Admin is setting up customized subscription plans for {config.name}.
-                  </Text>
-                </View>
-              ) : (
-                plans.map((plan) => {
-                  const priceRupees = Math.round((plan.pricePaise || plan.price_paise || 0) / 100);
-                  const isPaying = payingPlanId === plan.id;
-                  const isPlanActive = Boolean(
-                    plan.isActive ||
-                    activePlanCodes.some((c) => String(c).toLowerCase() === String(plan.code || '').toLowerCase()) ||
-                    activePlanCodes.some((c) => String(c) === String(plan.id)) ||
-                    (activePlanCode && String(plan.code || '').toLowerCase() === String(activePlanCode).toLowerCase()) ||
-                    (isSubscribed && plans.length === 1)
-                  );
-
-                  return (
-                    <View
-                      key={plan.id}
-                      style={[
-                        styles.planCard,
-                        isPlanActive && styles.planCardActive,
-                      ]}
-                    >
-                      {isPlanActive && (
-                        <View style={styles.activePlanBadge}>
-                          <Text style={styles.activePlanBadgeText}>✓ CURRENT ACTIVE PLAN</Text>
-                        </View>
-                      )}
-
-                      <View style={styles.planHeaderRow}>
-                        <View>
-                          <Text style={styles.planName}>{plan.name}</Text>
-                          <Text style={styles.planDuration}>{plan.durationDays || 365} Days Unlimited Validity</Text>
-                        </View>
-                        <View style={styles.planPriceBox}>
-                          <Text style={styles.planPriceRupees}>₹{priceRupees}</Text>
-                          <Text style={styles.planPricePeriod}>/ full access</Text>
-                        </View>
-                      </View>
-
-                      {/* Features */}
-                      <View style={styles.planFeaturesList}>
-                        {(Array.isArray(plan.features) ? plan.features : []).map((feat, idx) => (
-                          <View key={idx} style={styles.planFeatureItem}>
-                            <Text style={styles.planFeatureCheck}>✓</Text>
-                            <Text style={styles.planFeatureText}>{feat}</Text>
-                          </View>
-                        ))}
-                      </View>
-
-                      {isPlanActive ? (
-                        <TouchableOpacity
-                          style={styles.planActiveBtn}
-                          onPress={() => setView('modules')}
-                          activeOpacity={0.85}
-                        >
-                          <Text style={styles.planActiveBtnText}>✓ Plan Activated • Access Unlocked 📚</Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <TouchableOpacity
-                          style={[
-                            styles.planPayBtn,
-                            { backgroundColor: config.themeColor },
-                            isPaying && styles.opacity60,
-                          ]}
-                          onPress={() => handleSubscribe(plan)}
-                          disabled={isPaying}
-                          activeOpacity={0.85}
-                        >
-                          {isPaying ? (
-                            <ActivityIndicator color="#fff" />
-                          ) : (
-                            <Text style={styles.planPayBtnText}>Unlock {config.name} Now 💳</Text>
-                          )}
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  );
-                })
-              )}
-            </View>
+            <PlansCarouselSection
+              plans={plans}
+              examName={config.name}
+              themeColor={config.themeColor}
+              payingPlanId={payingPlanId}
+              isPlanActiveFn={(plan) =>
+                Boolean(
+                  plan.isActive ||
+                  activePlanCodes.some((c) => String(c).toLowerCase() === String(plan.code || '').toLowerCase()) ||
+                  activePlanCodes.some((c) => String(c) === String(plan.id)) ||
+                  (activePlanCode && String(plan.code || '').toLowerCase() === String(activePlanCode).toLowerCase()) ||
+                  (isSubscribed && plans.length === 1)
+                )
+              }
+              onSelectPlan={(plan) => handleSubscribe(plan)}
+              onAccessUnlocked={() => setView('modules')}
+              onViewAllPlans={() => router.push(`/student/all-plans?exam=${examId}`)}
+            />
           </View>
         )}
       </ScrollView>

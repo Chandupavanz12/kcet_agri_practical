@@ -35,7 +35,7 @@ export default function AdminPlansScreen() {
         if (Array.isArray(res?.settings?.subscriptionsDisabled)) {
           setSubscriptionsDisabled(res.settings.subscriptionsDisabled);
         }
-      } catch (_) {}
+      } catch (_) { }
     })();
   }, [token]);
 

@@ -312,7 +312,12 @@ export default function AdminBulkPlansScreen() {
           ) : filteredItems.length === 0 ? (
             <Text style={styles.emptyText}>No items found for this filter.</Text>
           ) : (
-            <View style={styles.itemList}>
+            <ScrollView
+              style={styles.itemListScroll}
+              contentContainerStyle={styles.itemList}
+              nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={true}
+            >
               {filteredItems.map((item) => {
                 const checked = isSelected(typeTab, item.exam, item.id);
                 return (
@@ -335,7 +340,7 @@ export default function AdminBulkPlansScreen() {
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
           )}
 
           <TouchableOpacity
@@ -416,7 +421,8 @@ const styles = StyleSheet.create({
   typeBtnText: { fontSize: 11.5, fontWeight: '700', color: '#475569' },
   typeBtnTextActive: { color: '#1d4ed8', fontWeight: '800' },
   emptyText: { fontSize: 13, color: '#64748b', textAlign: 'center', paddingVertical: 16 },
-  itemList: { gap: 8, maxHeight: 340 },
+  itemListScroll: { maxHeight: 300, borderWidth: 1, borderColor: '#f1f5f9', borderRadius: 12, padding: 6, backgroundColor: '#f8fafc' },
+  itemList: { gap: 8, paddingBottom: 4 },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' },
   checkRowActive: { backgroundColor: '#f0fdf4', borderColor: '#16a34a' },
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: '#94a3b8', alignItems: 'center', justifyContent: 'center' },
