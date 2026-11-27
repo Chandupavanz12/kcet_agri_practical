@@ -15,6 +15,7 @@ const MANAGE_LINKS = [
   { to: '/admin/materials', icon: '📚', label: 'Materials', desc: 'PDFs & Chapter Notes' },
   { to: '/admin/pyqs', icon: '📄', label: 'PYQs', desc: 'Previous Year Papers' },
   { to: '/admin/plans', icon: '💳', label: 'Plans', desc: 'Pricing & Tiers' },
+  { to: '/admin/bulk-plans', icon: '📦', label: 'Bulk Plan Creation', desc: 'Bundle Specific Tests, PDFs & PYQs' },
   { to: '/admin/payments', icon: '💰', label: 'Payments', desc: 'Revenue & Transaction Logs' },
   { to: '/admin/feedback', icon: '💬', label: 'Feedback', desc: 'Student Communications' },
   { to: '/admin/notifications', icon: '🔔', label: 'Broadcast', desc: 'Global Announcements' },

@@ -340,10 +340,10 @@ export default function StudentDashboardScreen() {
 
         {/* 3. Features Row (Quick Actions) */}
         <View style={styles.featuresRow}>
-          {/* Video Guidance (Active for Agri Practical) */}
+          {/* Video Guidance (PUC & Agri Practical) */}
           <TouchableOpacity
             style={styles.featureItem}
-            onPress={() => router.push('/student/exam/agri')}
+            onPress={() => router.push('/student/videos')}
             activeOpacity={0.7}
           >
             <View style={[styles.featureIconBox, { backgroundColor: '#ede9fe' }]}>

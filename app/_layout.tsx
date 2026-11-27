@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect } from 'react';
-import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { AppState, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/contexts/AuthContext.jsx';
 import PushRegistration from '../src/components/PushRegistration.jsx';
@@ -11,10 +11,35 @@ export default function RootLayout() {
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
   const isWide = isWeb && width > 520;
+  const lastPingRef = useRef(0);
 
-  // Pre-warm the backend on initial app load to eliminate Render cold start delays
+  // Pre-warm the backend on app load, foreground resume, and every 4 mins while active
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/ping`).catch(() => {});
+    const pingServer = (force = false) => {
+      const now = Date.now();
+      if (!force && now - lastPingRef.current < 15000) return;
+      lastPingRef.current = now;
+      fetch(`${API_BASE_URL}/api/ping`).catch(() => {});
+    };
+
+    pingServer(true);
+
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        pingServer(true);
+      }
+    });
+
+    const interval = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        pingServer(true);
+      }
+    }, 4 * 60 * 1000);
+
+    return () => {
+      sub.remove();
+      clearInterval(interval);
+    };
   }, []);
 
   return (

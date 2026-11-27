@@ -63,6 +63,55 @@ const BANNER_TEMPLATES = [
   },
 ];
 
+const ROUTE_EXAM_OPTIONS = [
+  { id: 'all', label: 'All Exams (General)' },
+  { id: 'puc', label: 'PUC' },
+  { id: 'kcet', label: 'KCET' },
+  { id: 'neet', label: 'NEET' },
+  { id: 'agri', label: 'Agri Practical' },
+];
+
+const ROUTES_BY_EXAM = {
+  all: [
+    { label: 'Home / Student Dashboard', route: '/student/dashboard' },
+    { label: 'Study Materials (All Exams)', route: '/student/materials' },
+    { label: 'Mock Tests (All Exams)', route: '/student/tests' },
+    { label: 'Previous Year Papers (All Exams)', route: '/student/pyqs' },
+    { label: 'Video Guidance (All Exams)', route: '/student/videos' },
+    { label: 'Progress & Analytics', route: '/student/progress' },
+  ],
+  puc: [
+    { label: 'PUC Exam Overview', route: '/student/exam/puc' },
+    { label: 'PUC Video Guidance', route: '/student/videos?exam=puc' },
+    { label: 'PUC Study Materials', route: '/student/exam/puc?module=materials' },
+    { label: 'PUC Mock Tests', route: '/student/exam/puc?module=tests' },
+    { label: 'PUC Previous Year Papers', route: '/student/exam/puc?module=pyqs' },
+    { label: 'PUC Subscription Plans', route: '/student/exam/puc?module=plans' },
+  ],
+  kcet: [
+    { label: 'KCET Exam Overview', route: '/student/exam/kcet' },
+    { label: 'KCET Study Materials', route: '/student/exam/kcet?module=materials' },
+    { label: 'KCET Mock Tests', route: '/student/exam/kcet?module=tests' },
+    { label: 'KCET Previous Year Papers', route: '/student/exam/kcet?module=pyqs' },
+    { label: 'KCET Subscription Plans', route: '/student/exam/kcet?module=plans' },
+  ],
+  neet: [
+    { label: 'NEET Exam Overview', route: '/student/exam/neet' },
+    { label: 'NEET Study Materials', route: '/student/exam/neet?module=materials' },
+    { label: 'NEET Mock Tests', route: '/student/exam/neet?module=tests' },
+    { label: 'NEET Previous Year Papers', route: '/student/exam/neet?module=pyqs' },
+    { label: 'NEET Subscription Plans', route: '/student/exam/neet?module=plans' },
+  ],
+  agri: [
+    { label: 'Agri Exam Overview', route: '/student/exam/agri' },
+    { label: 'Agri Video Guidance', route: '/student/videos?exam=agri' },
+    { label: 'Agri Study Materials', route: '/student/materials?exam=agri' },
+    { label: 'Agri Mock Tests', route: '/student/tests?exam=agri' },
+    { label: 'Agri Previous Year Papers', route: '/student/pyqs?exam=agri' },
+    { label: 'Agri Subscription Plans', route: '/student/premium' },
+  ],
+};
+
 export default function AdminBannersScreen() {
   const { token } = useAuth();
   const router = useRouter();
@@ -81,7 +130,10 @@ export default function AdminBannersScreen() {
   const [highlightText, setHighlightText] = useState('');
   const [subtitle, setSubtitle] = useState('');
   const [buttonText, setButtonText] = useState('Start Learning >');
+  const [routeExam, setRouteExam] = useState('all');
   const [actionRoute, setActionRoute] = useState('/student/dashboard');
+  const [examDropdownOpen, setExamDropdownOpen] = useState(false);
+  const [pageDropdownOpen, setPageDropdownOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [isActive, setIsActive] = useState(true);
 
@@ -258,20 +310,87 @@ export default function AdminBannersScreen() {
               onChangeText={setSubtitle}
             />
 
-            <Text style={styles.fieldLabel}>6. Button Text & Route</Text>
-            <View style={styles.rowTwoCol}>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="Button Text"
-                value={buttonText}
-                onChangeText={setButtonText}
-              />
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="Action Route"
-                value={actionRoute}
-                onChangeText={setActionRoute}
-              />
+            <Text style={styles.fieldLabel}>6. Button Text</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Explore Now >"
+              value={buttonText}
+              onChangeText={setButtonText}
+            />
+
+            <Text style={styles.fieldLabel}>6b. Navigation Route (Select Exam & Destination Page)</Text>
+            <View style={{ gap: 8, marginBottom: 12 }}>
+              <TouchableOpacity
+                style={styles.dropdownTrigger}
+                onPress={() => {
+                  setExamDropdownOpen(!examDropdownOpen);
+                  setPageDropdownOpen(false);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.dropdownTriggerText}>
+                  Exam: {ROUTE_EXAM_OPTIONS.find((o) => o.id === routeExam)?.label || 'All Exams'}
+                </Text>
+                <Text style={styles.dropdownArrow}>{examDropdownOpen ? '▲' : '▼'}</Text>
+              </TouchableOpacity>
+
+              {examDropdownOpen && (
+                <View style={styles.dropdownMenu}>
+                  {ROUTE_EXAM_OPTIONS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={[styles.dropdownItem, routeExam === opt.id && styles.dropdownItemActive]}
+                      onPress={() => {
+                        setRouteExam(opt.id);
+                        const firstRoute = ROUTES_BY_EXAM[opt.id]?.[0]?.route || '/student/dashboard';
+                        setActionRoute(firstRoute);
+                        setExamDropdownOpen(false);
+                      }}
+                    >
+                      <Text style={[styles.dropdownItemText, routeExam === opt.id && styles.dropdownItemTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={styles.dropdownTrigger}
+                onPress={() => {
+                  setPageDropdownOpen(!pageDropdownOpen);
+                  setExamDropdownOpen(false);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.dropdownTriggerText}>
+                  Page: {(ROUTES_BY_EXAM[routeExam] || []).find((r) => r.route === actionRoute)?.label || actionRoute}
+                </Text>
+                <Text style={styles.dropdownArrow}>{pageDropdownOpen ? '▲' : '▼'}</Text>
+              </TouchableOpacity>
+
+              {pageDropdownOpen && (
+                <View style={styles.dropdownMenu}>
+                  {(ROUTES_BY_EXAM[routeExam] || []).map((opt) => (
+                    <TouchableOpacity
+                      key={opt.route}
+                      style={[styles.dropdownItem, actionRoute === opt.route && styles.dropdownItemActive]}
+                      onPress={() => {
+                        setActionRoute(opt.route);
+                        setPageDropdownOpen(false);
+                      }}
+                    >
+                      <Text style={[styles.dropdownItemText, actionRoute === opt.route && styles.dropdownItemTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <View style={styles.routePreviewPill}>
+                <Text style={styles.routePreviewText}>Target Route: {actionRoute}</Text>
+              </View>
             </View>
 
             <Text style={styles.fieldLabel}>7. Student Image URL (Optional)</Text>
@@ -408,6 +527,39 @@ const styles = StyleSheet.create({
   examChoiceTextActive: { color: '#ffffff' },
 
   input: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#0f172a', backgroundColor: '#f8fafc' },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    backgroundColor: '#f8fafc',
+  },
+  dropdownTriggerText: { fontSize: 13.5, fontWeight: '700', color: '#0f172a' },
+  dropdownArrow: { fontSize: 11, color: '#64748b' },
+  dropdownMenu: {
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+  },
+  dropdownItem: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  dropdownItemActive: { backgroundColor: '#ecfdf5' },
+  dropdownItemText: { fontSize: 13, fontWeight: '600', color: '#334155' },
+  dropdownItemTextActive: { color: '#059669', fontWeight: '800' },
+  routePreviewPill: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  routePreviewText: { fontSize: 11.5, fontWeight: '700', color: '#1d4ed8' },
   rowTwoCol: { flexDirection: 'row', gap: 10 },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   switchLabel: { fontSize: 14, fontWeight: '600', color: '#0f172a' },

@@ -1,8 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -31,13 +32,25 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Pre-warm the backend immediately upon entering the login screen to prevent Render spin-up wait
-  useEffect(() => {
+  const lastWarmRef = useRef(0);
+  const warmServer = (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastWarmRef.current < 20000) return;
+    lastWarmRef.current = now;
     fetch(`${API_BASE_URL}/api/ping`).catch(() => {});
+  };
+
+  // Pre-warm the backend on mount and whenever returning from background inactivity
+  useEffect(() => {
+    warmServer(true);
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') warmServer(true);
+    });
+    return () => sub.remove();
   }, []);
 
   const handleInputFocus = () => {
-    fetch(`${API_BASE_URL}/api/ping`).catch(() => {});
+    warmServer(false);
   };
 
   async function onSubmit() {

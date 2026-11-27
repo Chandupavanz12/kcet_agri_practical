@@ -7,7 +7,7 @@ import { apiFetch } from '../api/client.js';
 export default function AdminVideosScreen() {
   const { token } = useAuth();
   const [items, setItems] = useState([]);
-  const [form, setForm] = useState({ title: '', youtubeId: '', subject: 'General', status: 'active' });
+  const [form, setForm] = useState({ title: '', youtubeId: '', exam: 'agri', subject: 'General', status: 'active' });
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -54,11 +54,12 @@ export default function AdminVideosScreen() {
         body: {
           title: form.title.trim(),
           youtubeId: form.youtubeId.trim(),
+          exam: form.exam || 'agri',
           subject: form.subject.trim(),
           status: form.status,
         },
       });
-      setForm({ title: '', youtubeId: '', subject: 'General', status: 'active' });
+      setForm({ title: '', youtubeId: '', exam: form.exam || 'agri', subject: 'General', status: 'active' });
       await load();
       Alert.alert('Success', 'Video saved');
     } catch (err) {
@@ -103,6 +104,38 @@ export default function AdminVideosScreen() {
                 onChangeText={(t) => setForm((s) => ({ ...s, youtubeId: t }))}
               />
               {!!errors.youtubeId && <Text style={styles.errorHint}>{errors.youtubeId}</Text>}
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Target Exam</Text>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                {[
+                  { id: 'agri', label: 'Agri Practical' },
+                  { id: 'puc', label: 'PUC' },
+                  { id: 'kcet', label: 'KCET' },
+                  { id: 'neet', label: 'NEET' },
+                ].map((ex) => {
+                  const active = form.exam === ex.id;
+                  return (
+                    <TouchableOpacity
+                      key={ex.id}
+                      onPress={() => setForm((s) => ({ ...s, exam: ex.id }))}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: active ? '#2563eb' : '#cbd5e1',
+                        backgroundColor: active ? '#eff6ff' : '#fff',
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? '#1d4ed8' : '#334155' }}>
+                        {ex.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
 
             <View style={styles.formGroup}>
@@ -153,8 +186,8 @@ export default function AdminVideosScreen() {
                     <View style={styles.videoHeader}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.videoTitle}>{v.title}</Text>
-                        <Text style={styles.videoSubject}>{v.subject}</Text>
-                        <Text style={styles.videoMeta}>ID: {v.youtubeId}</Text>
+                        <Text style={styles.videoSubject}>{(v.exam || 'agri').toUpperCase()} • {v.subject}</Text>
+                        <Text style={styles.videoMeta}>URL: {v.videoUrl || `https://www.youtube.com/watch?v=${v.youtubeId}`}</Text>
                       </View>
                       <View style={[styles.badge, v.status === 'active' && styles.badgeSuccess]}>
                         <Text style={[styles.badgeText, v.status === 'active' && styles.badgeSuccessText]}>{v.status}</Text>

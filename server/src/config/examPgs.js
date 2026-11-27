@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS plans (
   duration_days INT NOT NULL DEFAULT 365,
   access_modules JSONB DEFAULT '["all"]'::jsonb,
   target_exams JSONB DEFAULT '[]'::jsonb,
+  allowed_items JSONB DEFAULT NULL,
   features JSONB DEFAULT '[]'::jsonb,
   status VARCHAR(20) DEFAULT 'active',
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -171,6 +172,7 @@ CREATE TABLE IF NOT EXISTS user_access (
   exam VARCHAR(50) NOT NULL,
   plan_code VARCHAR(50) NOT NULL,
   access_modules JSONB DEFAULT '["all"]'::jsonb,
+  allowed_items JSONB DEFAULT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, exam, plan_code)
@@ -194,7 +196,9 @@ export async function initExamPgSchemas() {
       try {
         await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS access_modules JSONB DEFAULT '["all"]'::jsonb`);
         await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS target_exams JSONB DEFAULT '[]'::jsonb`);
+        await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allowed_items JSONB DEFAULT NULL`);
         await pool.query(`ALTER TABLE user_access ADD COLUMN IF NOT EXISTS access_modules JSONB DEFAULT '["all"]'::jsonb`);
+        await pool.query(`ALTER TABLE user_access ADD COLUMN IF NOT EXISTS allowed_items JSONB DEFAULT NULL`);
         await pool.query(`ALTER TABLE mock_tests ADD COLUMN IF NOT EXISTS is_free BOOLEAN DEFAULT true`);
       } catch (_) {}
       console.log(`[pg-init] Schemas verified for ${name}`);

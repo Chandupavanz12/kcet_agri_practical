@@ -284,6 +284,87 @@ export function modulesInclude(accessModules, moduleName) {
   });
 }
 
+// Helper: Check if a plan/access record is an item-level Bulk Plan
+export function hasBulkAllowedItems(obj) {
+  let items = obj?.allowed_items;
+  if (!items) return false;
+  if (typeof items === 'string') {
+    try { items = JSON.parse(items); } catch { return false; }
+  }
+  if (!items || typeof items !== 'object') return false;
+  return (
+    (Array.isArray(items.materials) && items.materials.length > 0) ||
+    (Array.isArray(items.pyqs) && items.pyqs.length > 0) ||
+    (Array.isArray(items.tests) && items.tests.length > 0)
+  );
+}
+
+// Helper: Fetch merged item-level unlocks across all active Bulk Plans for a user
+export async function getUserBulkAllowedItems(userId) {
+  const result = {
+    materials: new Set(),
+    pyqs: new Set(),
+    tests: new Set(),
+  };
+  if (!userId) return result;
+
+  const mergeItems = (raw) => {
+    let items = raw;
+    if (typeof items === 'string') {
+      try { items = JSON.parse(items); } catch { return; }
+    }
+    if (!items || typeof items !== 'object') return;
+    for (const key of ['materials', 'pyqs', 'tests']) {
+      if (Array.isArray(items[key])) {
+        for (const entry of items[key]) {
+          if (entry && entry.exam && entry.id !== undefined) {
+            result[key].add(`${String(entry.exam).toLowerCase().trim()}:${Number(entry.id)}`);
+          }
+        }
+      }
+    }
+  };
+
+  try {
+    const { Payment } = await import('../models/index.js');
+    const paidDocs = await Payment.find({
+      user_id: Number(userId),
+      status: { $in: ['paid', 'free'] },
+      admin_revoked: { $ne: true },
+      allowed_items: { $ne: null },
+    }).lean();
+    const now = new Date();
+    for (const doc of paidDocs) {
+      const paidDate = doc.paid_at || doc.created_at || now;
+      const durationDays = Number(doc.duration_days || 365);
+      const expiresAt = new Date(new Date(paidDate).getTime() + durationDays * 86400000);
+      if (expiresAt > now) {
+        mergeItems(doc.allowed_items);
+      }
+    }
+  } catch (_) {}
+
+  const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
+  for (const p of pools) {
+    try {
+      const r = await p.query(
+        `SELECT allowed_items FROM user_access WHERE user_id = $1 AND allowed_items IS NOT NULL AND expires_at > NOW()`,
+        [Number(userId)]
+      );
+      for (const row of r.rows) {
+        mergeItems(row.allowed_items);
+      }
+    } catch (_) {}
+  }
+
+  return result;
+}
+
+export function isItemUnlockedByBulk(bulkItems, type, exam, id) {
+  if (!bulkItems || !bulkItems[type]) return false;
+  return bulkItems[type].has(`${String(exam).toLowerCase().trim()}:${Number(id)}`);
+}
+
 // Helper: Check student module access (respects granular module choices & global plans)
 const _userAccessCache = new Map();
 export async function checkUserModuleAccess(pool, userId, exam, moduleName) {
@@ -316,6 +397,10 @@ export async function checkUserModuleAccess(pool, userId, exam, moduleName) {
       const expiresAt = new Date(new Date(paidDate).getTime() + durationDays * 86400000);
 
       if (expiresAt > now) {
+        // Bulk Plans only unlock specific allowed_items, never whole modules
+        if (hasBulkAllowedItems(paidDoc)) {
+          continue;
+        }
         // If plan is 'global', check if this exam is allowed
         if (paidDoc.exam === 'global' && Array.isArray(paidDoc.target_exams) && paidDoc.target_exams.length > 0) {
           if (!paidDoc.target_exams.map((x) => String(x).toLowerCase()).includes(cleanExam)) {
@@ -338,11 +423,12 @@ export async function checkUserModuleAccess(pool, userId, exam, moduleName) {
   if (pool) {
     try {
       const res = await pool.query(
-        `SELECT access_modules, exam, expires_at FROM user_access 
+        `SELECT access_modules, allowed_items, exam, expires_at FROM user_access 
          WHERE user_id = $1 AND (exam = $2 OR exam = 'global') AND expires_at > NOW()`,
         [userId, cleanExam]
       );
       for (const row of res.rows) {
+        if (hasBulkAllowedItems(row)) continue;
         if (modulesInclude(row.access_modules, moduleName)) {
           _userAccessCache.set(cacheKey, { hasAccess: true, expiresAt: Date.now() + 60000 });
           return true;
@@ -357,8 +443,8 @@ export async function checkUserModuleAccess(pool, userId, exam, moduleName) {
   return false;
 }
 
-// Helper: Grant exam access in PostgreSQL (supports granular modules & global plans)
-export async function grantExamAccess(userId, exam, planCode, accessModules = ['all'], durationDays = 365) {
+// Helper: Grant exam access in PostgreSQL (supports granular modules, global plans, & bulk item plans)
+export async function grantExamAccess(userId, exam, planCode, accessModules = ['all'], durationDays = 365, allowedItems = null) {
   const normalizedExam = String(exam || '').toLowerCase().trim();
   const expiresAt = new Date(Date.now() + durationDays * 86400000);
 
@@ -377,6 +463,7 @@ export async function grantExamAccess(userId, exam, planCode, accessModules = ['
           exam VARCHAR(50) NOT NULL DEFAULT 'puc',
           plan_code VARCHAR(50) NOT NULL,
           access_modules JSONB DEFAULT '["all"]'::jsonb,
+          allowed_items JSONB DEFAULT NULL,
           expires_at TIMESTAMPTZ NOT NULL,
           created_at TIMESTAMPTZ DEFAULT NOW()
         )
@@ -384,6 +471,7 @@ export async function grantExamAccess(userId, exam, planCode, accessModules = ['
       try {
         await p.query(`ALTER TABLE user_access ADD COLUMN IF NOT EXISTS exam VARCHAR(50) DEFAULT 'puc'`);
         await p.query(`ALTER TABLE user_access ADD COLUMN IF NOT EXISTS access_modules JSONB DEFAULT '["all"]'::jsonb`);
+        await p.query(`ALTER TABLE user_access ADD COLUMN IF NOT EXISTS allowed_items JSONB DEFAULT NULL`);
       } catch (_) {}
 
       await p.query(
@@ -391,9 +479,9 @@ export async function grantExamAccess(userId, exam, planCode, accessModules = ['
         [userId, normalizedExam, planCode]
       );
       await p.query(
-        `INSERT INTO user_access (user_id, exam, plan_code, access_modules, expires_at)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [userId, normalizedExam, planCode, JSON.stringify(accessModules), expiresAt]
+        `INSERT INTO user_access (user_id, exam, plan_code, access_modules, allowed_items, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userId, normalizedExam, planCode, JSON.stringify(accessModules), allowedItems ? JSON.stringify(allowedItems) : null, expiresAt]
       );
     } catch (err) {
       console.error('[grantExamAccess] error:', err);
@@ -537,7 +625,10 @@ export async function getExamMaterials(req, res, next) {
     }
 
     const userId = Number(req.user?.sub || req.user?.id);
-    const hasAccess = await checkUserModuleAccess(pool, userId, exam, 'materials');
+    const [hasAccess, bulkItems] = await Promise.all([
+      checkUserModuleAccess(pool, userId, exam, 'materials'),
+      userId ? getUserBulkAllowedItems(userId) : Promise.resolve(null),
+    ]);
 
     const materials = rows.map((m) => ({
       id: m.id,
@@ -547,7 +638,7 @@ export async function getExamMaterials(req, res, next) {
       pdfUrl: m.pdf_url,
       type: m.type || 'pdf',
       isFree: m.is_free,
-      locked: !m.is_free && !hasAccess,
+      locked: !m.is_free && !hasAccess && !isItemUnlockedByBulk(bulkItems, 'materials', exam, m.id),
       exam: m.exam,
       createdAt: m.created_at,
     }));
@@ -591,7 +682,10 @@ export async function getExamPyqs(req, res, next) {
     }
 
     const userId = Number(req.user?.sub || req.user?.id);
-    const hasAccess = await checkUserModuleAccess(pool, userId, exam, 'pyqs');
+    const [hasAccess, bulkItems] = await Promise.all([
+      checkUserModuleAccess(pool, userId, exam, 'pyqs'),
+      userId ? getUserBulkAllowedItems(userId) : Promise.resolve(null),
+    ]);
 
     const pyqs = rows.map((p) => ({
       id: p.id,
@@ -600,7 +694,7 @@ export async function getExamPyqs(req, res, next) {
       year: p.year,
       pdfUrl: p.pdf_url,
       isFree: p.is_free,
-      locked: !p.is_free && !hasAccess,
+      locked: !p.is_free && !hasAccess && !isItemUnlockedByBulk(bulkItems, 'pyqs', exam, p.id),
       exam: p.exam,
       createdAt: p.created_at,
     }));
@@ -647,11 +741,14 @@ export async function getExamTests(req, res, next) {
     }
 
     const userId = Number(req.user?.sub || req.user?.id);
-    const hasAccess = await checkUserModuleAccess(pool, userId, exam, 'tests');
+    const [hasAccess, bulkItems] = await Promise.all([
+      checkUserModuleAccess(pool, userId, exam, 'tests'),
+      userId ? getUserBulkAllowedItems(userId) : Promise.resolve(null),
+    ]);
 
     const tests = rows.map((t) => {
       const isFree = t.is_free === true || t.is_free === null || t.is_free === undefined ? (t.is_free !== false) : false;
-      const locked = !isFree && !hasAccess;
+      const locked = !isFree && !hasAccess && !isItemUnlockedByBulk(bulkItems, 'tests', exam, t.id);
 
       return {
         id: t.id,
@@ -878,10 +975,21 @@ export async function getExamPlans(req, res, next) {
 
     const hasAnyActive = !!activeAccess || activePlanCodes.length > 0;
 
-    const mappedPlans = plansRows.map((p) => {
+    const filteredPlans = plansRows.filter((p) => {
+      if (p.exam !== 'global') return true;
+      const targets = Array.isArray(p.target_exams)
+        ? p.target_exams
+        : typeof p.target_exams === 'string'
+          ? JSON.parse(p.target_exams || '[]')
+          : [];
+      if (!Array.isArray(targets) || targets.length === 0) return true;
+      return targets.map((x) => String(x).toLowerCase().trim()).includes(exam);
+    });
+
+    const mappedPlans = filteredPlans.map((p) => {
       const pCode = String(p.code || '').toLowerCase().trim();
       const pId = Number(p.id || 0);
-      const isPlanActive = activePlanCodes.includes(pCode) || activePlanIds.includes(pId) || (hasAnyActive && plansRows.length === 1);
+      const isPlanActive = activePlanCodes.includes(pCode) || activePlanIds.includes(pId) || (hasAnyActive && filteredPlans.length === 1);
       return {
         id: p.id,
         code: p.code,
@@ -891,6 +999,7 @@ export async function getExamPlans(req, res, next) {
         durationDays: p.duration_days,
         accessModules: Array.isArray(p.access_modules) ? p.access_modules : (typeof p.access_modules === 'string' ? JSON.parse(p.access_modules || '["all"]') : ['all']),
         targetExams: Array.isArray(p.target_exams) ? p.target_exams : (typeof p.target_exams === 'string' ? JSON.parse(p.target_exams || '[]') : []),
+        allowedItems: p.allowed_items || null,
         features: Array.isArray(p.features) ? p.features : typeof p.features === 'string' ? JSON.parse(p.features || '[]') : [],
         isActive: Boolean(isPlanActive),
       };
@@ -1805,5 +1914,211 @@ export async function deleteAdminExamPlan(req, res, next) {
     return next(err);
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BULK PLAN CREATION (Multi-Exam, Item-Level Unlocking)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getBulkPlanCatalog(req, res, next) {
+  try {
+    const pucPool = getPucPool();
+    const kcetPool = getKcetNeetPool();
+    const { getTestModel } = await import('../config/mockTestDb.js');
+    const AgriTest = await getTestModel();
+
+    const [
+      pucMats, pucPyqs, pucTests,
+      knMats, knPyqs, knTests,
+      agriMats, agriPyqs, agriTests,
+    ] = await Promise.all([
+      pucPool ? pucPool.query(`SELECT id, exam, subject, title, is_free FROM materials WHERE status = 'active' ORDER BY id DESC`).catch(() => ({ rows: [] })) : { rows: [] },
+      pucPool ? pucPool.query(`SELECT id, exam, subject, year, title, is_free FROM pyqs WHERE status = 'active' ORDER BY id DESC`).catch(() => ({ rows: [] })) : { rows: [] },
+      pucPool ? pucPool.query(`SELECT id, exam, subject, title, is_free FROM mock_tests WHERE is_active = true ORDER BY id DESC`).catch(() => ({ rows: [] })) : { rows: [] },
+      kcetPool ? kcetPool.query(`SELECT id, exam, subject, title, is_free FROM materials WHERE status = 'active' ORDER BY id DESC`).catch(() => ({ rows: [] })) : { rows: [] },
+      kcetPool ? kcetPool.query(`SELECT id, exam, subject, year, title, is_free FROM pyqs WHERE status = 'active' ORDER BY id DESC`).catch(() => ({ rows: [] })) : { rows: [] },
+      kcetPool ? kcetPool.query(`SELECT id, exam, subject, title, is_free FROM mock_tests WHERE is_active = true ORDER BY id DESC`).catch(() => ({ rows: [] })) : { rows: [] },
+      Material.find({ status: 'active' }).select({ id: 1, title: 1, subject: 1, access_type: 1 }).sort({ id: -1 }).lean().catch(() => []),
+      Pyq.find({ status: 'active' }).select({ id: 1, title: 1, subject: 1, year: 1, access_type: 1 }).sort({ id: -1 }).lean().catch(() => []),
+      AgriTest.find({ is_active: true }).select({ id: 1, title: 1 }).sort({ id: -1 }).lean().catch(() => []),
+    ]);
+
+    const materials = [
+      ...pucMats.rows.map((m) => ({ id: Number(m.id), exam: String(m.exam || 'puc').toLowerCase(), subject: m.subject || 'General', title: m.title })),
+      ...knMats.rows.map((m) => ({ id: Number(m.id), exam: String(m.exam || 'kcet').toLowerCase(), subject: m.subject || 'General', title: m.title })),
+      ...agriMats.map((m) => ({ id: Number(m.id), exam: 'agri', subject: m.subject || 'Practical', title: m.title })),
+    ];
+
+    const pyqs = [
+      ...pucPyqs.rows.map((p) => ({ id: Number(p.id), exam: String(p.exam || 'puc').toLowerCase(), subject: p.subject || 'General', year: p.year, title: p.title })),
+      ...knPyqs.rows.map((p) => ({ id: Number(p.id), exam: String(p.exam || 'kcet').toLowerCase(), subject: p.subject || 'General', year: p.year, title: p.title })),
+      ...agriPyqs.map((p) => ({ id: Number(p.id), exam: 'agri', subject: p.subject || 'Practical', year: p.year, title: p.title })),
+    ];
+
+    const tests = [
+      ...pucTests.rows.map((t) => ({ id: Number(t.id), exam: String(t.exam || 'puc').toLowerCase(), subject: t.subject || 'General', title: t.title })),
+      ...knTests.rows.map((t) => ({ id: Number(t.id), exam: String(t.exam || 'kcet').toLowerCase(), subject: t.subject || 'General', title: t.title })),
+      ...agriTests.map((t) => ({ id: Number(t.id), exam: 'agri', subject: 'Practical', title: t.title })),
+    ];
+
+    return res.json({ success: true, materials, pyqs, tests });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function listBulkPlans(req, res, next) {
+  try {
+    const pool = getKcetNeetPool() || getPucPool();
+    if (!pool) return res.json({ success: true, plans: [] });
+    const result = await pool.query(
+      `SELECT * FROM plans WHERE allowed_items IS NOT NULL ORDER BY id DESC`
+    );
+    return res.json({ success: true, plans: result.rows });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+function deriveTargetExamsFromAllowedItems(allowedItems) {
+  const exams = new Set();
+  if (!allowedItems || typeof allowedItems !== 'object') return [];
+  for (const key of ['materials', 'pyqs', 'tests']) {
+    if (Array.isArray(allowedItems[key])) {
+      for (const item of allowedItems[key]) {
+        if (item?.exam) exams.add(String(item.exam).toLowerCase().trim());
+      }
+    }
+  }
+  return Array.from(exams);
+}
+
+export async function createBulkPlan(req, res, next) {
+  try {
+    const {
+      code,
+      name,
+      price_paise = 0,
+      duration_days = 365,
+      allowed_items = { materials: [], pyqs: [], tests: [] },
+      features = [],
+      status = 'active',
+    } = req.body;
+
+    if (!code?.trim() || !name?.trim()) {
+      return res.status(400).json({ message: 'Plan code and name are required' });
+    }
+    const targetExams = deriveTargetExamsFromAllowedItems(allowed_items);
+    if (targetExams.length === 0) {
+      return res.status(400).json({ message: 'Please select at least one material, PYQ, or mock test' });
+    }
+
+    const poolsToInsert = [getKcetNeetPool()];
+    if (targetExams.includes('puc') && getPucPool() && getPucPool() !== getKcetNeetPool()) {
+      poolsToInsert.push(getPucPool());
+    }
+
+    let savedPlan = null;
+    for (const pool of poolsToInsert.filter(Boolean)) {
+      const result = await pool.query(
+        `INSERT INTO plans (exam, code, name, price_paise, duration_days, access_modules, target_exams, allowed_items, features, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING *`,
+        [
+          'global',
+          code.trim().toLowerCase(),
+          name.trim(),
+          Number(price_paise),
+          Number(duration_days),
+          JSON.stringify(['bulk']),
+          JSON.stringify(targetExams),
+          JSON.stringify(allowed_items),
+          JSON.stringify(Array.isArray(features) ? features : []),
+          status,
+        ]
+      );
+      if (!savedPlan) savedPlan = result.rows[0];
+    }
+
+    clearExamCache();
+    return res.status(201).json({ success: true, plan: savedPlan });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function updateBulkPlan(req, res, next) {
+  try {
+    const { id } = req.params;
+    const {
+      code,
+      name,
+      price_paise,
+      duration_days,
+      allowed_items,
+      features,
+      status = 'active',
+    } = req.body;
+
+    const targetExams = allowed_items ? deriveTargetExamsFromAllowedItems(allowed_items) : null;
+    const pools = [getKcetNeetPool(), getPucPool()].filter(Boolean);
+
+    let updated = null;
+    for (const pool of pools) {
+      try {
+        const result = await pool.query(
+          `UPDATE plans SET
+            code = COALESCE($1, code),
+            name = COALESCE($2, name),
+            price_paise = COALESCE($3, price_paise),
+            duration_days = COALESCE($4, duration_days),
+            target_exams = COALESCE($5, target_exams),
+            allowed_items = COALESCE($6, allowed_items),
+            features = COALESCE($7, features),
+            status = COALESCE($8, status),
+            updated_at = NOW()
+           WHERE id = $9 OR (code = $1 AND allowed_items IS NOT NULL)
+           RETURNING *`,
+          [
+            code ? code.trim().toLowerCase() : null,
+            name ? name.trim() : null,
+            price_paise !== undefined ? Number(price_paise) : null,
+            duration_days !== undefined ? Number(duration_days) : null,
+            targetExams ? JSON.stringify(targetExams) : null,
+            allowed_items ? JSON.stringify(allowed_items) : null,
+            features ? JSON.stringify(features) : null,
+            status,
+            id,
+          ]
+        );
+        if (result.rows.length > 0 && !updated) updated = result.rows[0];
+      } catch (_) {}
+    }
+
+    clearExamCache();
+    return res.json({ success: true, plan: updated });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function deleteBulkPlan(req, res, next) {
+  try {
+    const { id } = req.params;
+    const pools = [getKcetNeetPool(), getPucPool()].filter(Boolean);
+    let planCode = null;
+    for (const pool of pools) {
+      try {
+        const found = await pool.query('SELECT code FROM plans WHERE id = $1', [id]);
+        if (found.rows[0]?.code) planCode = found.rows[0].code;
+        await pool.query('DELETE FROM plans WHERE id = $1 OR ($2::text IS NOT NULL AND code = $2 AND allowed_items IS NOT NULL)', [id, planCode]);
+      } catch (_) {}
+    }
+    clearExamCache();
+    return res.json({ success: true, message: 'Bulk plan deleted' });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 
 

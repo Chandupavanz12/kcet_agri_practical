@@ -436,6 +436,62 @@ export async function listPlansStudent(req, res, next) {
         isActive: Boolean(isActive),
       };
     });
+
+    // Also include active Bulk/Global Plans from Neon PG that target 'agri'
+    try {
+      const { getKcetNeetPool } = await import('../config/examPgs.js');
+      const pgPool = getKcetNeetPool();
+      if (pgPool) {
+        const pgRes = await pgPool.query(
+          `SELECT * FROM plans WHERE exam = 'global' AND status = 'active' AND allowed_items IS NOT NULL ORDER BY price_paise ASC`
+        );
+        let userBulkCodes = new Set();
+        let userBulkIds = new Set();
+        if (Number.isFinite(userId)) {
+          const paidDocs = await Payment.find({
+            user_id: userId,
+            status: { $in: ['paid', 'free'] },
+            admin_revoked: { $ne: true },
+            allowed_items: { $ne: null },
+          }).lean();
+          const now = new Date();
+          for (const d of paidDocs) {
+            const paidDate = d.paid_at || d.created_at || now;
+            const exp = new Date(new Date(paidDate).getTime() + Number(d.duration_days || 365) * 86400000);
+            if (exp > now) {
+              if (d.plan_code) userBulkCodes.add(String(d.plan_code).toLowerCase().trim());
+              if (d.plan_id) userBulkIds.add(Number(d.plan_id));
+            }
+          }
+        }
+        for (const bp of pgRes.rows) {
+          const targets = Array.isArray(bp.target_exams)
+            ? bp.target_exams
+            : typeof bp.target_exams === 'string'
+              ? JSON.parse(bp.target_exams || '[]')
+              : [];
+          if (!targets.map((x) => String(x).toLowerCase().trim()).includes('agri')) continue;
+          const bCode = String(bp.code || '').toLowerCase().trim();
+          const isBulkActive = userBulkCodes.has(bCode) || userBulkIds.has(Number(bp.id));
+          if (isBulkActive) activePlanCodes.push(bCode);
+          plans.push({
+            id: bp.id,
+            code: bp.code,
+            name: bp.name,
+            exam: 'global',
+            pricePaise: Number(bp.price_paise || 0),
+            durationDays: Number(bp.duration_days || 365),
+            isFree: Number(bp.price_paise || 0) <= 0,
+            status: bp.status,
+            allowedItems: bp.allowed_items,
+            targetExams: targets,
+            isActive: Boolean(isBulkActive),
+          });
+        }
+      }
+    } catch (_) {}
+
+    activePlanCodes = [...new Set(activePlanCodes)];
     return res.json({
       plans,
       activePlanCodes,
@@ -514,8 +570,34 @@ export async function createPaymentOrderStudent(req, res, next) {
         }
         if (!Array.isArray(accessModules)) accessModules = ['all'];
 
+        let targetExams = pgPlan.target_exams;
+        if (typeof targetExams === 'string') {
+          try { targetExams = JSON.parse(targetExams); } catch { targetExams = []; }
+        }
+        if (!Array.isArray(targetExams)) targetExams = [];
+
+        let allowedItems = pgPlan.allowed_items || null;
+        if (typeof allowedItems === 'string') {
+          try { allowedItems = JSON.parse(allowedItems); } catch { allowedItems = null; }
+        }
+
         if (pricePaise <= 0) {
-          await grantExamAccess(userId, targetExam, pgPlan.code, accessModules, durationDays);
+          await grantExamAccess(userId, targetExam, pgPlan.code, accessModules, durationDays, allowedItems);
+          await new Payment({
+            user_id: userId,
+            plan_id: Number(pgPlan.id || 0),
+            amount_paise: 0,
+            razorpay_order_id: `free_${userId}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
+            exam: String(targetExam),
+            plan_code: String(pgPlan.code),
+            plan_name: String(pgPlan.name),
+            access_modules: accessModules,
+            target_exams: targetExams,
+            allowed_items: allowedItems,
+            duration_days: durationDays,
+            status: 'free',
+            paid_at: new Date(),
+          }).save();
           await createUserNotification(userId, 'Premium activated', `Your ${pgPlan.name} is active.`);
           return res.json({ success: true, free: true, plan: { code: pgPlan.code, name: pgPlan.name } });
         }
@@ -543,6 +625,8 @@ export async function createPaymentOrderStudent(req, res, next) {
           plan_code: String(pgPlan.code),
           plan_name: String(pgPlan.name),
           access_modules: accessModules,
+          target_exams: targetExams,
+          allowed_items: allowedItems,
           duration_days: durationDays,
           status: 'created',
         }).save();
@@ -678,17 +762,18 @@ export async function verifyPaymentStudent(req, res, next) {
 
     let expiry = null;
     const targetExam = String(paymentDoc.exam || exam || '').toLowerCase().trim();
-    if (targetExam && ['puc', 'kcet', 'neet'].includes(targetExam)) {
+    const allowedItems = paymentDoc.allowed_items || null;
+    if (targetExam && ['puc', 'kcet', 'neet', 'global'].includes(targetExam)) {
       const { grantExamAccess } = await import('./exam.controller.js');
-      await grantExamAccess(userId, targetExam, planCode, accessModules, durationDays);
-      await createUserNotification(userId, 'Premium activated', `Your ${planName} for ${targetExam.toUpperCase()} is active.`);
+      await grantExamAccess(userId, targetExam, planCode, accessModules, durationDays, allowedItems);
+      await createUserNotification(userId, 'Premium activated', `Your ${planName}${targetExam !== 'global' ? ` for ${targetExam.toUpperCase()}` : ''} is active.`);
       expiry = new Date(Date.now() + durationDays * 86400000);
     } else if (planDoc) {
       expiry = await grantAccessForPlan(userId, String(planCode), durationDays);
       await createUserNotification(userId, 'Premium activated', `Your ${planName} is active.`);
     } else {
       const { grantExamAccess } = await import('./exam.controller.js');
-      await grantExamAccess(userId, targetExam || 'puc', planCode, accessModules, durationDays);
+      await grantExamAccess(userId, targetExam || 'puc', planCode, accessModules, durationDays, allowedItems);
       await createUserNotification(userId, 'Premium activated', `Your ${planName} is active.`);
       expiry = new Date(Date.now() + durationDays * 86400000);
     }
@@ -978,11 +1063,12 @@ export async function verifyPaymentRedirect(req, res, next) {
       const accessModules = paymentDoc.access_modules || ['all'];
       let pName = paymentDoc.plan_name || planDoc?.name || 'Premium Access';
 
-      if (targetExam && ['puc', 'kcet', 'neet'].includes(targetExam)) {
+      const allowedItems = paymentDoc.allowed_items || null;
+      if (targetExam && ['puc', 'kcet', 'neet', 'global'].includes(targetExam)) {
         try {
           const { grantExamAccess } = await import('./exam.controller.js');
-          await grantExamAccess(Number(paymentDoc.user_id), targetExam, planCode, accessModules, durationDays);
-          await createUserNotification(Number(paymentDoc.user_id), 'Premium activated', `Your ${pName} for ${targetExam.toUpperCase()} is active.`);
+          await grantExamAccess(Number(paymentDoc.user_id), targetExam, planCode, accessModules, durationDays, allowedItems);
+          await createUserNotification(Number(paymentDoc.user_id), 'Premium activated', `Your ${pName}${targetExam !== 'global' ? ` for ${targetExam.toUpperCase()}` : ''} is active.`);
           planName = pName;
         } catch (e) {
           console.error('[verifyPaymentRedirect] Exam grant error:', e);
@@ -993,7 +1079,7 @@ export async function verifyPaymentRedirect(req, res, next) {
       } else {
         try {
           const { grantExamAccess } = await import('./exam.controller.js');
-          await grantExamAccess(Number(paymentDoc.user_id), targetExam || 'puc', planCode, accessModules, durationDays);
+          await grantExamAccess(Number(paymentDoc.user_id), targetExam || 'puc', planCode, accessModules, durationDays, allowedItems);
           await createUserNotification(Number(paymentDoc.user_id), 'Premium activated', `Your ${pName} is active.`);
         } catch (e) {
           console.error('[verifyPaymentRedirect] Fallback grant error:', e);
@@ -1219,14 +1305,17 @@ export async function listMaterialsStudent(req, res, next) {
       .lean()
     );
 
-    const [materialsUnlocked, pyqUnlocked] = await Promise.all([
+    const { getUserBulkAllowedItems, isItemUnlockedByBulk } = await import('./exam.controller.js');
+    const [materialsUnlocked, pyqUnlocked, bulkItems] = await Promise.all([
       canAccessPlan(userId, role, 'materials'),
       canAccessPlan(userId, role, 'pyq'),
+      Number.isFinite(userId) ? getUserBulkAllowedItems(userId) : Promise.resolve(null),
     ]);
     const materials = rows.map((m) => {
       const accessType = String(m.access_type || 'paid').toLowerCase();
       const planUnlocked = String(m.type || '').toLowerCase() === 'pyq' ? pyqUnlocked : materialsUnlocked;
-      const locked = accessType === 'paid' && !planUnlocked;
+      const bulkUnlocked = isItemUnlockedByBulk(bulkItems, 'materials', 'agri', m.id);
+      const locked = accessType === 'paid' && !planUnlocked && !bulkUnlocked;
       const fileEndpoint = `/api/student/materials/${m.id}/file`;
       const pdfUrl = fileEndpoint;
       return {
@@ -1298,8 +1387,24 @@ export async function getMenus(req, res, next) {
 
 export async function listVideosStudent(req, res, next) {
   try {
-    const rows = await Video.find({ status: 'active' }).sort({ created_at: -1, id: -1 }).limit(20).lean();
-    const videos = rows.map((v) => ({ id: v.id, title: v.title, videoUrl: v.video_url, subject: v.subject, status: v.status }));
+    const examFilter = String(req.query.exam || '').toLowerCase().trim();
+    const filter = { status: 'active' };
+    if (examFilter && examFilter !== 'all') {
+      if (examFilter === 'agri') {
+        filter.$or = [{ exam: 'agri' }, { exam: { $exists: false } }, { exam: null }];
+      } else {
+        filter.exam = examFilter;
+      }
+    }
+    const rows = await Video.find(filter).sort({ created_at: -1, id: -1 }).limit(40).lean();
+    const videos = rows.map((v) => ({
+      id: v.id,
+      title: v.title,
+      videoUrl: v.video_url,
+      exam: v.exam || 'agri',
+      subject: v.subject,
+      status: v.status,
+    }));
     return res.json({ videos });
   } catch (err) {
     return next(err);
@@ -1494,11 +1599,15 @@ export async function listActiveTests(req, res, next) {
 
     const userId = Number(req.user?.sub || req.user?.id);
     const role = String(req.user?.role || 'student');
-    const isSubscribed = Boolean(userId) && (
-      await canAccessPlan(userId, role, 'combo') ||
-      await canAccessPlan(userId, role, 'materials') ||
-      await canAccessPlan(userId, role, 'pyq')
-    );
+    const { getUserBulkAllowedItems, isItemUnlockedByBulk } = await import('./exam.controller.js');
+    const [isSubscribed, bulkItems] = await Promise.all([
+      Promise.resolve(Boolean(userId)).then(async (ok) => ok && (
+        await canAccessPlan(userId, role, 'combo') ||
+        await canAccessPlan(userId, role, 'materials') ||
+        await canAccessPlan(userId, role, 'pyq')
+      )),
+      Number.isFinite(userId) ? getUserBulkAllowedItems(userId) : Promise.resolve(null),
+    ]);
 
     const MockTest = await getMockTestModel();
     const rows = await MockTest.find({ is_active: true, question_count: { $gt: 0 } })
@@ -1508,7 +1617,8 @@ export async function listActiveTests(req, res, next) {
 
     const tests = (rows || []).map((t) => {
       const isFree = t.is_free === true || t.is_free === null || t.is_free === undefined ? (t.is_free !== false) : false;
-      const locked = !isFree && !isSubscribed;
+      const bulkUnlocked = isItemUnlockedByBulk(bulkItems, 'tests', 'agri', t.id);
+      const locked = !isFree && !isSubscribed && !bulkUnlocked;
       return {
         id: t.id,
         title: t.title,
@@ -2284,7 +2394,11 @@ export async function listPyqsByCentreYear(req, res, next) {
 
     const userId = Number(req.user?.sub);
     const role = String(req.user?.role || 'student');
-    const pyqUnlocked = Number.isFinite(userId) ? await canAccessPlan(userId, role, 'pyq') : false;
+    const { getUserBulkAllowedItems, isItemUnlockedByBulk } = await import('./exam.controller.js');
+    const [pyqUnlocked, bulkItems] = await Promise.all([
+      Number.isFinite(userId) ? canAccessPlan(userId, role, 'pyq') : Promise.resolve(false),
+      Number.isFinite(userId) ? getUserBulkAllowedItems(userId) : Promise.resolve(null),
+    ]);
 
     const cacheKey = `pyqs:centreYear:v1:${centreId}:${year}`;
     const PyqModel = await getPyqModel();
@@ -2298,7 +2412,8 @@ export async function listPyqsByCentreYear(req, res, next) {
     );
     const pyqs = rows.map((p) => {
       const accessType = String(p.access_type || 'paid').toLowerCase();
-      const locked = accessType === 'paid' && !pyqUnlocked;
+      const bulkUnlocked = isItemUnlockedByBulk(bulkItems, 'pyqs', 'agri', p.id);
+      const locked = accessType === 'paid' && !pyqUnlocked && !bulkUnlocked;
       return {
         id: p.id,
         title: p.title,
@@ -2355,9 +2470,13 @@ export async function streamPyqPdf(req, res, next) {
       let ok = Number.isFinite(userId) ? await canAccessPlan(userId, role, 'pyq') : false;
       if (!ok && Number.isFinite(userId)) {
         try {
-          const { checkUserModuleAccess } = await import('./exam.controller.js');
-          const exam = String(p.exam || 'puc').toLowerCase();
+          const { checkUserModuleAccess, getUserBulkAllowedItems, isItemUnlockedByBulk } = await import('./exam.controller.js');
+          const exam = String(p.exam || 'agri').toLowerCase();
           ok = await checkUserModuleAccess(null, userId, exam, 'pyqs');
+          if (!ok) {
+            const bulkItems = await getUserBulkAllowedItems(userId);
+            ok = isItemUnlockedByBulk(bulkItems, 'pyqs', exam, p.id);
+          }
         } catch (_) { }
       }
       if (!ok) return res.status(403).json({ message: 'Premium access required' });
@@ -2504,10 +2623,14 @@ export async function streamMaterialFile(req, res, next) {
       let ok = Number.isFinite(userId) ? await canAccessPlan(userId, role, planCode) : false;
       if (!ok && Number.isFinite(userId)) {
         try {
-          const { checkUserModuleAccess } = await import('./exam.controller.js');
-          const exam = String(m.exam || 'puc').toLowerCase();
+          const { checkUserModuleAccess, getUserBulkAllowedItems, isItemUnlockedByBulk } = await import('./exam.controller.js');
+          const exam = String(m.exam || 'agri').toLowerCase();
           const targetModule = String(m.type || '').toLowerCase() === 'pyq' ? 'pyqs' : 'materials';
           ok = await checkUserModuleAccess(null, userId, exam, targetModule);
+          if (!ok) {
+            const bulkItems = await getUserBulkAllowedItems(userId);
+            ok = isItemUnlockedByBulk(bulkItems, targetModule, exam, m.id);
+          }
         } catch (_) { }
       }
       if (!ok) return res.status(403).json({ message: 'Premium access required' });

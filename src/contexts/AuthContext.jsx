@@ -100,27 +100,23 @@ export function AuthProvider({ children }) {
     try {
       if (nextRole === 'admin') {
         // Do not persist admin sessions per user request
-        await storage.deleteItem('kcet_token');
-        await storage.deleteItem('kcet_role');
-        await storage.deleteItem('kcet_user');
+        await Promise.all([
+          storage.deleteItem('kcet_token'),
+          storage.deleteItem('kcet_role'),
+          storage.deleteItem('kcet_user'),
+        ]);
         return;
       }
 
-      if (nextToken) {
-        await storage.setItem('kcet_token', nextToken);
-      } else {
-        await storage.deleteItem('kcet_token');
-      }
-      if (nextRole) {
-        await storage.setItem('kcet_role', nextRole);
-      } else {
-        await storage.deleteItem('kcet_role');
-      }
-      if (nextUser) {
-        await storage.setItem('kcet_user', JSON.stringify(nextUser));
-      } else if (!nextToken) {
-        await storage.deleteItem('kcet_user');
-      }
+      await Promise.all([
+        nextToken ? storage.setItem('kcet_token', nextToken) : storage.deleteItem('kcet_token'),
+        nextRole ? storage.setItem('kcet_role', nextRole) : storage.deleteItem('kcet_role'),
+        nextUser
+          ? storage.setItem('kcet_user', JSON.stringify(nextUser))
+          : !nextToken
+            ? storage.deleteItem('kcet_user')
+            : Promise.resolve(),
+      ]);
     } catch {
       // ignore
     }

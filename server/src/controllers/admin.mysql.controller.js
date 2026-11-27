@@ -856,13 +856,15 @@ export async function createVideo(req, res, next) {
   try {
     const body = req.body || {};
     const title = asNonEmptyString(body.title);
-    const videoUrl = asNonEmptyString(body.videoUrl);
+    const rawYoutubeId = asNonEmptyString(body.youtubeId);
+    const videoUrl = asNonEmptyString(body.videoUrl) || (rawYoutubeId ? `https://www.youtube.com/watch?v=${rawYoutubeId}` : '');
+    const exam = String(body.exam || 'agri').toLowerCase().trim();
     const subject = asNonEmptyString(body.subject) || 'General';
     const status = normalizeStatus(body.status, ['active', 'inactive']) || 'active';
 
     const errors = {};
     if (!title) errors.title = 'title is required';
-    if (!videoUrl) errors.videoUrl = 'videoUrl is required';
+    if (!videoUrl) errors.videoUrl = 'videoUrl or youtubeId is required';
     if (!subject) errors.subject = 'subject is required';
     if (!normalizeStatus(status, ['active', 'inactive'])) errors.status = 'status must be active|inactive';
     if (Object.keys(errors).length) return badRequest(res, 'Validation failed', errors);
@@ -870,6 +872,7 @@ export async function createVideo(req, res, next) {
     const v = new Video({
       title,
       video_url: videoUrl,
+      exam,
       subject,
       status,
       created_at: new Date(),
@@ -882,6 +885,7 @@ export async function createVideo(req, res, next) {
         id: v.id,
         title: v.title,
         videoUrl: v.video_url,
+        exam: v.exam || 'agri',
         subject: v.subject,
         status: v.status,
       },
@@ -893,13 +897,23 @@ export async function createVideo(req, res, next) {
 
 export async function listVideos(req, res, next) {
   try {
-    const rows = await Video.find({}, { _id: 0, __v: 0 })
+    const examFilter = String(req.query.exam || '').toLowerCase().trim();
+    const filter = {};
+    if (examFilter && examFilter !== 'all') {
+      if (examFilter === 'agri') {
+        filter.$or = [{ exam: 'agri' }, { exam: { $exists: false } }, { exam: null }];
+      } else {
+        filter.exam = examFilter;
+      }
+    }
+    const rows = await Video.find(filter, { _id: 0, __v: 0 })
       .sort({ created_at: -1, id: -1 })
       .lean();
     const videos = (rows || []).map((v) => ({
       id: v.id,
       title: v.title,
       videoUrl: v.video_url,
+      exam: v.exam || 'agri',
       subject: v.subject,
       status: v.status,
     }));

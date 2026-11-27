@@ -98,6 +98,11 @@ import {
   updateAdminExamPlan,
   getAdminExamPlans,
   deleteAdminExamPlan,
+  getBulkPlanCatalog,
+  listBulkPlans,
+  createBulkPlan,
+  updateBulkPlan,
+  deleteBulkPlan,
 } from '../controllers/exam.controller.js';
 
 export const adminRouter = Router();
@@ -128,6 +133,12 @@ adminRouter.get('/exam/plans', getAdminExamPlans);
 adminRouter.post('/exam/plans', createAdminExamPlan);
 adminRouter.put('/exam/plans/:id', updateAdminExamPlan);
 adminRouter.delete('/exam/plans/:id', deleteAdminExamPlan);
+
+adminRouter.get('/bulk-plans/catalog', getBulkPlanCatalog);
+adminRouter.get('/bulk-plans', listBulkPlans);
+adminRouter.post('/bulk-plans', createBulkPlan);
+adminRouter.put('/bulk-plans/:id', updateBulkPlan);
+adminRouter.delete('/bulk-plans/:id', deleteBulkPlan);
 
 adminRouter.get('/menu', getMenus);
 adminRouter.post('/menu', createMenu);

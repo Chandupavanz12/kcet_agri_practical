@@ -131,11 +131,29 @@ export function createApp() {
     res.json({ ok: true, db: mongoose.connection.readyState === 1 ? 'up' : 'down' });
   });
 
-  // Lightweight ping – point an uptime monitor (e.g. UptimeRobot) at this
-  // endpoint every 5 minutes so the server and MongoDB connection stay warm.
-  // This eliminates the "first request" cold-start delay entirely.
+  // Lightweight ping – warms up Express, MongoDB, and Neon Postgres pools so
+  // subsequent login/data requests after inactivity complete sub-second.
+  let lastWarmupAt = 0;
   app.get('/api/ping', (req, res) => {
-    res.json({ pong: true, version: '2.0.0-verified', ts: Date.now() });
+    const now = Date.now();
+    if (now - lastWarmupAt > 20000) {
+      lastWarmupAt = now;
+      Promise.resolve().then(async () => {
+        try {
+          if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+            await mongoose.connection.db.admin().ping();
+          }
+        } catch (_) {}
+        try {
+          const { getPucPool, getKcetNeetPool } = await import('./config/examPgs.js');
+          await Promise.allSettled([
+            getPucPool()?.query('SELECT 1'),
+            getKcetNeetPool()?.query('SELECT 1'),
+          ]);
+        } catch (_) {}
+      }).catch(() => {});
+    }
+    res.json({ pong: true, version: '2.0.0-verified', ts: now });
   });
 
   app.get('/api/public/gridfs/:id', async (req, res, next) => {

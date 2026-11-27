@@ -37,7 +37,7 @@ const EXAM_CONFIG = {
       { name: 'Mathematics', icon: '📐', color: '#ea580c', bg: '#ffedd5' },
       { name: 'Biology', icon: '🧬', color: '#16a34a', bg: '#dcfce7' },
     ],
-    hasVideos: false,
+    hasVideos: true,
   },
   kcet: {
     name: 'KCET',
@@ -93,11 +93,16 @@ export default function ExamDetailsScreen() {
   const { token, user } = useAuth();
 
   const examId = String(params.examId || 'puc').toLowerCase().trim();
+  const initialModule = String(params.module || '').toLowerCase().trim();
   const config = EXAM_CONFIG[examId] || EXAM_CONFIG.puc;
 
   // Navigation flow state: 'modules' | 'subjects' | 'content' | 'plans'
-  const [view, setView] = useState('modules');
-  const [selectedModule, setSelectedModule] = useState('materials'); // 'materials' | 'tests' | 'pyqs' | 'plans'
+  const [view, setView] = useState(
+    initialModule === 'plans' ? 'plans' : ['materials', 'tests', 'pyqs'].includes(initialModule) ? 'subjects' : 'modules'
+  );
+  const [selectedModule, setSelectedModule] = useState(
+    ['materials', 'tests', 'pyqs', 'plans'].includes(initialModule) ? initialModule : 'materials'
+  ); // 'materials' | 'tests' | 'pyqs' | 'plans'
   const [selectedSubject, setSelectedSubject] = useState(config.subjects[0]?.name || '');
 
   const cachedData = EXAM_CLIENT_CACHE.get(examId);
@@ -268,13 +273,15 @@ export default function ExamDetailsScreen() {
 
   // Select Module Action
   const handleSelectModule = (mod) => {
+    if (mod === 'videos') {
+      return router.push(`/student/videos?exam=${examId}`);
+    }
     if (examId === 'agri') {
       // Agri Practical directs directly to existing routes without subject selection
-      if (mod === 'materials') return router.push('/student/materials');
-      if (mod === 'tests') return router.push('/student/tests');
-      if (mod === 'pyqs') return router.push('/student/pyqs');
+      if (mod === 'materials') return router.push('/student/materials?exam=agri');
+      if (mod === 'tests') return router.push('/student/tests?exam=agri');
+      if (mod === 'pyqs') return router.push('/student/pyqs?exam=agri');
       if (mod === 'plans') return router.push('/student/premium');
-      if (mod === 'videos') return router.push('/student/videos');
     }
 
     if (mod === 'plans') {
@@ -525,6 +532,24 @@ export default function ExamDetailsScreen() {
                         )}
                       </Text>
                       <Text style={styles.bannerSubText}>{item.subtitle || config.fullName}</Text>
+                      {!!item.action_route && (
+                        <TouchableOpacity
+                          style={{
+                            marginTop: 8,
+                            alignSelf: 'flex-start',
+                            backgroundColor: 'rgba(255,255,255,0.2)',
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 999,
+                          }}
+                          onPress={() => router.push(item.action_route)}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>
+                            {item.button_text || 'Explore Now >'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                     <View style={styles.bannerRightIcon}>
                       <Text style={styles.bannerEmoji}>{config.icon}</Text>
@@ -575,11 +600,15 @@ export default function ExamDetailsScreen() {
                     <View style={styles.moduleTitleRow}>
                       <Text style={styles.moduleTitle}>Video Guidance</Text>
                       <View style={[styles.moduleTag, { backgroundColor: '#fdf2f8' }]}>
-                        <Text style={[styles.moduleTagText, { color: '#db2777' }]}>Specimens</Text>
+                        <Text style={[styles.moduleTagText, { color: '#db2777' }]}>
+                          {examId === 'puc' ? 'PUC Lectures' : 'Specimens'}
+                        </Text>
                       </View>
                     </View>
                     <Text style={styles.moduleDesc}>
-                      Practical plant identification & lab demonstration videos
+                      {examId === 'puc'
+                        ? 'Concept explanations, practicals & chapter video guides'
+                        : 'Practical plant identification & lab demonstration videos'}
                     </Text>
                   </View>
                   <Text style={styles.moduleArrow}>→</Text>
