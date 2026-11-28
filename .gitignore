@@ -43,5 +43,7 @@ app-example
 /ios
 /android
 
-# separate admin app repo
+# separate admin & student app folders
 /admin
+/StudyHack-admin
+/StudyHack-student
