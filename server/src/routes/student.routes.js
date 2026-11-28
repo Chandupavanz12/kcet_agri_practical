@@ -48,6 +48,7 @@ import {
   submitExamTest,
   getExamPlans,
   getAggregatedProgress,
+  listStudentActivities,
 } from '../controllers/exam.controller.js';
 
 export const studentRouter = Router();
@@ -79,6 +80,7 @@ studentRouter.get('/exam/tests', getExamTests);
 studentRouter.get('/exam/tests/:id/start', startExamTest);
 studentRouter.post('/exam/tests/:id/submit', submitExamTest);
 studentRouter.get('/exam/plans', getExamPlans);
+studentRouter.get('/activities', listStudentActivities);
 studentRouter.get('/subscription-settings', getSubscriptionSettingsStudent);
 studentRouter.get('/aggregated-progress', getAggregatedProgress);
 

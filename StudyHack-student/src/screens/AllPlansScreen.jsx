@@ -175,6 +175,14 @@ export default function AllPlansScreen() {
 
                   <Text style={styles.planName} numberOfLines={2}>{plan.name}</Text>
                   <View style={styles.priceRow}>
+                    {(() => {
+                      const origRs = Math.round((plan.originalPricePaise ?? plan.original_price_paise ?? 0) / 100);
+                      return origRs > priceRupees && priceRupees > 0 ? (
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#94a3b8', textDecorationLine: 'line-through', marginRight: 4 }}>
+                          ₹{origRs}
+                        </Text>
+                      ) : null;
+                    })()}
                     <Text style={[styles.priceText, { color: accent }]}>
                       {priceRupees <= 0 ? 'Free' : `₹${priceRupees}`}
                     </Text>

@@ -86,6 +86,7 @@ const PlanSchema = withNumericId(
       code: { type: String, required: true, trim: true, lowercase: true },
       name: { type: String, required: true, trim: true },
       price_paise: { type: Number, required: true, default: 0 },
+      original_price_paise: { type: Number, default: 0 },
       duration_days: { type: Number, required: true, default: 365 },
       status: { type: String, enum: ['active', 'inactive'], default: 'active', index: true },
       is_free: { type: Boolean, default: false },
@@ -547,8 +548,35 @@ const FeedbackSchema = withNumericId(
 
 const Feedback = mongoose.models.Feedback || mongoose.model('Feedback', FeedbackSchema);
 
+const ActivitySchema = withNumericId(
+  new Schema(
+    {
+      exam: { type: String, required: true, lowercase: true, trim: true, index: true },
+      title: { type: String, required: true, trim: true },
+      subtitle: { type: String, default: '' },
+      benefits: { type: [String], default: [] },
+      access_type: { type: String, enum: ['free', 'paid', 'partial'], default: 'paid' },
+      price_paise: { type: Number, default: 0 },
+      original_price_paise: { type: Number, default: 0 },
+      duration_days: { type: Number, default: 365 },
+      items: { type: Array, default: [] },
+      is_active: { type: Boolean, default: true, index: true },
+      created_at: { type: Date, default: () => new Date(), index: true },
+      updated_at: { type: Date, default: () => new Date() },
+    },
+    { collection: 'activities' }
+  ),
+  'activities'
+);
+
+ActivitySchema.pre('save', function touchUpdatedAt() {
+  this.updated_at = new Date();
+});
+
+const Activity = mongoose.models.Activity || mongoose.model('Activity', ActivitySchema);
+
 export {
-  Counter, ExamCentre,
+  Activity, Counter, ExamCentre,
   ExamCentreYear, Feedback, LoginOtp, Material, MaterialCompletion, Menu, Notification, PasswordReset, Payment, Plan, Pyq, RegisterOtp, Result, Settings, Specimen,
   Test,
   TestQuestion, User, UserAccess, UserNotification, Video

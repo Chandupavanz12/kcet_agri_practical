@@ -589,6 +589,33 @@ export async function createPaymentOrderStudent(req, res, next) {
         }
       }
 
+      if (!pgPlan && planCode.startsWith('activity_')) {
+        const actId = Number(planCode.replace('activity_', ''));
+        if (Number.isFinite(actId)) {
+          const { Activity } = await import('../models/index.js');
+          const act = await Activity.findOne({ id: actId, is_active: true }).lean();
+          if (act) {
+            const allowedItems = { materials: [], pyqs: [], tests: [], videos: [] };
+            for (const it of Array.isArray(act.items) ? act.items : []) {
+              const bucket = allowedItems[it.itemType] || allowedItems.materials;
+              bucket.push({ exam: String(it.exam || act.exam).toLowerCase(), id: Number(it.itemId), title: it.title });
+            }
+            pgPlan = {
+              id: Number(act.id),
+              code: `activity_${act.id}`,
+              name: act.title,
+              exam: act.exam,
+              price_paise: Number(act.price_paise || 0),
+              duration_days: Number(act.duration_days || 365),
+              status: 'active',
+              access_modules: ['activity'],
+              target_exams: [act.exam],
+              allowed_items: allowedItems,
+            };
+          }
+        }
+      }
+
       if (pgPlan && pgPlan.status === 'active') {
         const pricePaise = Number(pgPlan.price_paise || 0);
         const durationDays = Number(pgPlan.duration_days || 365);

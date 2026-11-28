@@ -197,6 +197,7 @@ export async function initExamPgSchemas() {
         await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS access_modules JSONB DEFAULT '["all"]'::jsonb`);
         await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS target_exams JSONB DEFAULT '[]'::jsonb`);
         await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allowed_items JSONB DEFAULT NULL`);
+        await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS original_price_paise INTEGER DEFAULT 0`);
         await pool.query(`ALTER TABLE user_access ADD COLUMN IF NOT EXISTS access_modules JSONB DEFAULT '["all"]'::jsonb`);
         await pool.query(`ALTER TABLE user_access ADD COLUMN IF NOT EXISTS allowed_items JSONB DEFAULT NULL`);
         await pool.query(`ALTER TABLE mock_tests ADD COLUMN IF NOT EXISTS is_free BOOLEAN DEFAULT true`);

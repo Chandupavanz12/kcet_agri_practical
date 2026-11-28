@@ -71,9 +71,15 @@ export default function PlansCarouselSection({
                 </View>
               </View>
 
-              {/* Plan Name & Price */}
+              {/* Plan Name & Price (with Slashed MRP / Other Price) */}
               <Text style={styles.planName}>{plan.name}</Text>
               <View style={styles.priceRow}>
+                {(() => {
+                  const origRs = Math.round((plan.originalPricePaise ?? plan.original_price_paise ?? 0) / 100);
+                  return origRs > priceRupees && priceRupees > 0 ? (
+                    <Text style={styles.mrpPriceText}>₹{origRs}</Text>
+                  ) : null;
+                })()}
                 <Text style={[styles.priceText, { color: accent }]}>
                   {priceRupees <= 0 ? 'Free' : `₹${priceRupees}`}
                 </Text>
@@ -195,7 +201,8 @@ const styles = StyleSheet.create({
   badgeTextNormal: { color: '#475569' },
   badgeTextActive: { color: '#15803d' },
   planName: { fontSize: 19, fontWeight: '900', color: '#0f172a' },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 6 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 6 },
+  mrpPriceText: { fontSize: 16, fontWeight: '700', color: '#94a3b8', textDecorationLine: 'line-through' },
   priceText: { fontSize: 30, fontWeight: '900' },
   periodText: { fontSize: 13.5, fontWeight: '600', color: '#64748b' },
   durationText: { fontSize: 13, fontWeight: '600', color: '#64748b', marginTop: 4 },

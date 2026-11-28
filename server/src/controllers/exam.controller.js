@@ -1719,6 +1719,7 @@ export async function createAdminExamPlan(req, res, next) {
       code,
       name,
       price_paise = 0,
+      original_price_paise = 0,
       duration_days = 365,
       access_modules = ['all'],
       target_exams = [],
@@ -1740,14 +1741,15 @@ export async function createAdminExamPlan(req, res, next) {
     let savedPlan = null;
     for (const pool of poolsToInsert) {
       const result = await pool.query(
-        `INSERT INTO plans (exam, code, name, price_paise, duration_days, access_modules, target_exams, features, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')
+        `INSERT INTO plans (exam, code, name, price_paise, original_price_paise, duration_days, access_modules, target_exams, features, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active')
          RETURNING *`,
         [
           normalizedExam,
           code.trim(),
           name.trim(),
           Number(price_paise),
+          Number(original_price_paise || 0),
           Number(duration_days),
           JSON.stringify(Array.isArray(access_modules) ? access_modules : [access_modules]),
           JSON.stringify(Array.isArray(target_exams) ? target_exams : [target_exams]),
@@ -1772,6 +1774,7 @@ export async function updateAdminExamPlan(req, res, next) {
       code,
       name,
       price_paise,
+      original_price_paise,
       duration_days,
       access_modules,
       target_exams,
@@ -1789,18 +1792,20 @@ export async function updateAdminExamPlan(req, res, next) {
             code = COALESCE($1, code),
             name = COALESCE($2, name),
             price_paise = COALESCE($3, price_paise),
-            duration_days = COALESCE($4, duration_days),
-            access_modules = COALESCE($5, access_modules),
-            target_exams = COALESCE($6, target_exams),
-            features = COALESCE($7, features),
-            status = COALESCE($8, status),
+            original_price_paise = COALESCE($4, original_price_paise),
+            duration_days = COALESCE($5, duration_days),
+            access_modules = COALESCE($6, access_modules),
+            target_exams = COALESCE($7, target_exams),
+            features = COALESCE($8, features),
+            status = COALESCE($9, status),
             updated_at = NOW()
-           WHERE id = $9 OR code = $1
+           WHERE id = $10 OR code = $1
            RETURNING *`,
           [
             code ? code.trim() : null,
             name ? name.trim() : null,
             price_paise !== undefined ? Number(price_paise) : null,
+            original_price_paise !== undefined ? Number(original_price_paise) : null,
             duration_days !== undefined ? Number(duration_days) : null,
             access_modules ? JSON.stringify(Array.isArray(access_modules) ? access_modules : [access_modules]) : null,
             target_exams ? JSON.stringify(Array.isArray(target_exams) ? target_exams : [target_exams]) : null,
@@ -1981,7 +1986,7 @@ export async function getBulkPlanCatalog(req, res, next) {
     const pucPool = getPucPool();
     const kcetPool = getKcetNeetPool();
     const { getMockTestModel, connectMockTestDb } = await import('../config/mockTestDb.js');
-    const { getMaterialModel, getPyqModel } = await import('../models/index.js');
+    const { getMaterialModel, getPyqModel, Video } = await import('../models/index.js');
     await connectMockTestDb();
     const [AgriTest, AgriMaterial, AgriPyq] = await Promise.all([
       getMockTestModel(),
@@ -1993,6 +1998,7 @@ export async function getBulkPlanCatalog(req, res, next) {
       pucMats, pucPyqs, pucTests,
       knMats, knPyqs, knTests,
       agriMats, agriPyqs, agriTests,
+      videoRows,
     ] = await Promise.all([
       pucPool ? pucPool.query(`SELECT id, exam, subject, title, is_free FROM materials WHERE status = 'active' ORDER BY id DESC`).catch(() => ({ rows: [] })) : { rows: [] },
       pucPool ? pucPool.query(`SELECT id, exam, subject, year, title, is_free FROM pyqs WHERE status = 'active' ORDER BY id DESC`).catch(() => ({ rows: [] })) : { rows: [] },
@@ -2003,6 +2009,7 @@ export async function getBulkPlanCatalog(req, res, next) {
       AgriMaterial.find({ status: 'active' }).select({ id: 1, title: 1, subject: 1, access_type: 1 }).sort({ id: -1 }).lean().catch(() => []),
       AgriPyq.find({ status: 'active' }).select({ id: 1, title: 1, subject: 1, year: 1, access_type: 1 }).sort({ id: -1 }).lean().catch(() => []),
       AgriTest.find({ is_active: true }).select({ id: 1, title: 1 }).sort({ id: -1 }).lean().catch(() => []),
+      Video.find({ status: { $ne: 'inactive' } }).select({ id: 1, title: 1, subject: 1, exam: 1, youtube_url: 1 }).sort({ id: -1 }).lean().catch(() => []),
     ]);
 
     const materials = [
@@ -2023,7 +2030,15 @@ export async function getBulkPlanCatalog(req, res, next) {
       ...agriTests.map((t) => ({ id: Number(t.id), exam: 'agri', subject: 'Practical', title: t.title })),
     ];
 
-    return res.json({ success: true, materials, pyqs, tests });
+    const videos = (videoRows || []).map((v) => ({
+      id: Number(v.id),
+      exam: String(v.exam || 'agri').toLowerCase(),
+      subject: v.subject || 'General',
+      title: v.title,
+      youtubeUrl: v.youtube_url,
+    }));
+
+    return res.json({ success: true, materials, pyqs, tests, videos });
   } catch (err) {
     return next(err);
   }
@@ -2061,6 +2076,7 @@ export async function createBulkPlan(req, res, next) {
       code,
       name,
       price_paise = 0,
+      original_price_paise = 0,
       duration_days = 365,
       allowed_items = { materials: [], pyqs: [], tests: [] },
       features = [],
@@ -2083,14 +2099,15 @@ export async function createBulkPlan(req, res, next) {
     let savedPlan = null;
     for (const pool of poolsToInsert.filter(Boolean)) {
       const result = await pool.query(
-        `INSERT INTO plans (exam, code, name, price_paise, duration_days, access_modules, target_exams, allowed_items, features, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO plans (exam, code, name, price_paise, original_price_paise, duration_days, access_modules, target_exams, allowed_items, features, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
           'global',
           code.trim().toLowerCase(),
           name.trim(),
           Number(price_paise),
+          Number(original_price_paise || 0),
           Number(duration_days),
           JSON.stringify(['bulk']),
           JSON.stringify(targetExams),
@@ -2116,6 +2133,7 @@ export async function updateBulkPlan(req, res, next) {
       code,
       name,
       price_paise,
+      original_price_paise,
       duration_days,
       allowed_items,
       features,
@@ -2133,18 +2151,20 @@ export async function updateBulkPlan(req, res, next) {
             code = COALESCE($1, code),
             name = COALESCE($2, name),
             price_paise = COALESCE($3, price_paise),
-            duration_days = COALESCE($4, duration_days),
-            target_exams = COALESCE($5, target_exams),
-            allowed_items = COALESCE($6, allowed_items),
-            features = COALESCE($7, features),
-            status = COALESCE($8, status),
+            original_price_paise = COALESCE($4, original_price_paise),
+            duration_days = COALESCE($5, duration_days),
+            target_exams = COALESCE($6, target_exams),
+            allowed_items = COALESCE($7, allowed_items),
+            features = COALESCE($8, features),
+            status = COALESCE($9, status),
             updated_at = NOW()
-           WHERE id = $9 OR (code = $1 AND allowed_items IS NOT NULL)
+           WHERE id = $10 OR (code = $1 AND allowed_items IS NOT NULL)
            RETURNING *`,
           [
             code ? code.trim().toLowerCase() : null,
             name ? name.trim() : null,
             price_paise !== undefined ? Number(price_paise) : null,
+            original_price_paise !== undefined ? Number(original_price_paise) : null,
             duration_days !== undefined ? Number(duration_days) : null,
             targetExams ? JSON.stringify(targetExams) : null,
             allowed_items ? JSON.stringify(allowed_items) : null,
@@ -2178,6 +2198,140 @@ export async function deleteBulkPlan(req, res, next) {
     }
     clearExamCache();
     return res.json({ success: true, message: 'Bulk plan deleted' });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXAM ACTIVITIES / PACKAGES (Passing Package, Scoring Package, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function listAdminActivities(req, res, next) {
+  try {
+    const { Activity } = await import('../models/index.js');
+    const exam = req.query.exam ? String(req.query.exam).toLowerCase().trim() : null;
+    const filter = exam && exam !== 'all' ? { exam } : {};
+    const rows = await Activity.find(filter, { _id: 0, __v: 0 }).sort({ id: -1 }).lean();
+    return res.json({ success: true, activities: rows || [] });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function createAdminActivity(req, res, next) {
+  try {
+    const { Activity } = await import('../models/index.js');
+    const {
+      exam = 'puc',
+      title,
+      subtitle = '',
+      benefits = [],
+      access_type = 'paid',
+      price_paise = 0,
+      original_price_paise = 0,
+      duration_days = 365,
+      items = [],
+      is_active = true,
+    } = req.body || {};
+
+    if (!title || !String(title).trim()) {
+      return res.status(400).json({ message: 'Activity title is required' });
+    }
+
+    const doc = await Activity.create({
+      exam: String(exam).toLowerCase().trim(),
+      title: String(title).trim(),
+      subtitle: String(subtitle || '').trim(),
+      benefits: Array.isArray(benefits) ? benefits : [],
+      access_type: ['free', 'paid', 'partial'].includes(String(access_type)) ? String(access_type) : 'paid',
+      price_paise: String(access_type) === 'free' ? 0 : Number(price_paise || 0),
+      original_price_paise: String(access_type) === 'free' ? 0 : Number(original_price_paise || 0),
+      duration_days: Number(duration_days || 365),
+      items: Array.isArray(items) ? items : [],
+      is_active: Boolean(is_active),
+    });
+
+    return res.status(201).json({ success: true, activity: doc.toObject() });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function updateAdminActivity(req, res, next) {
+  try {
+    const { Activity } = await import('../models/index.js');
+    const { id } = req.params;
+    const body = req.body || {};
+    const updates = {};
+    if (body.exam !== undefined) updates.exam = String(body.exam).toLowerCase().trim();
+    if (body.title !== undefined) updates.title = String(body.title).trim();
+    if (body.subtitle !== undefined) updates.subtitle = String(body.subtitle || '').trim();
+    if (body.benefits !== undefined) updates.benefits = Array.isArray(body.benefits) ? body.benefits : [];
+    if (body.access_type !== undefined) updates.access_type = body.access_type;
+    if (body.price_paise !== undefined) updates.price_paise = Number(body.price_paise || 0);
+    if (body.original_price_paise !== undefined) updates.original_price_paise = Number(body.original_price_paise || 0);
+    if (body.duration_days !== undefined) updates.duration_days = Number(body.duration_days || 365);
+    if (body.items !== undefined) updates.items = Array.isArray(body.items) ? body.items : [];
+    if (body.is_active !== undefined) updates.is_active = Boolean(body.is_active);
+    updates.updated_at = new Date();
+
+    const updated = await Activity.findOneAndUpdate({ id: Number(id) }, { $set: updates }, { new: true, projection: { _id: 0, __v: 0 } }).lean();
+    if (!updated) return res.status(404).json({ message: 'Activity not found' });
+    return res.json({ success: true, activity: updated });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function deleteAdminActivity(req, res, next) {
+  try {
+    const { Activity } = await import('../models/index.js');
+    const { id } = req.params;
+    await Activity.deleteOne({ id: Number(id) });
+    return res.json({ success: true, message: 'Activity deleted' });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function listStudentActivities(req, res, next) {
+  try {
+    const { Activity, Payment } = await import('../models/index.js');
+    const exam = String(req.query.exam || '').toLowerCase().trim();
+    const userId = Number(req.user?.sub || req.user?.id);
+    const filter = { is_active: true };
+    if (exam) filter.exam = exam;
+
+    const rows = await Activity.find(filter, { _id: 0, __v: 0 }).sort({ id: -1 }).lean();
+
+    let unlockedCodes = new Set();
+    if (Number.isFinite(userId)) {
+      const now = new Date();
+      const payments = await Payment.find({
+        user_id: userId,
+        status: { $in: ['paid', 'free'] },
+        plan_code: /^activity_/,
+      }).select({ plan_code: 1, paid_at: 1, duration_days: 1 }).lean().catch(() => []);
+      for (const p of payments) {
+        const exp = p.paid_at ? new Date(new Date(p.paid_at).getTime() + Number(p.duration_days || 365) * 86400000) : null;
+        if (!exp || exp > now) {
+          unlockedCodes.add(String(p.plan_code).toLowerCase());
+        }
+      }
+    }
+
+    const activities = (rows || []).map((a) => {
+      const code = `activity_${a.id}`;
+      const unlocked = a.access_type === 'free' || Number(a.price_paise || 0) <= 0 || unlockedCodes.has(code);
+      return {
+        ...a,
+        code,
+        unlocked,
+      };
+    });
+
+    return res.json({ success: true, activities });
   } catch (err) {
     return next(err);
   }

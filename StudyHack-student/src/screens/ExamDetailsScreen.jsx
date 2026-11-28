@@ -97,14 +97,16 @@ export default function ExamDetailsScreen() {
   const initialModule = String(params.module || '').toLowerCase().trim();
   const config = EXAM_CONFIG[examId] || EXAM_CONFIG.puc;
 
-  // Navigation flow state: 'modules' | 'subjects' | 'content' | 'plans'
+  // Navigation flow state: 'modules' | 'content' | 'plans' | 'activity'
   const [view, setView] = useState(
-    initialModule === 'plans' ? 'plans' : ['materials', 'tests', 'pyqs'].includes(initialModule) ? 'subjects' : 'modules'
+    initialModule === 'plans' ? 'plans' : ['materials', 'tests', 'pyqs'].includes(initialModule) ? 'content' : 'modules'
   );
   const [selectedModule, setSelectedModule] = useState(
     ['materials', 'tests', 'pyqs', 'plans'].includes(initialModule) ? initialModule : 'materials'
   ); // 'materials' | 'tests' | 'pyqs' | 'plans'
-  const [selectedSubject, setSelectedSubject] = useState(config.subjects[0]?.name || '');
+  const [selectedSubject, setSelectedSubject] = useState('All');
+  const [activities, setActivities] = useState([]);
+  const [selectedActivity, setSelectedActivity] = useState(null);
 
   const cachedData = EXAM_CLIENT_CACHE.get(examId);
 
@@ -158,11 +160,7 @@ export default function ExamDetailsScreen() {
   // Hardware back button handler for Android
   useEffect(() => {
     const onBackPress = () => {
-      if (view === 'content') {
-        setView('subjects');
-        return true;
-      }
-      if (view === 'subjects' || view === 'plans') {
+      if (view === 'content' || view === 'plans' || view === 'activity') {
         setView('modules');
         return true;
       }
@@ -178,8 +176,14 @@ export default function ExamDetailsScreen() {
     if (showContentSpinner) setFetchingContent(true);
     try {
       setError('');
-      // Load top banner for this exam
-      const bannerRes = await apiFetch(`/api/student/banners?exam=${examId}`, { token }).catch(() => null);
+      // Load top banner & activities for this exam
+      const [bannerRes, actRes] = await Promise.all([
+        apiFetch(`/api/student/banners?exam=${examId}`, { token }).catch(() => null),
+        apiFetch(`/api/student/activities?exam=${examId}`, { token }).catch(() => null),
+      ]);
+      if (Array.isArray(actRes?.activities)) {
+        setActivities(actRes.activities);
+      }
       let currentBanners = banners;
       if (Array.isArray(bannerRes?.banners) && bannerRes.banners.length > 0) {
         currentBanners = bannerRes.banners;
@@ -213,12 +217,11 @@ export default function ExamDetailsScreen() {
           tests: [],
         });
       } else {
-        // PUC / KCET / NEET loads from Neon Postgres endpoints
-        const subjectParam = selectedSubject ? `&subject=${encodeURIComponent(selectedSubject.toLowerCase())}` : '';
+        // PUC / KCET / NEET loads from Neon Postgres endpoints (fetch all subjects, filter inline in top row)
         const [matRes, pyqRes, testRes, planRes] = await Promise.all([
-          apiFetch(`/api/student/exam/materials?exam=${examId}${subjectParam}`, { token }).catch(() => null),
-          apiFetch(`/api/student/exam/pyqs?exam=${examId}${subjectParam}`, { token }).catch(() => null),
-          apiFetch(`/api/student/exam/tests?exam=${examId}${subjectParam}`, { token }).catch(() => null),
+          apiFetch(`/api/student/exam/materials?exam=${examId}`, { token }).catch(() => null),
+          apiFetch(`/api/student/exam/pyqs?exam=${examId}`, { token }).catch(() => null),
+          apiFetch(`/api/student/exam/tests?exam=${examId}`, { token }).catch(() => null),
           apiFetch(`/api/student/exam/plans?exam=${examId}`, { token }).catch(() => null),
         ]);
 
@@ -263,7 +266,7 @@ export default function ExamDetailsScreen() {
 
   useEffect(() => {
     loadExamData(false);
-  }, [examId, selectedSubject]);
+  }, [examId]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -271,22 +274,19 @@ export default function ExamDetailsScreen() {
   };
 
   const handleBack = () => {
-    if (view === 'content') {
-      setView('subjects');
-    } else if (view === 'subjects' || view === 'plans') {
+    if (view === 'content' || view === 'plans' || view === 'activity') {
       setView('modules');
     } else {
       router.back();
     }
   };
 
-  // Select Module Action
+  // Select Module Action (go straight to content with inline Subject Filter Row)
   const handleSelectModule = (mod) => {
     if (mod === 'videos') {
       return router.push(`/student/videos?exam=${examId}`);
     }
     if (examId === 'agri') {
-      // Agri Practical directs directly to existing routes without subject selection
       if (mod === 'materials') return router.push('/student/materials?exam=agri');
       if (mod === 'tests') return router.push('/student/tests?exam=agri');
       if (mod === 'pyqs') return router.push('/student/pyqs?exam=agri');
@@ -298,7 +298,8 @@ export default function ExamDetailsScreen() {
       setView('plans');
     } else {
       setSelectedModule(mod);
-      setView('subjects');
+      setSelectedSubject('All');
+      setView('content');
     }
   };
 
@@ -593,9 +594,51 @@ export default function ExamDetailsScreen() {
               )}
             </View>
 
+            {/* Exam Activities / Packages (Only shown when created by Admin for this exam) */}
+            {activities.length > 0 && (
+              <View style={{ gap: 10 }}>
+                <View style={styles.sectionHeaderCol}>
+                  <Text style={styles.sectionHeading}>🎯 {config.name} Packages &amp; Activities</Text>
+                  <Text style={styles.sectionSubHeading}>Curated study packs with notes, tests, PYQs &amp; guidance</Text>
+                </View>
+
+                <View style={styles.modulesGrid}>
+                  {activities.map((act) => (
+                    <TouchableOpacity
+                      key={act.id}
+                      style={[styles.moduleCard, { borderColor: '#bbf7d0', backgroundColor: '#ffffff' }]}
+                      onPress={() => {
+                        setSelectedActivity(act);
+                        setView('activity');
+                      }}
+                      activeOpacity={0.82}
+                    >
+                      <View style={[styles.moduleIconBox, { backgroundColor: '#ecfdf5' }]}>
+                        <Text style={styles.moduleIcon}>🎯</Text>
+                      </View>
+                      <View style={styles.moduleInfo}>
+                        <View style={styles.moduleTitleRow}>
+                          <Text style={styles.moduleTitle}>{act.title}</Text>
+                          {act.access_type === 'free' && (
+                            <View style={[styles.moduleTag, { backgroundColor: '#dcfce7' }]}>
+                              <Text style={[styles.moduleTagText, { color: '#15803d' }]}>FREE</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.moduleDesc} numberOfLines={2}>
+                          {act.subtitle || `${Array.isArray(act.items) ? act.items.length : 0} curated learning items included`}
+                        </Text>
+                      </View>
+                      <Text style={styles.moduleArrow}>→</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
             {/* Exam Heading */}
             <View style={styles.sectionHeaderCol}>
-              <Text style={styles.sectionHeading}>Select Module</Text>
+              <Text style={styles.sectionHeading}>📚 {config.name} Learning Hub</Text>
               <Text style={styles.sectionSubHeading}>Explore resources and tests designed for {config.fullName}</Text>
             </View>
 
@@ -774,16 +817,17 @@ export default function ExamDetailsScreen() {
           </View>
         )}
 
-        {/* ─── LEVEL 3: SUBJECT CONTENT PAGE ──────────────────────────────────── */}
+        {/* ─── LEVEL 3: INLINE SUBJECT FILTER + CONTENT PAGE ─────────────────── */}
         {view === 'content' && (() => {
+          const isAll = !selectedSubject || selectedSubject === 'All';
           const displayedMaterials = materials.filter(
-            (item) => !selectedSubject || !item.subject || item.subject.toLowerCase() === selectedSubject.toLowerCase()
+            (item) => isAll || !item.subject || item.subject.toLowerCase() === selectedSubject.toLowerCase()
           );
           const displayedTests = tests.filter(
-            (test) => !selectedSubject || !test.subject || test.subject.toLowerCase() === selectedSubject.toLowerCase()
+            (test) => isAll || !test.subject || test.subject.toLowerCase() === selectedSubject.toLowerCase()
           );
           const displayedPyqs = pyqs.filter(
-            (pyq) => !selectedSubject || !pyq.subject || pyq.subject.toLowerCase() === selectedSubject.toLowerCase()
+            (pyq) => isAll || !pyq.subject || pyq.subject.toLowerCase() === selectedSubject.toLowerCase()
           );
 
           return (
@@ -791,8 +835,6 @@ export default function ExamDetailsScreen() {
               <View style={styles.contentHeaderBox}>
                 <View style={styles.contentBreadcrumbRow}>
                   <Text style={styles.breadcrumbExam}>{config.name}</Text>
-                  <Text style={styles.breadcrumbSlash}>/</Text>
-                  <Text style={styles.breadcrumbSubject}>{selectedSubject}</Text>
                   <Text style={styles.breadcrumbSlash}>/</Text>
                   <Text style={styles.breadcrumbModule}>
                     {selectedModule === 'materials'
@@ -802,6 +844,42 @@ export default function ExamDetailsScreen() {
                         : 'PYQs'}
                   </Text>
                 </View>
+
+                {/* Top Row Inline Subject Filter Pills */}
+                {config.subjects.length > 0 && (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+                  >
+                    {[{ name: 'All', icon: '✨' }, ...config.subjects].map((subj) => {
+                      const active = selectedSubject === subj.name;
+                      return (
+                        <TouchableOpacity
+                          key={subj.name}
+                          onPress={() => setSelectedSubject(subj.name)}
+                          activeOpacity={0.8}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            paddingHorizontal: 14,
+                            paddingVertical: 8,
+                            borderRadius: 20,
+                            backgroundColor: active ? config.themeColor : '#ffffff',
+                            borderWidth: 1,
+                            borderColor: active ? config.themeColor : '#e2e8f0',
+                          }}
+                        >
+                          <Text style={{ fontSize: 13 }}>{subj.icon}</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: active ? '#ffffff' : '#334155' }}>
+                            {subj.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                )}
 
                 {!isSubscribed && !subscriptionDisabled && (
                   <TouchableOpacity
@@ -1035,6 +1113,166 @@ export default function ExamDetailsScreen() {
                   )}
                 </View>
               )}
+            </View>
+          );
+        })()}
+
+        {/* ─── LEVEL 3B: ACTIVITY / PACKAGE DETAIL PAGE ─────────────────────── */}
+        {view === 'activity' && selectedActivity && (() => {
+          const ourRs = Math.round(Number(selectedActivity.price_paise || 0) / 100);
+          const mrpRs = Math.round(Number(selectedActivity.original_price_paise || 0) / 100);
+          const isFreePkg = selectedActivity.access_type === 'free' || ourRs <= 0;
+          const pkgUnlocked = Boolean(selectedActivity.unlocked || isFreePkg);
+          const pkgBenefits = Array.isArray(selectedActivity.benefits) ? selectedActivity.benefits : [];
+          const pkgItems = Array.isArray(selectedActivity.items) ? selectedActivity.items : [];
+
+          return (
+            <View style={styles.pageSection}>
+              <LinearGradient
+                colors={config.gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.bannerCard}
+              >
+                <View style={styles.bannerLeft}>
+                  <View style={styles.bannerPill}>
+                    <Text style={styles.bannerPillText}>
+                      {isFreePkg ? 'FREE PACKAGE' : pkgUnlocked ? '✓ UNLOCKED PACKAGE' : `${config.name} PACKAGE`}
+                    </Text>
+                  </View>
+                  <Text style={styles.bannerHeading}>{selectedActivity.title}</Text>
+                  {!!selectedActivity.subtitle && (
+                    <Text style={styles.bannerSubText}>{selectedActivity.subtitle}</Text>
+                  )}
+                </View>
+                <View style={styles.bannerRightIcon}>
+                  <Text style={styles.bannerEmoji}>🎯</Text>
+                </View>
+              </LinearGradient>
+
+              {/* Benefits Card */}
+              {pkgBenefits.length > 0 && (
+                <View style={styles.contentCard}>
+                  <Text style={styles.contentCardTitle}>✨ What You Will Get</Text>
+                  <View style={{ gap: 6 }}>
+                    {pkgBenefits.map((b, idx) => (
+                      <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                        <Text style={{ color: '#059669', fontWeight: '900' }}>✓</Text>
+                        <Text style={{ flex: 1, fontSize: 13.5, color: '#334155', lineHeight: 19 }}>{b}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Pricing & Unlock Card (Only if Paid/Partial and not yet unlocked) */}
+              {!pkgUnlocked && !isFreePkg && (
+                <View style={[styles.contentCard, { borderColor: '#10b981', borderWidth: 1.5 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+                    {mrpRs > ourRs && (
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: '#94a3b8', textDecorationLine: 'line-through' }}>
+                        ₹{mrpRs}
+                      </Text>
+                    )}
+                    <Text style={{ fontSize: 28, fontWeight: '900', color: '#059669' }}>₹{ourRs}</Text>
+                    <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '600' }}>
+                      /{selectedActivity.duration_days || 365} days
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.viewPdfBtn, { backgroundColor: '#059669' }]}
+                    onPress={() =>
+                      handlePurchasePlan({
+                        id: selectedActivity.id,
+                        code: selectedActivity.code || `activity_${selectedActivity.id}`,
+                        name: selectedActivity.title,
+                        price_paise: selectedActivity.price_paise,
+                      })
+                    }
+                    disabled={payingPlanId === (selectedActivity.code || `activity_${selectedActivity.id}`)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.viewPdfBtnText}>
+                      {payingPlanId === (selectedActivity.code || `activity_${selectedActivity.id}`)
+                        ? 'Opening Payment...'
+                        : `💳 Unlock ${selectedActivity.title} Now`}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Included Package Items */}
+              <View style={styles.sectionHeaderCol}>
+                <Text style={styles.sectionHeading}>📦 Included Content ({pkgItems.length})</Text>
+              </View>
+
+              <View style={styles.itemsList}>
+                {pkgItems.map((it, idx) => {
+                  const itemUnlocked = Boolean(it.isFree || pkgUnlocked);
+                  const iconMap = { materials: '📄', pyqs: '📑', tests: '📝', videos: '🎥' };
+                  return (
+                    <View key={`${it.itemType}_${it.itemId}_${idx}`} style={styles.contentCard}>
+                      <View style={styles.contentCardTop}>
+                        <View style={styles.contentTypeIconBox}>
+                          <Text style={{ fontSize: 20 }}>{iconMap[it.itemType] || '📚'}</Text>
+                        </View>
+                        <View style={styles.contentCardTitleCol}>
+                          <Text style={styles.contentCardTitle}>{it.title}</Text>
+                          <Text style={styles.contentCardMeta}>
+                            {String(it.itemType || '').toUpperCase()} • {it.subject || 'General'}
+                          </Text>
+                        </View>
+                        <View style={[styles.itemStatusBadge, itemUnlocked ? styles.statusBadgeFree : styles.statusBadgeLocked]}>
+                          <Text style={[styles.itemStatusBadgeText, itemUnlocked ? styles.statusTextFree : styles.statusTextLocked]}>
+                            {it.isFree ? 'FREE' : itemUnlocked ? '✓ Unlocked' : '🔒 Locked'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {itemUnlocked ? (
+                        <TouchableOpacity
+                          style={styles.viewPdfBtn}
+                          onPress={() => {
+                            if (it.itemType === 'tests') {
+                              handleStartTest({ id: it.itemId, uniqueId: examId === 'agri' ? String(it.itemId) : `${examId}_${it.itemId}` });
+                            } else if (it.itemType === 'videos') {
+                              router.push(`/student/videos?exam=${examId}`);
+                            } else if (it.itemType === 'pyqs') {
+                              const found = pyqs.find((p) => Number(p.id) === Number(it.itemId));
+                              if (found) handleOpenPdf(found);
+                              else handleSelectModule('pyqs');
+                            } else {
+                              const found = materials.find((m) => Number(m.id) === Number(it.itemId));
+                              if (found) handleOpenPdf(found);
+                              else handleSelectModule('materials');
+                            }
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={styles.viewPdfBtnText}>
+                            {it.itemType === 'tests' ? 'Start Mock Test →' : it.itemType === 'videos' ? 'Watch Video 🎥' : 'Open Content 📄'}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.unlockItemBtn}
+                          onPress={() =>
+                            handlePurchasePlan({
+                              id: selectedActivity.id,
+                              code: selectedActivity.code || `activity_${selectedActivity.id}`,
+                              name: selectedActivity.title,
+                              price_paise: selectedActivity.price_paise,
+                            })
+                          }
+                          activeOpacity={0.85}
+                        >
+                          <Text style={styles.unlockItemBtnText}>🔒 Unlock Package to Access 💳</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
             </View>
           );
         })()}

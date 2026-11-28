@@ -81,30 +81,34 @@ import {
 } from '../controllers/admin.mysql.controller.js';
 
 import {
-  getAdminBanners,
   createAdminBanner,
-  updateAdminBanner,
-  deleteAdminBanner,
   createAdminExamMaterial,
-  getAdminExamMaterials,
-  deleteAdminExamMaterial,
-  updateAdminExamMaterial,
-  createAdminExamPyq,
-  getAdminExamPyqs,
-  deleteAdminExamPyq,
-  updateAdminExamPyq,
-  createAdminExamTest,
-  getAdminExamTests,
-  deleteAdminExamTest,
   createAdminExamPlan,
-  updateAdminExamPlan,
-  getAdminExamPlans,
+  createAdminExamPyq,
+  createAdminExamTest,
+  createBulkPlan,
+  deleteAdminBanner,
+  deleteAdminExamMaterial,
   deleteAdminExamPlan,
+  deleteAdminExamPyq,
+  deleteAdminExamTest,
+  deleteBulkPlan,
+  getAdminBanners,
+  getAdminExamMaterials,
+  getAdminExamPlans,
+  getAdminExamPyqs,
+  getAdminExamTests,
   getBulkPlanCatalog,
   listBulkPlans,
-  createBulkPlan,
+  updateAdminBanner,
+  updateAdminExamMaterial,
+  updateAdminExamPlan,
+  updateAdminExamPyq,
   updateBulkPlan,
-  deleteBulkPlan,
+  listAdminActivities,
+  createAdminActivity,
+  updateAdminActivity,
+  deleteAdminActivity,
 } from '../controllers/exam.controller.js';
 
 export const adminRouter = Router();
@@ -143,6 +147,11 @@ adminRouter.get('/bulk-plans', listBulkPlans);
 adminRouter.post('/bulk-plans', createBulkPlan);
 adminRouter.put('/bulk-plans/:id', updateBulkPlan);
 adminRouter.delete('/bulk-plans/:id', deleteBulkPlan);
+
+adminRouter.get('/activities', listAdminActivities);
+adminRouter.post('/activities', createAdminActivity);
+adminRouter.put('/activities/:id', updateAdminActivity);
+adminRouter.delete('/activities/:id', deleteAdminActivity);
 
 adminRouter.get('/menu', getMenus);
 adminRouter.post('/menu', createMenu);
