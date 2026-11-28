@@ -1181,7 +1181,7 @@ export default function ExamDetailsScreen() {
                   <TouchableOpacity
                     style={[styles.viewPdfBtn, { backgroundColor: '#059669' }]}
                     onPress={() =>
-                      handlePurchasePlan({
+                      handleSubscribe({
                         id: selectedActivity.id,
                         code: selectedActivity.code || `activity_${selectedActivity.id}`,
                         name: selectedActivity.title,
@@ -1266,7 +1266,7 @@ export default function ExamDetailsScreen() {
                         <TouchableOpacity
                           style={styles.unlockItemBtn}
                           onPress={() =>
-                            handlePurchasePlan({
+                            handleSubscribe({
                               id: selectedActivity.id,
                               code: selectedActivity.code || `activity_${selectedActivity.id}`,
                               name: selectedActivity.title,
