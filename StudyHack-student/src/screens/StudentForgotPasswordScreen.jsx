@@ -1,21 +1,17 @@
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
-import PublicFooter from '../components/PublicFooter.jsx';
-import PublicHeader from '../components/PublicHeader.jsx';
+import StudentAuthShell from '../components/StudentAuthShell.jsx';
 
 export default function StudentForgotPasswordScreen() {
   const router = useRouter();
@@ -106,7 +102,7 @@ export default function StudentForgotPasswordScreen() {
         method: 'POST',
         body: { email: e, otp: otp.trim(), newPassword },
       });
-      setMessage('🎉 Password reset successful! Redirecting to login...');
+      setMessage('Password reset successful! Redirecting to login...');
       setIsError(false);
       setTimeout(() => router.replace('/login'), 1200);
     } catch (err) {
@@ -118,351 +114,222 @@ export default function StudentForgotPasswordScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <PublicHeader />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <StudentAuthShell
+      titleLead="Reset"
+      titleAccent="Password!"
+      subtitle="Recover your account securely with an email OTP"
+      badgeIcon="key"
+      badgeIconColor="#059669"
+    >
+      <View style={styles.pillInputWrap}>
+        <Ionicons name="mail-outline" size={20} color="#475569" style={styles.leftIcon} />
+        <TextInput
+          style={styles.pillInput}
+          placeholder="Registered Email Address"
+          placeholderTextColor="#94a3b8"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+      </View>
+
+      <View style={styles.pillInputWrap}>
+        <Ionicons name="lock-closed" size={20} color="#475569" style={styles.leftIcon} />
+        <TextInput
+          style={styles.pillInput}
+          placeholder="New Password"
+          placeholderTextColor="#94a3b8"
+          value={newPassword}
+          onChangeText={setNewPassword}
+          secureTextEntry={!showPassword}
+        />
+        <TouchableOpacity
+          onPress={() => setShowPassword((v) => !v)}
+          activeOpacity={0.7}
+          style={styles.eyeBtn}
         >
-          <View style={styles.centerWrapper}>
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <View style={styles.cardHeaderLeft}>
-                  <View style={styles.brandBadge}>
-                    <Text style={styles.brandBadgeEmoji}>🎓</Text>
-                    <Text style={styles.brandBadgeText}>ACCOUNT RECOVERY</Text>
-                  </View>
-                  <Text style={styles.title}>Reset Password</Text>
-                  <Text style={styles.subtitle}>
-                    Reset your password using an OTP sent to your registered email
-                  </Text>
-                </View>
-              </View>
+          <Ionicons
+            name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+            size={20}
+            color="#475569"
+          />
+        </TouchableOpacity>
+      </View>
 
-              <View style={styles.form}>
-                <View style={styles.formGroup}>
-                  <Text style={styles.label}>Registered Email</Text>
-                  <View style={styles.inputWrapper}>
-                    <Text style={styles.inputIcon}>@</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter your registered email"
-                      placeholderTextColor="#94a3b8"
-                      value={email}
-                      onChangeText={setEmail}
-                      autoCapitalize="none"
-                      keyboardType="email-address"
-                    />
-                  </View>
-                </View>
+      <View style={styles.pillInputWrap}>
+        <Ionicons name="shield-checkmark-outline" size={20} color="#475569" style={styles.leftIcon} />
+        <TextInput
+          style={styles.pillInput}
+          placeholder="Confirm New Password"
+          placeholderTextColor="#94a3b8"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry={!showPassword}
+        />
+      </View>
 
-                <View style={styles.formGroup}>
-                  <Text style={styles.label}>New Password</Text>
-                  <View style={styles.inputWrapper}>
-                    <Text style={styles.inputIcon}>🔒</Text>
-                    <TextInput
-                      style={[styles.input, { paddingRight: 64 }]}
-                      placeholder="Enter new password"
-                      placeholderTextColor="#94a3b8"
-                      value={newPassword}
-                      onChangeText={setNewPassword}
-                      secureTextEntry={!showPassword}
-                    />
-                    <TouchableOpacity
-                      style={styles.showBtn}
-                      onPress={() => setShowPassword((v) => !v)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.showBtnText}>{showPassword ? 'Hide' : 'Show'}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+      <TouchableOpacity
+        style={[styles.outlineBtn, (busy || resendLeftSec > 0) && styles.btnDisabled]}
+        onPress={handleSendOtp}
+        disabled={busy || resendLeftSec > 0}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="paper-plane-outline" size={16} color="#059669" />
+        <Text style={styles.outlineBtnText}>
+          {resendLeftSec > 0 ? `Resend OTP in ${resendLeftSec}s` : 'Send Reset OTP'}
+        </Text>
+      </TouchableOpacity>
 
-                <View style={styles.formGroup}>
-                  <Text style={styles.label}>Confirm Password</Text>
-                  <View style={styles.inputWrapper}>
-                    <Text style={styles.inputIcon}>🔒</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Confirm new password"
-                      placeholderTextColor="#94a3b8"
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                      secureTextEntry={!showPassword}
-                    />
-                  </View>
-                </View>
+      <View style={styles.pillInputWrap}>
+        <Ionicons name="key-outline" size={20} color="#475569" style={styles.leftIcon} />
+        <TextInput
+          style={[styles.pillInput, styles.otpInput]}
+          placeholder="Enter 6-Digit OTP"
+          placeholderTextColor="#94a3b8"
+          value={otp}
+          onChangeText={setOtp}
+          keyboardType="number-pad"
+          maxLength={6}
+        />
+      </View>
 
-                {/* Send OTP Button */}
-                <TouchableOpacity
-                  style={[styles.btnOutline, (busy || resendLeftSec > 0) && styles.btnDisabled]}
-                  onPress={handleSendOtp}
-                  disabled={busy || resendLeftSec > 0}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.btnOutlineText}>
-                    {busy
-                      ? 'Sending Code...'
-                      : resendLeftSec > 0
-                        ? `Resend OTP in ${resendLeftSec}s`
-                        : 'Send Verification OTP 📩'}
-                  </Text>
-                </TouchableOpacity>
+      {!!message && (
+        <View style={isError ? styles.errorBox : styles.successBox}>
+          <Ionicons
+            name={isError ? 'alert-circle' : 'checkmark-circle'}
+            size={18}
+            color={isError ? '#b91c1c' : '#15803d'}
+          />
+          <Text style={isError ? styles.errorText : styles.successText}>{message}</Text>
+        </View>
+      )}
 
-                {/* OTP Input */}
-                <View style={[styles.formGroup, { marginTop: 4 }]}>
-                  <Text style={styles.label}>Enter 6-Digit OTP</Text>
-                  <View style={styles.inputWrapper}>
-                    <Text style={styles.inputIcon}>🔑</Text>
-                    <TextInput
-                      style={[styles.input, styles.otpInput]}
-                      placeholder="••••••"
-                      placeholderTextColor="#94a3b8"
-                      value={otp}
-                      onChangeText={setOtp}
-                      keyboardType="number-pad"
-                      maxLength={6}
-                    />
-                  </View>
-                </View>
-
-                {/* Alert / Status Message */}
-                {!!message && (
-                  <View style={isError ? styles.errorBox : styles.successBox}>
-                    <Text style={styles.errorIcon}>{isError ? '⚠️' : '✅'}</Text>
-                    <Text style={isError ? styles.errorText : styles.successText}>{message}</Text>
-                  </View>
-                )}
-
-                {/* Submit Reset Button */}
-                <TouchableOpacity
-                  onPress={handleVerifyAndReset}
-                  disabled={busy}
-                  activeOpacity={0.85}
-                  style={styles.submitBtnWrapper}
-                >
-                  <LinearGradient
-                    colors={['#10b981', '#2563eb']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.submitBtn}
-                  >
-                    {busy ? (
-                      <View style={styles.busyRow}>
-                        <ActivityIndicator color="#ffffff" size="small" />
-                        <Text style={styles.submitBtnText}>Verifying...</Text>
-                      </View>
-                    ) : (
-                      <Text style={styles.submitBtnText}>Verify OTP & Reset Password ➔</Text>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-
-              {/* Bottom Switcher */}
-              <View style={styles.footerLinks}>
-                <Text style={styles.footerText}>Remember your password? </Text>
-                <TouchableOpacity onPress={() => router.push('/login')} activeOpacity={0.7}>
-                  <Text style={styles.linkTextBold}>Login ➔</Text>
-                </TouchableOpacity>
-              </View>
+      <TouchableOpacity onPress={handleVerifyAndReset} disabled={busy} activeOpacity={0.88}>
+        <LinearGradient
+          colors={['#059669', '#065f46']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.submitBtn}
+        >
+          {busy ? (
+            <ActivityIndicator color="#ffffff" size="small" />
+          ) : (
+            <View style={styles.busyRow}>
+              <Ionicons name="checkmark-done-outline" size={20} color="#ffffff" />
+              <Text style={styles.submitBtnText}>Verify & Reset Password</Text>
             </View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-      <PublicFooter />
-    </SafeAreaView>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
+
+      <View style={styles.orRow}>
+        <View style={styles.orLine} />
+        <Text style={styles.orText}>or</Text>
+        <View style={styles.orLine} />
+      </View>
+
+      <TouchableOpacity
+        style={styles.secondaryPill}
+        onPress={() => router.replace('/login')}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="arrow-back-outline" size={18} color="#059669" />
+        <Text style={styles.secondaryAccent}>Back to Login</Text>
+      </TouchableOpacity>
+    </StudentAuthShell>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  scrollContainer: {
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  centerWrapper: {
-    width: '100%',
-    maxWidth: 480,
-  },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 16,
-    elevation: 3,
-  },
-  cardHeader: {
-    marginBottom: 20,
-  },
-  cardHeaderLeft: {
-    gap: 4,
-  },
-  brandBadge: {
+  pillInputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#f1f5f9',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  brandBadgeEmoji: {
-    fontSize: 12,
-  },
-  brandBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#334155',
-    letterSpacing: 0.5,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#0f172a',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  form: {
-    gap: 14,
-  },
-  formGroup: {
-    gap: 6,
-  },
-  label: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  inputWrapper: {
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  inputIcon: {
-    position: 'absolute',
-    left: 14,
-    zIndex: 10,
-    color: '#94a3b8',
-    fontSize: 16,
-  },
-  input: {
     backgroundColor: '#f8fafc',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    borderRadius: 14,
-    paddingLeft: 44,
-    paddingRight: 16,
-    paddingVertical: 12,
-    fontSize: 14.5,
+    borderRadius: 28,
+    height: 52,
+    paddingHorizontal: 16,
+  },
+  leftIcon: {
+    marginRight: 10,
+  },
+  pillInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
     color: '#0f172a',
-    minHeight: 48,
+    height: '100%',
   },
   otpInput: {
-    fontSize: 20,
+    letterSpacing: 3,
     fontWeight: '800',
-    letterSpacing: 4,
   },
-  showBtn: {
-    position: 'absolute',
-    right: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 8,
+  eyeBtn: {
+    padding: 6,
   },
-  showBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  btnOutline: {
-    borderWidth: 1.5,
-    borderColor: '#0284c7',
-    borderRadius: 12,
-    paddingVertical: 12,
+  outlineBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f0f9ff',
+    gap: 8,
+    height: 46,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#10b981',
+    backgroundColor: '#f0fdf4',
   },
   btnDisabled: {
-    borderColor: '#cbd5e1',
-    backgroundColor: '#f1f5f9',
-    opacity: 0.7,
+    opacity: 0.6,
   },
-  btnOutlineText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#0369a1',
+  outlineBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#059669',
   },
   errorBox: {
-    backgroundColor: '#fef2f2',
-    borderColor: '#fecaca',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 14,
+    padding: 10,
   },
   successBox: {
-    backgroundColor: '#f0fdf4',
-    borderColor: '#bbf7d0',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  errorIcon: {
-    fontSize: 16,
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    borderRadius: 14,
+    padding: 10,
   },
   errorText: {
-    color: '#b91c1c',
+    flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    flex: 1,
+    color: '#b91c1c',
   },
   successText: {
-    color: '#15803d',
+    flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    flex: 1,
-  },
-  submitBtnWrapper: {
-    marginTop: 6,
-    borderRadius: 14,
-    shadowColor: '#10b981',
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 8,
-    elevation: 3,
+    color: '#15803d',
   },
   submitBtn: {
-    borderRadius: 14,
-    paddingVertical: 14,
+    height: 52,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#065f46',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
   },
   busyRow: {
     flexDirection: 'row',
@@ -470,25 +337,41 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   submitBtnText: {
+    fontSize: 15.5,
+    fontWeight: '800',
     color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 0.3,
   },
-  footerLinks: {
+  orRow: {
     flexDirection: 'row',
-    marginTop: 20,
-    justifyContent: 'center',
     alignItems: 'center',
+    gap: 10,
+    marginVertical: 2,
   },
-  footerText: {
-    fontSize: 14,
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e2e8f0',
+  },
+  orText: {
+    fontSize: 13,
+    fontWeight: '700',
     color: '#64748b',
-    fontWeight: '500',
   },
-  linkTextBold: {
-    fontSize: 14,
+  secondaryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1.5,
+    borderColor: '#bbf7d0',
+    borderRadius: 28,
+    paddingVertical: 13,
+    paddingHorizontal: 18,
+    gap: 8,
+  },
+  secondaryAccent: {
+    fontSize: 13.5,
     fontWeight: '800',
-    color: '#10b981',
+    color: '#059669',
   },
 });

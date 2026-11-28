@@ -200,29 +200,43 @@ export default function StudentDashboardScreen() {
           <StudyHackLogo />
 
           <View style={styles.headerRight}>
-            {/* Notification Bell */}
             <TouchableOpacity
               style={styles.iconCircle}
               onPress={() => router.push('/student/notifications')}
-              activeOpacity={0.7}
+              activeOpacity={0.75}
             >
               <Text style={styles.bellIcon}>🔔</Text>
               {notifications.length > 0 && <View style={styles.notifBadge} />}
             </TouchableOpacity>
 
-            {/* User Avatar Initial Letter with Green Active Dot */}
             <TouchableOpacity
               style={styles.avatarWrapper}
               onPress={() => router.push('/student/profile')}
               activeOpacity={0.8}
             >
-              <View style={styles.avatarCircle}>
+              <LinearGradient
+                colors={['#10b981', '#059669']}
+                style={styles.avatarCircle}
+              >
                 <Text style={styles.avatarLetter}>
                   {(user?.name?.trim()?.[0] || 'S').toUpperCase()}
                 </Text>
-              </View>
+              </LinearGradient>
               <View style={styles.avatarOnlineDot} />
             </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Native Greeting Strip */}
+        <View style={styles.greetingStrip}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.greetingEyebrow}>STUDENT LEARNING HUB</Text>
+            <Text style={styles.greetingName} numberOfLines={1}>
+              Welcome back, {user?.name?.split(' ')[0] || 'Student'} 👋
+            </Text>
+          </View>
+          <View style={styles.streakPill}>
+            <Text style={styles.streakPillText}>✨ ACTIVE</Text>
           </View>
         </View>
 
@@ -238,8 +252,8 @@ export default function StudentDashboardScreen() {
           </View>
         )}
 
-        {/* 1. Hero Banner Slider (Smooth left-to-right sliding animation) */}
-        <View style={{ marginBottom: 4 }}>
+        {/* 1. Hero Banner Slider */}
+        <View style={{ marginBottom: 2 }}>
           <FlatList
             ref={bannerFlatListRef}
             data={banners}
@@ -257,19 +271,22 @@ export default function StudentDashboardScreen() {
             }}
             renderItem={({ item }) => (
               <LinearGradient
-                colors={[item.bg_gradient_start || '#07162c', item.bg_gradient_end || '#059669']}
+                colors={[item.bg_gradient_start || '#0f172a', item.bg_gradient_end || '#059669']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.heroCard, { width: BANNER_WIDTH }]}
               >
                 <View style={styles.heroLeft}>
+                  <View style={styles.heroBadge}>
+                    <Text style={styles.heroBadgeText}>🎓 STUDYHACK PRO</Text>
+                  </View>
                   <Text style={styles.heroHeading}>
                     {item.title}{'\n'}
                     {!!item.highlight_text && (
                       <Text style={styles.heroHeadingHighlight}>{item.highlight_text}</Text>
                     )}
                   </Text>
-                  <Text style={styles.heroSubText}>
+                  <Text style={styles.heroSubText} numberOfLines={2}>
                     {item.subtitle || 'Your Complete Exam Preparation Partner'}
                   </Text>
 
@@ -282,7 +299,6 @@ export default function StudentDashboardScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Student Illustration / Image on Right */}
                 <View style={styles.heroRight}>
                   <Image
                     source={{
@@ -295,7 +311,6 @@ export default function StudentDashboardScreen() {
             )}
           />
 
-          {/* Carousel Dots */}
           {banners.length > 1 && (
             <View style={styles.carouselDotsRow}>
               {banners.map((_, idx) => (
@@ -317,8 +332,8 @@ export default function StudentDashboardScreen() {
 
         {/* 2. "Choose Your Exam" Section */}
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionHeading}>Choose Your Exam</Text>
-          <TouchableOpacity onPress={() => router.push('/student/exam/puc')}>
+          <Text style={styles.sectionHeading}>🎯 CHOOSE YOUR EXAM</Text>
+          <TouchableOpacity style={styles.viewAllPill} onPress={() => router.push('/student/exam/puc')}>
             <Text style={styles.viewAllText}>View All →</Text>
           </TouchableOpacity>
         </View>
@@ -327,12 +342,15 @@ export default function StudentDashboardScreen() {
           {EXAM_CARDS.map((exam) => (
             <TouchableOpacity
               key={exam.id}
-              style={[styles.examCard, { backgroundColor: exam.bgColor, borderColor: exam.borderColor }]}
+              style={styles.examCard}
               onPress={() => router.push(`/student/exam/${exam.id}`)}
-              activeOpacity={0.8}
+              activeOpacity={0.82}
             >
-              <View style={styles.examIconCircle}>
-                <Text style={styles.examIcon}>{exam.icon}</Text>
+              <View style={styles.examCardTop}>
+                <View style={[styles.examIconCircle, { backgroundColor: exam.bgColor, borderColor: exam.borderColor }]}>
+                  <Text style={styles.examIcon}>{exam.icon}</Text>
+                </View>
+                <Text style={styles.examCardArrow}>→</Text>
               </View>
               <Text style={styles.examName}>{exam.name}</Text>
               <Text style={styles.examSub}>{exam.subtitle}</Text>
@@ -341,12 +359,15 @@ export default function StudentDashboardScreen() {
         </View>
 
         {/* 3. Features Row (Quick Actions) */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeading}>⚡ STUDY TOOLS</Text>
+        </View>
+
         <View style={styles.featuresRow}>
-          {/* Video Guidance (PUC & Agri Practical) */}
           <TouchableOpacity
             style={styles.featureItem}
             onPress={() => router.push('/student/videos')}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
             <View style={[styles.featureIconBox, { backgroundColor: '#ede9fe' }]}>
               <Text style={{ fontSize: 20 }}>▶️</Text>
@@ -354,11 +375,10 @@ export default function StudentDashboardScreen() {
             <Text style={styles.featureLabel}>Video{'\n'}Lectures</Text>
           </TouchableOpacity>
 
-          {/* Mock Tests */}
           <TouchableOpacity
             style={styles.featureItem}
             onPress={() => router.push('/student/tests')}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
             <View style={[styles.featureIconBox, { backgroundColor: '#dcfce7' }]}>
               <Text style={{ fontSize: 20 }}>📋</Text>
@@ -366,11 +386,10 @@ export default function StudentDashboardScreen() {
             <Text style={styles.featureLabel}>Mock{'\n'}Tests</Text>
           </TouchableOpacity>
 
-          {/* Study Materials */}
           <TouchableOpacity
             style={styles.featureItem}
             onPress={() => router.push('/student/materials')}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
             <View style={[styles.featureIconBox, { backgroundColor: '#ffedd5' }]}>
               <Text style={{ fontSize: 20 }}>📖</Text>
@@ -378,32 +397,30 @@ export default function StudentDashboardScreen() {
             <Text style={styles.featureLabel}>Study{'\n'}Materials</Text>
           </TouchableOpacity>
 
-          {/* Previous Year Papers */}
           <TouchableOpacity
             style={styles.featureItem}
             onPress={() => router.push('/student/pyqs')}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
             <View style={[styles.featureIconBox, { backgroundColor: '#e0f2fe' }]}>
               <Text style={{ fontSize: 20 }}>📑</Text>
             </View>
-            <Text style={styles.featureLabel}>Previous{'\n'}Year Papers</Text>
+            <Text style={styles.featureLabel}>Previous{'\n'}Papers</Text>
           </TouchableOpacity>
 
-          {/* Performance Analytics */}
           <TouchableOpacity
             style={styles.featureItem}
             onPress={() => router.push('/student/progress')}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
             <View style={[styles.featureIconBox, { backgroundColor: '#fae8ff' }]}>
               <Text style={{ fontSize: 20 }}>📈</Text>
             </View>
-            <Text style={styles.featureLabel}>Performance{'\n'}Analytics</Text>
+            <Text style={styles.featureLabel}>Analytics</Text>
           </TouchableOpacity>
         </View>
 
-        {/* 4. "Your Progress" Section Card */}
+        {/* 4. "Your Progress" Section Card (matching Admin Hero Card Polish) */}
         <TouchableOpacity
           activeOpacity={0.88}
           onPress={() => router.push('/student/progress')}
@@ -417,16 +434,14 @@ export default function StudentDashboardScreen() {
             <View style={styles.progressHeaderRow}>
               <View style={styles.progressTitleBox}>
                 <Text style={{ fontSize: 18 }}>📊</Text>
-                <Text style={styles.progressTitle}>Your Progress</Text>
+                <Text style={styles.progressTitle}>YOUR PROGRESS</Text>
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={styles.keepGoingText}>Keep Going! 🔥</Text>
-                <Text style={{ color: '#38bdf8', fontSize: 11, fontWeight: '700' }}>View Details ➔</Text>
+              <View style={styles.progressDetailsPill}>
+                <Text style={styles.progressDetailsText}>View Details →</Text>
               </View>
             </View>
 
             <View style={styles.progressBodyRow}>
-              {/* Left Circular Meter */}
               <View style={styles.circleContainer}>
                 <View style={styles.circleRing}>
                   <Text style={styles.circlePercentText}>{progress.progressPercent}%</Text>
@@ -434,24 +449,21 @@ export default function StudentDashboardScreen() {
                 <View style={styles.circleLabelCol}>
                   <Text style={styles.overallPrepText}>Overall Preparation</Text>
                   <Text style={styles.doingGreatText}>
-                    {progress.progressPercent > 60 ? "You're doing great!" : 'Keep practicing daily!'}
+                    {progress.progressPercent > 60 ? "You're doing great! 🔥" : 'Keep practicing daily! 🔥'}
                   </Text>
                 </View>
               </View>
 
-              {/* Right Metrics */}
               <View style={styles.metricsCol}>
-                <View style={styles.metricItem}>
-                  <Text style={{ fontSize: 22 }}>🏆</Text>
+                <LinearGradient colors={['#10b981', '#059669']} style={styles.metricStatPill}>
                   <Text style={styles.metricVal}>{progress.totalTestsGiven}</Text>
-                  <Text style={styles.metricSub}>Tests Given</Text>
-                </View>
+                  <Text style={styles.metricSub}>TESTS</Text>
+                </LinearGradient>
 
-                <View style={styles.metricItem}>
-                  <Text style={{ fontSize: 22 }}>⭐</Text>
+                <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.metricStatPill}>
                   <Text style={styles.metricVal}>{progress.totalScore}</Text>
-                  <Text style={styles.metricSub}>Total Score</Text>
-                </View>
+                  <Text style={styles.metricSub}>SCORE</Text>
+                </LinearGradient>
               </View>
             </View>
           </LinearGradient>
@@ -459,52 +471,49 @@ export default function StudentDashboardScreen() {
 
         {/* 5. "Quick Access" Section */}
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionHeading}>Quick Access</Text>
-          <TouchableOpacity onPress={() => router.push('/student/tests')}>
+          <Text style={styles.sectionHeading}>🚀 QUICK ACCESS</Text>
+          <TouchableOpacity style={styles.viewAllPill} onPress={() => router.push('/student/tests')}>
             <Text style={styles.viewAllText}>See More →</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.quickAccessRow}>
-          {/* Daily Quiz */}
           <TouchableOpacity
-            style={[styles.quickCard, { backgroundColor: '#fffbeb', borderColor: '#fef3c7' }]}
+            style={styles.quickCard}
             onPress={() => router.push('/student/tests')}
-            activeOpacity={0.8}
+            activeOpacity={0.82}
           >
-            <View style={styles.quickIconRow}>
-              <Text style={{ fontSize: 22 }}>⚡</Text>
-              <Text style={styles.quickTitle}>Daily Quiz</Text>
+            <View style={[styles.quickIconCircle, { backgroundColor: '#fef3c7' }]}>
+              <Text style={{ fontSize: 18 }}>⚡</Text>
             </View>
-            <Text style={styles.quickSub}>Test Your Knowledge</Text>
+            <Text style={styles.quickTitle}>Daily Quiz</Text>
+            <Text style={styles.quickSub}>Test Knowledge</Text>
             <Text style={styles.quickArrow}>→</Text>
           </TouchableOpacity>
 
-          {/* Top Rankers Tips */}
           <TouchableOpacity
-            style={[styles.quickCard, { backgroundColor: '#eef2ff', borderColor: '#e0e7ff' }]}
+            style={styles.quickCard}
             onPress={() => router.push('/student/materials')}
-            activeOpacity={0.8}
+            activeOpacity={0.82}
           >
-            <View style={styles.quickIconRow}>
-              <Text style={{ fontSize: 22 }}>📖</Text>
-              <Text style={styles.quickTitle}>Rankers Tips</Text>
+            <View style={[styles.quickIconCircle, { backgroundColor: '#e0e7ff' }]}>
+              <Text style={{ fontSize: 18 }}>📖</Text>
             </View>
-            <Text style={styles.quickSub}>Learn from the Best</Text>
+            <Text style={styles.quickTitle}>Rankers Tips</Text>
+            <Text style={styles.quickSub}>Top Notes</Text>
             <Text style={styles.quickArrow}>→</Text>
           </TouchableOpacity>
 
-          {/* Study Rewards (hidden if Agri/All subscriptions are disabled) */}
           {!subscriptionsDisabled.includes('all') && !subscriptionsDisabled.includes('agri') && (
             <TouchableOpacity
-              style={[styles.quickCard, { backgroundColor: '#fff1f2', borderColor: '#ffe4e6' }]}
+              style={styles.quickCard}
               onPress={() => router.push('/student/premium')}
-              activeOpacity={0.8}
+              activeOpacity={0.82}
             >
-              <View style={styles.quickIconRow}>
-                <Text style={{ fontSize: 22 }}>🎁</Text>
-                <Text style={styles.quickTitle}>Rewards</Text>
+              <View style={[styles.quickIconCircle, { backgroundColor: '#ffe4e6' }]}>
+                <Text style={{ fontSize: 18 }}>🎁</Text>
               </View>
+              <Text style={styles.quickTitle}>Rewards</Text>
               <Text style={styles.quickSub}>Earn & Unlock</Text>
               <Text style={styles.quickArrow}>→</Text>
             </TouchableOpacity>
@@ -512,12 +521,11 @@ export default function StudentDashboardScreen() {
         </View>
       </ScrollView>
 
-      {/* 6. Bottom Navigation Bar */}
+      {/* 6. Native Bottom Navigation Bar */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.bottomNavItem} onPress={() => { }}>
-          <Text style={[styles.bottomNavIcon, { color: '#16a34a' }]}>🏠</Text>
-          <Text style={[styles.bottomNavLabel, { color: '#16a34a', fontWeight: '800' }]}>Home</Text>
-          <View style={styles.bottomActiveBar} />
+        <TouchableOpacity style={[styles.bottomNavItem, styles.bottomNavItemActive]} onPress={() => {}}>
+          <Text style={[styles.bottomNavIcon, { color: '#059669' }]}>🏠</Text>
+          <Text style={[styles.bottomNavLabel, { color: '#059669', fontWeight: '800' }]}>Home</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.bottomNavItem} onPress={() => router.push('/student/tests')}>
@@ -542,13 +550,13 @@ export default function StudentDashboardScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8fafc',
   },
   scrollContainer: {
     paddingHorizontal: 16,
-    paddingTop: 0,
-    paddingBottom: 85,
-    gap: 14,
+    paddingTop: 8,
+    paddingBottom: 92,
+    gap: 16,
   },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
@@ -557,27 +565,74 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 0,
-    paddingBottom: 0,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logoBadge: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#0284c7', alignItems: 'center', justifyContent: 'center' },
-  logoGradCap: { fontSize: 14, position: 'absolute', top: 2 },
-  logoS: { fontSize: 22, fontWeight: '900', color: '#ffffff', marginTop: 10 },
   logoTextCol: { gap: 1 },
-  logoTitle: { fontSize: 22, fontWeight: '900', color: '#0f172a', letterSpacing: -0.5 },
-  logoTitleGreen: { color: '#16a34a' },
-  logoSubtitle: { fontSize: 10, fontWeight: '700', color: '#334155' },
-  logoUnderline: { height: 2, backgroundColor: '#16a34a', borderRadius: 2, width: 40, marginTop: 1 },
+  logoTitle: { fontSize: 21, fontWeight: '900', color: '#0f172a', letterSpacing: -0.5 },
+  logoTitleGreen: { color: '#059669' },
+  logoSubtitle: { fontSize: 10, fontWeight: '700', color: '#475569' },
+  logoUnderline: { height: 2, backgroundColor: '#10b981', borderRadius: 2, width: 42, marginTop: 1 },
 
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconCircle: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
-  bellIcon: { fontSize: 18 },
-  notifBadge: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#ef4444', position: 'absolute', top: 9, right: 9 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bellIcon: { fontSize: 17 },
+  notifBadge: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#ef4444', position: 'absolute', top: 8, right: 8 },
   avatarWrapper: { width: 42, height: 42, borderRadius: 21, borderWidth: 2, borderColor: '#10b981' },
-  avatarCircle: { width: '100%', height: '100%', borderRadius: 21, backgroundColor: '#0284c7', alignItems: 'center', justifyContent: 'center' },
-  avatarLetter: { fontSize: 18, fontWeight: '900', color: '#ffffff' },
+  avatarCircle: { width: '100%', height: '100%', borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  avatarLetter: { fontSize: 17, fontWeight: '900', color: '#ffffff' },
   avatarOnlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#22c55e', position: 'absolute', bottom: -1, right: -1, borderWidth: 2, borderColor: '#fff' },
+
+  // Greeting Strip
+  greetingStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  greetingEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#059669',
+    letterSpacing: 0.8,
+  },
+  greetingName: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#0f172a',
+    marginTop: 2,
+  },
+  streakPill: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  streakPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#059669',
+  },
 
   errorBox: { backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1, borderRadius: 14, padding: 12 },
   errorText: { color: '#b91c1c', fontSize: 13, fontWeight: '600' },
@@ -585,68 +640,156 @@ const styles = StyleSheet.create({
   successText: { color: '#15803d', fontSize: 13, fontWeight: '600' },
 
   // Hero Card
-  heroCard: { borderRadius: 22, padding: 20, flexDirection: 'row', alignItems: 'center', position: 'relative', overflow: 'hidden', minHeight: 175 },
-  heroLeft: { flex: 1.2, gap: 8 },
-  heroHeading: { fontSize: 20, fontWeight: '900', color: '#ffffff', lineHeight: 26 },
+  heroCard: {
+    borderRadius: 24,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+    minHeight: 178,
+    shadowColor: '#000',
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  heroLeft: { flex: 1.25, gap: 7 },
+  heroBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  heroBadgeText: { color: '#e2e8f0', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  heroHeading: { fontSize: 20, fontWeight: '900', color: '#ffffff', lineHeight: 25 },
   heroHeadingHighlight: { color: '#facc15', fontStyle: 'italic' },
-  heroSubText: { fontSize: 12, color: '#e2e8f0', lineHeight: 16 },
+  heroSubText: { fontSize: 12, color: '#cbd5e1', lineHeight: 16, fontWeight: '500' },
   heroCtaBtn: { alignSelf: 'flex-start', backgroundColor: '#facc15', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, marginTop: 4 },
-  heroCtaText: { color: '#0f172a', fontWeight: '800', fontSize: 12 },
-  heroRight: { flex: 0.8, alignItems: 'center', justifyContent: 'center' },
-  heroStudentImg: { width: 110, height: 130, borderRadius: 16, resizeMode: 'cover' },
+  heroCtaText: { color: '#0f172a', fontWeight: '900', fontSize: 12 },
+  heroRight: { flex: 0.75, alignItems: 'center', justifyContent: 'center' },
+  heroStudentImg: { width: 108, height: 128, borderRadius: 16, resizeMode: 'cover' },
   carouselDotsRow: { position: 'absolute', bottom: 8, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.4)' },
   dotActive: { width: 18, backgroundColor: '#facc15' },
 
   // Sections
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-  sectionHeading: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
-  viewAllText: { fontSize: 13, fontWeight: '700', color: '#059669' },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
+  sectionHeading: { fontSize: 15, fontWeight: '900', color: '#1e293b', letterSpacing: 0.4 },
+  viewAllPill: { backgroundColor: '#ecfdf5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  viewAllText: { fontSize: 12, fontWeight: '800', color: '#059669' },
 
-  // Exam Grid
+  // Exam Grid (Admin-style elevated native cards)
   examGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
-  examCard: { width: '48%', maxWidth: '48%', flexBasis: '48%', borderRadius: 18, padding: 14, borderWidth: 1, gap: 4, shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 6, elevation: 1 },
-  examIconCircle: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  examCard: {
+    width: '48.2%',
+    maxWidth: '48.2%',
+    flexBasis: '48.2%',
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  examCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  examIconCircle: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   examIcon: { fontSize: 22 },
-  examName: { fontSize: 17, fontWeight: '900', color: '#0f172a' },
-  examSub: { fontSize: 11, fontWeight: '600', color: '#64748b' },
+  examCardArrow: { fontSize: 18, fontWeight: '900', color: '#cbd5e1' },
+  examName: { fontSize: 16.5, fontWeight: '900', color: '#0f172a' },
+  examSub: { fontSize: 11.5, fontWeight: '600', color: '#64748b' },
 
   // Features Row
-  featuresRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#f8fafc', borderRadius: 18, paddingVertical: 14, paddingHorizontal: 8, borderWidth: 1, borderColor: '#f1f5f9' },
+  featuresRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
   featureItem: { alignItems: 'center', gap: 6, flex: 1 },
-  featureIconBox: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  featureLabel: { fontSize: 10, fontWeight: '700', color: '#334155', textAlign: 'center', lineHeight: 13 },
+  featureIconBox: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  featureLabel: { fontSize: 10, fontWeight: '800', color: '#334155', textAlign: 'center', lineHeight: 13 },
 
-  // Progress Card
-  progressCard: { borderRadius: 20, padding: 18, gap: 14 },
+  // Progress Card (Admin Hero Card polish)
+  progressCard: {
+    borderRadius: 24,
+    padding: 20,
+    gap: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    elevation: 6,
+  },
   progressHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   progressTitleBox: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  progressTitle: { fontSize: 15, fontWeight: '800', color: '#ffffff' },
-  keepGoingText: { fontSize: 12, fontWeight: '700', color: '#facc15' },
-  progressBodyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  progressTitle: { fontSize: 14, fontWeight: '900', color: '#ffffff', letterSpacing: 0.5 },
+  progressDetailsPill: { backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  progressDetailsText: { color: '#38bdf8', fontSize: 11, fontWeight: '800' },
+  progressBodyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
   circleContainer: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  circleRing: { width: 62, height: 62, borderRadius: 31, borderWidth: 5, borderColor: '#22c55e', alignItems: 'center', justifyContent: 'center' },
-  circlePercentText: { fontSize: 17, fontWeight: '900', color: '#ffffff' },
+  circleRing: { width: 62, height: 62, borderRadius: 31, borderWidth: 5, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', alignItems: 'center', justifyContent: 'center' },
+  circlePercentText: { fontSize: 16, fontWeight: '900', color: '#ffffff' },
   circleLabelCol: { gap: 2, flex: 1 },
-  overallPrepText: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
-  doingGreatText: { fontSize: 11, color: '#94a3b8' },
-  metricsCol: { flexDirection: 'row', gap: 16 },
-  metricItem: { alignItems: 'center', gap: 2 },
-  metricVal: { fontSize: 16, fontWeight: '900', color: '#ffffff' },
-  metricSub: { fontSize: 10, color: '#94a3b8' },
+  overallPrepText: { fontSize: 13.5, fontWeight: '800', color: '#ffffff' },
+  doingGreatText: { fontSize: 11, color: '#cbd5e1', fontWeight: '500' },
+  metricsCol: { flexDirection: 'row', gap: 8 },
+  metricStatPill: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14, alignItems: 'center', minWidth: 62 },
+  metricVal: { fontSize: 17, fontWeight: '900', color: '#ffffff' },
+  metricSub: { fontSize: 9, fontWeight: '800', color: '#e2e8f0', letterSpacing: 0.6, marginTop: 2 },
 
   // Quick Access
   quickAccessRow: { flexDirection: 'row', gap: 10 },
-  quickCard: { flex: 1, borderRadius: 14, padding: 12, borderWidth: 1, gap: 4 },
-  quickIconRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  quickTitle: { fontSize: 12, fontWeight: '800', color: '#0f172a' },
-  quickSub: { fontSize: 10, color: '#64748b' },
-  quickArrow: { fontSize: 14, color: '#0f172a', fontWeight: '800', marginTop: 4 },
+  quickCard: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  quickIconCircle: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  quickTitle: { fontSize: 12.5, fontWeight: '900', color: '#0f172a' },
+  quickSub: { fontSize: 10.5, color: '#64748b', fontWeight: '600' },
+  quickArrow: { fontSize: 14, color: '#10b981', fontWeight: '900', marginTop: 2 },
 
   // Bottom Nav
-  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 65, backgroundColor: '#ffffff', flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#f1f5f9', alignItems: 'center', justifyContent: 'space-around' },
-  bottomNavItem: { alignItems: 'center', justifyContent: 'center', gap: 2, position: 'relative' },
-  bottomNavIcon: { fontSize: 20 },
-  bottomNavLabel: { fontSize: 11, fontWeight: '600', color: '#64748b' },
-  bottomActiveBar: { position: 'absolute', bottom: -6, width: 20, height: 3, backgroundColor: '#16a34a', borderRadius: 2 },
+  bottomNav: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 68,
+    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  bottomNavItem: { alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16 },
+  bottomNavItemActive: { backgroundColor: '#ecfdf5' },
+  bottomNavIcon: { fontSize: 19 },
+  bottomNavLabel: { fontSize: 11, fontWeight: '700', color: '#64748b' },
 });
