@@ -20,14 +20,11 @@ import { API_BASE_URL } from '../config/env.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function LoginScreen() {
-  const { loginStudent, loginAdmin, verifyAdminLoginOtp } = useAuth();
+  const { loginStudent } = useAuth();
   const router = useRouter();
 
-  const [mode, setMode] = useState('student'); // 'student' | 'admin'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [adminOtp, setAdminOtp] = useState('');
-  const [adminStep, setAdminStep] = useState('details'); // 'details' | 'otp'
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -58,25 +55,9 @@ export default function LoginScreen() {
     setBusy(true);
 
     try {
-      if (mode === 'admin') {
-        if (adminStep === 'details') {
-          const data = await loginAdmin({ email, password });
-          if (data.requiresOtp) {
-            setAdminStep('otp');
-          } else if (data.user?.role === 'admin') {
-            router.replace('/admin/dashboard');
-          }
-        } else {
-          const data = await verifyAdminLoginOtp({ email, otp: adminOtp });
-          if (data.user?.role === 'admin') {
-            router.replace('/admin/dashboard');
-          }
-        }
-      } else {
-        const data = await loginStudent({ email, password });
-        if (data.user?.role === 'student') {
-          router.replace('/student/dashboard');
-        }
+      const data = await loginStudent({ email, password });
+      if (data.user?.role === 'student') {
+        router.replace('/student/dashboard');
       }
     } catch (err) {
       setError(err?.message || 'Login failed. Please check your credentials.');
@@ -115,53 +96,9 @@ export default function LoginScreen() {
                 </View>
               </View>
 
-              {/* Role Toggle: Student / Admin */}
-              <View style={styles.tabContainer}>
-                <TouchableOpacity
-                  style={[styles.tab, mode === 'student' && styles.tabActiveStudent]}
-                  onPress={() => setMode('student')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.tabText, mode === 'student' && styles.tabTextActive]}>
-                    👨‍🎓 Student
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.tab, mode === 'admin' && styles.tabActiveAdmin]}
-                  onPress={() => {
-                    setMode('admin');
-                    setAdminStep('details');
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.tabText, mode === 'admin' && styles.tabTextActive]}>
-                    🛡️ Admin
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
               {/* Form Section */}
               <View style={styles.form}>
-                {mode === 'admin' && adminStep === 'otp' ? (
-                  <View style={styles.formGroup}>
-                    <Text style={styles.label}>Admin Verification Code</Text>
-                    <Text style={styles.sentText}>Check your admin email for the 6-digit OTP</Text>
-                    <View style={styles.inputWrapper}>
-                      <Text style={styles.inputIcon}>🔑</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Enter 6-digit OTP"
-                        placeholderTextColor="#94a3b8"
-                        value={adminOtp}
-                        onChangeText={setAdminOtp}
-                        keyboardType="number-pad"
-                        maxLength={6}
-                      />
-                    </View>
-                  </View>
-                ) : (
-                  <>
+                <>
                     <View style={styles.formGroup}>
                       <Text style={styles.label}>Username or Email</Text>
                       <View style={styles.inputWrapper}>
@@ -210,7 +147,6 @@ export default function LoginScreen() {
                       </TouchableOpacity>
                     </View>
                   </>
-                )}
 
                 {/* Error Box */}
                 {!!error && (
@@ -239,13 +175,7 @@ export default function LoginScreen() {
                         <Text style={styles.submitBtnText}>Please wait...</Text>
                       </View>
                     ) : (
-                      <Text style={styles.submitBtnText}>
-                        {mode === 'admin' && adminStep === 'details'
-                          ? 'Send Admin OTP ➔'
-                          : mode === 'admin' && adminStep === 'otp'
-                            ? 'Verify & Open Admin Dashboard ➔'
-                            : 'Login to StudyHack ➔'}
-                      </Text>
+                      <Text style={styles.submitBtnText}>Login to StudyHack ➔</Text>
                     )}
                   </LinearGradient>
                 </TouchableOpacity>

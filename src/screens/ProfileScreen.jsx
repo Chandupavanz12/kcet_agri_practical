@@ -145,6 +145,21 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
+    if (Platform.OS === 'web') {
+      const confirmed =
+        typeof window !== 'undefined'
+          ? window.confirm('Are you sure you want to log out of StudyHack?')
+          : true;
+      if (!confirmed) return;
+      await logout();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      } else {
+        router.replace('/login');
+      }
+      return;
+    }
+
     Alert.alert('Sign Out', 'Are you sure you want to log out of StudyHack?', [
       { text: 'Cancel', style: 'cancel' },
       {

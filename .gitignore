@@ -42,3 +42,6 @@ app-example
 # generated native folders
 /ios
 /android
+
+# separate admin app repo
+/admin
