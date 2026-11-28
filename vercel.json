@@ -1,6 +1,7 @@
 {
-  "buildCommand": "expo export -p web",
-  "outputDirectory": "dist",
+  "installCommand": "cd StudyHack-student && npm install",
+  "buildCommand": "cd StudyHack-student && npx expo export -p web",
+  "outputDirectory": "StudyHack-student/dist",
   "cleanUrls": true,
   "rewrites": [
     {
