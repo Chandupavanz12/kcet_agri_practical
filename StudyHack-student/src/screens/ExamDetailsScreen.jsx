@@ -492,21 +492,32 @@ export default function ExamDetailsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      {/* ─── Top Bar with Back Button and Hub Badge ────────────────────────────── */}
+      {/* ─── Top Bar with Back Button, Exam Title & Quick Profile ──────────────── */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
           <Text style={styles.backButtonIcon}>←</Text>
           <Text style={styles.backButtonText}>
-            {view === 'content'
-              ? 'Subjects'
-              : view === 'subjects' || view === 'plans'
-                ? `${config.name} Hub`
-                : 'Dashboard'}
+            {view === 'content' || view === 'plans' || view === 'activity' ? `${config.name} Exam` : 'Back'}
           </Text>
         </TouchableOpacity>
 
-        <View style={[styles.examBadgeHeader, { backgroundColor: config.themeColor }]}>
-          <Text style={styles.examBadgeHeaderText}>{config.name}</Text>
+        <Text style={{ fontSize: 17, fontWeight: '900', color: '#0f172a' }}>{config.name} Exam</Text>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            onPress={() => router.push('/student/admin-notifications')}
+            style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Text style={{ fontSize: 15 }}>🔔</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push('/student/profile')}
+            style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: config.themeColor, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>
+              {(user?.name?.trim()?.[0] || 'S').toUpperCase()}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -606,186 +617,154 @@ export default function ExamDetailsScreen() {
               )}
             </View>
 
-            {/* Exam Activities / Packages (Only shown when created by Admin for this exam) */}
+            {/* Recommended Packages (2-per-row matching reference UI, hidden if none created) */}
             {activities.length > 0 && (
               <View style={{ gap: 10 }}>
-                <View style={styles.sectionHeaderCol}>
-                  <Text style={styles.sectionHeading}>🎯 {config.name} Packages &amp; Activities</Text>
-                  <Text style={styles.sectionSubHeading}>Curated study packs with notes, tests, PYQs &amp; guidance</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={styles.sectionHeading}>👑 Recommended Packages</Text>
                 </View>
 
-                <View style={styles.modulesGrid}>
-                  {activities.map((act) => (
-                    <TouchableOpacity
-                      key={act.id}
-                      style={[styles.moduleCard, { borderColor: '#bbf7d0', backgroundColor: '#ffffff' }]}
-                      onPress={() => {
-                        setSelectedActivity(act);
-                        setView('activity');
-                      }}
-                      activeOpacity={0.82}
-                    >
-                      <View style={[styles.moduleIconBox, { backgroundColor: '#ecfdf5' }]}>
-                        <Text style={styles.moduleIcon}>🎯</Text>
-                      </View>
-                      <View style={styles.moduleInfo}>
-                        <View style={styles.moduleTitleRow}>
-                          <Text style={styles.moduleTitle}>{act.title}</Text>
-                          {act.access_type === 'free' && (
-                            <View style={[styles.moduleTag, { backgroundColor: '#dcfce7' }]}>
-                              <Text style={[styles.moduleTagText, { color: '#15803d' }]}>FREE</Text>
-                            </View>
-                          )}
+                <View style={styles.modulesTwoColGrid}>
+                  {activities.map((act, idx) => {
+                    const isSecond = idx % 2 === 1;
+                    const cardBg = isSecond ? '#f0fdf4' : '#eff6ff';
+                    const cardBorder = isSecond ? '#bbf7d0' : '#bfdbfe';
+                    const badgeBg = act.access_type === 'free' ? '#10b981' : isSecond ? '#10b981' : '#f59e0b';
+                    const badgeLabel = act.access_type === 'free' ? '★ Free' : isSecond ? '★ Best Value' : '★ Most Popular';
+                    const btnBg = isSecond ? '#dcfce7' : '#dbeafe';
+
+                    return (
+                      <TouchableOpacity
+                        key={act.id}
+                        style={[styles.pkgGridCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
+                        onPress={() => {
+                          setSelectedActivity(act);
+                          setView('activity');
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <View style={[styles.pkgTopPill, { backgroundColor: badgeBg }]}>
+                          <Text style={styles.pkgTopPillText}>{badgeLabel}</Text>
                         </View>
-                        <Text style={styles.moduleDesc} numberOfLines={2}>
-                          {act.subtitle || `${Array.isArray(act.items) ? act.items.length : 0} curated learning items included`}
+
+                        <View style={styles.pkgIconTitleRow}>
+                          <Text style={{ fontSize: 28 }}>{isSecond ? '✅' : '🎯'}</Text>
+                          <Text style={styles.pkgTitle} numberOfLines={2}>{act.title}</Text>
+                        </View>
+
+                        <Text style={styles.pkgSub} numberOfLines={2}>
+                          {act.subtitle || `${Array.isArray(act.items) ? act.items.length : 0} curated items included`}
                         </Text>
-                      </View>
-                      <Text style={styles.moduleArrow}>→</Text>
-                    </TouchableOpacity>
-                  ))}
+
+                        <View style={[styles.pkgExploreBtn, { backgroundColor: btnBg }]}>
+                          <Text style={styles.pkgExploreText}>Explore Package →</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             )}
 
-            {/* Exam Heading */}
-            <View style={styles.sectionHeaderCol}>
-              <Text style={styles.sectionHeading}>📚 {config.name} Learning Hub</Text>
-              <Text style={styles.sectionSubHeading}>Explore resources and tests designed for {config.fullName}</Text>
+            {/* Quick Access Section (matching reference UI) */}
+            <View style={styles.quickAccessCard}>
+              <Text style={styles.quickAccessHeading}>📖 Quick Access</Text>
+              <View style={styles.quickAccessRow}>
+                {config.hasVideos && (
+                  <TouchableOpacity style={styles.quickCircleItem} onPress={() => handleSelectModule('videos')} activeOpacity={0.8}>
+                    <View style={[styles.quickCircleIcon, { backgroundColor: '#fce7f3' }]}>
+                      <Text style={{ fontSize: 20 }}>🎥</Text>
+                    </View>
+                    <Text style={styles.quickCircleLabel}>Video{'\n'}Guidance</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity style={styles.quickCircleItem} onPress={() => handleSelectModule('materials')} activeOpacity={0.8}>
+                  <View style={[styles.quickCircleIcon, { backgroundColor: '#e0e7ff' }]}>
+                    <Text style={{ fontSize: 20 }}>📖</Text>
+                  </View>
+                  <Text style={styles.quickCircleLabel}>Study{'\n'}Materials</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.quickCircleItem} onPress={() => handleSelectModule('pyqs')} activeOpacity={0.8}>
+                  <View style={[styles.quickCircleIcon, { backgroundColor: '#dbeafe' }]}>
+                    <Text style={{ fontSize: 20 }}>📄</Text>
+                  </View>
+                  <Text style={styles.quickCircleLabel}>PYQ{'\n'}Papers</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.quickCircleItem} onPress={() => handleSelectModule('tests')} activeOpacity={0.8}>
+                  <View style={[styles.quickCircleIcon, { backgroundColor: '#ede9fe' }]}>
+                    <Text style={{ fontSize: 20 }}>📝</Text>
+                  </View>
+                  <Text style={styles.quickCircleLabel}>Mock{'\n'}Test</Text>
+                </TouchableOpacity>
+
+                {!subscriptionDisabled && (
+                  <TouchableOpacity style={styles.quickCircleItem} onPress={() => handleSelectModule('plans')} activeOpacity={0.8}>
+                    <View style={[styles.quickCircleIcon, { backgroundColor: '#fef3c7' }]}>
+                      <Text style={{ fontSize: 20 }}>👑</Text>
+                    </View>
+                    <Text style={styles.quickCircleLabel}>Plans</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
 
-            {/* 2-per-Row Modules Grid (matching Student Home Page) */}
-            <View style={styles.modulesTwoColGrid}>
-              {config.hasVideos && (
-                <TouchableOpacity
-                  style={styles.moduleGridCard}
-                  onPress={() => handleSelectModule('videos')}
-                  activeOpacity={0.82}
-                >
-                  <View style={styles.moduleGridTop}>
-                    <View style={[styles.moduleGridIconBox, { backgroundColor: '#fce7f3', borderColor: '#fbcfe8' }]}>
-                      <Text style={styles.moduleIcon}>🎥</Text>
-                    </View>
-                    <Text style={styles.moduleGridArrow}>→</Text>
-                  </View>
-                  <Text style={styles.moduleGridTitle}>Video Guidance</Text>
-                  <Text style={styles.moduleGridDesc} numberOfLines={2}>
-                    {examId === 'puc' ? 'PUC Lectures & Guides' : 'Specimens & Lab Videos'}
-                  </Text>
+            {/* Your {config.name} Progress Card (3-column white card matching reference UI) */}
+            <View style={{ gap: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={styles.sectionHeading}>📊 Your {config.name} Progress</Text>
+                <TouchableOpacity onPress={() => router.push('/student/progress')}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '800', color: config.themeColor }}>View Details →</Text>
                 </TouchableOpacity>
-              )}
+              </View>
 
               <TouchableOpacity
-                style={styles.moduleGridCard}
-                onPress={() => handleSelectModule('materials')}
-                activeOpacity={0.82}
+                activeOpacity={0.88}
+                onPress={() => router.push('/student/progress')}
+                style={styles.whiteProgressCard}
               >
-                <View style={styles.moduleGridTop}>
-                  <View style={[styles.moduleGridIconBox, { backgroundColor: '#e0e7ff', borderColor: '#c7d2fe' }]}>
-                    <Text style={styles.moduleIcon}>📚</Text>
+                <View style={styles.progressCol}>
+                  <View style={styles.progressRing}>
+                    <Text style={styles.progressRingText}>{examProgress.progressPercent}%</Text>
                   </View>
-                  <Text style={styles.moduleGridArrow}>→</Text>
+                  <Text style={styles.progressColLabel}>Overall Progress</Text>
                 </View>
-                <Text style={styles.moduleGridTitle}>Study Materials</Text>
-                <Text style={styles.moduleGridDesc} numberOfLines={2}>
-                  {examId === 'agri' ? 'Practical Notes & PDFs' : `${config.subjects.length} Subjects Notes & PDFs`}
-                </Text>
-              </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.moduleGridCard}
-                onPress={() => handleSelectModule('tests')}
-                activeOpacity={0.82}
-              >
-                <View style={styles.moduleGridTop}>
-                  <View style={[styles.moduleGridIconBox, { backgroundColor: '#dcfce7', borderColor: '#bbf7d0' }]}>
-                    <Text style={styles.moduleIcon}>📝</Text>
-                  </View>
-                  <Text style={styles.moduleGridArrow}>→</Text>
+                <View style={styles.progressDivider} />
+
+                <View style={styles.progressCol}>
+                  <Text style={{ fontSize: 20 }}>📝</Text>
+                  <Text style={styles.progressColVal}>{examProgress.testsAttended}</Text>
+                  <Text style={styles.progressColLabel}>Tests Attended</Text>
                 </View>
-                <Text style={styles.moduleGridTitle}>Mock Tests</Text>
-                <Text style={styles.moduleGridDesc} numberOfLines={2}>
-                  Timed Drills & Instant Rank
-                </Text>
-              </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.moduleGridCard}
-                onPress={() => handleSelectModule('pyqs')}
-                activeOpacity={0.82}
-              >
-                <View style={styles.moduleGridTop}>
-                  <View style={[styles.moduleGridIconBox, { backgroundColor: '#ffedd5', borderColor: '#fed7aa' }]}>
-                    <Text style={styles.moduleIcon}>📑</Text>
-                  </View>
-                  <Text style={styles.moduleGridArrow}>→</Text>
+                <View style={styles.progressDivider} />
+
+                <View style={styles.progressCol}>
+                  <Text style={{ fontSize: 20 }}>⭐</Text>
+                  <Text style={styles.progressColVal}>{examProgress.avgAccuracy}%</Text>
+                  <Text style={styles.progressColLabel}>Avg Accuracy</Text>
                 </View>
-                <Text style={styles.moduleGridTitle}>Previous Papers</Text>
-                <Text style={styles.moduleGridDesc} numberOfLines={2}>
-                  {examId === 'agri' ? 'Centre-wise Solved PYQs' : 'Solved Papers & Keys'}
-                </Text>
               </TouchableOpacity>
-
-              {!subscriptionDisabled && (
-                <TouchableOpacity
-                  style={styles.moduleGridCard}
-                  onPress={() => handleSelectModule('plans')}
-                  activeOpacity={0.82}
-                >
-                  <View style={styles.moduleGridTop}>
-                    <View style={[styles.moduleGridIconBox, { backgroundColor: '#fef9c3', borderColor: '#fef08a' }]}>
-                      <Text style={styles.moduleIcon}>⭐</Text>
-                    </View>
-                    <Text style={styles.moduleGridArrow}>→</Text>
-                  </View>
-                  <Text style={styles.moduleGridTitle}>Subscription Plans</Text>
-                  <Text style={styles.moduleGridDesc} numberOfLines={2}>
-                    VIP Access & Bundles
-                  </Text>
-                </TouchableOpacity>
-              )}
             </View>
 
-            {/* Exam-Specific Progress & Activity Card (matching Student Home Page) */}
-            <TouchableOpacity
-              activeOpacity={0.88}
-              onPress={() => router.push('/student/progress')}
-            >
+            {/* Bottom Progress Test CTA Banner */}
+            <TouchableOpacity activeOpacity={0.88} onPress={() => handleSelectModule('tests')}>
               <LinearGradient
-                colors={['#0f172a', '#1e293b']}
+                colors={['#eef2ff', '#e0e7ff', '#dbeafe']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.examProgressCard}
+                style={styles.takeTestBanner}
               >
-                <View style={styles.examProgressTop}>
-                  <Text style={styles.examProgressTitle}>📊 {config.name.toUpperCase()} ACTIVITY &amp; PROGRESS</Text>
-                  <View style={styles.examProgressPill}>
-                    <Text style={styles.examProgressPillText}>Analytics →</Text>
-                  </View>
+                <Text style={{ fontSize: 30 }}>🏆</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.takeTestTitle}>Take a Progress Test</Text>
+                  <Text style={styles.takeTestSub}>Know where you stand!</Text>
                 </View>
-
-                <View style={styles.examProgressBody}>
-                  <View style={styles.examProgressCircle}>
-                    <Text style={styles.examProgressPct}>{examProgress.progressPercent}%</Text>
-                  </View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={{ color: '#ffffff', fontSize: 13.5, fontWeight: '800' }}>
-                      {config.name} Preparation
-                    </Text>
-                    <Text style={{ color: '#cbd5e1', fontSize: 11.5 }}>
-                      {examProgress.testsAttended > 0 ? 'Keep practicing to boost rank!' : 'Start a mock test to track progress!'}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <LinearGradient colors={['#10b981', '#059669']} style={styles.examStatPill}>
-                      <Text style={styles.examStatVal}>{examProgress.testsAttended}</Text>
-                      <Text style={styles.examStatLbl}>TESTS</Text>
-                    </LinearGradient>
-                    <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.examStatPill}>
-                      <Text style={styles.examStatVal}>{examProgress.avgAccuracy}%</Text>
-                      <Text style={styles.examStatLbl}>ACCURACY</Text>
-                    </LinearGradient>
-                  </View>
+                <View style={styles.takeTestBtn}>
+                  <Text style={styles.takeTestBtnText}>Start Test →</Text>
                 </View>
               </LinearGradient>
             </TouchableOpacity>
@@ -1253,6 +1232,16 @@ export default function ExamDetailsScreen() {
                         <TouchableOpacity
                           style={styles.viewPdfBtn}
                           onPress={() => {
+                            if (it.pdfUrl) {
+                              const targetUrl = it.pdfUrl.startsWith('http') ? it.pdfUrl : `${API_BASE_URL}${it.pdfUrl}`;
+                              WebBrowser.openBrowserAsync(targetUrl).catch(() => {});
+                              return;
+                            }
+                            if (it.youtubeUrl) {
+                              const yt = it.youtubeUrl.startsWith('http') ? it.youtubeUrl : `https://www.youtube.com/watch?v=${it.youtubeUrl}`;
+                              WebBrowser.openBrowserAsync(yt).catch(() => {});
+                              return;
+                            }
                             if (it.itemType === 'tests') {
                               handleStartTest({ id: it.itemId, uniqueId: examId === 'agri' ? String(it.itemId) : `${examId}_${it.itemId}` });
                             } else if (it.itemType === 'videos') {
@@ -1458,6 +1447,76 @@ const styles = StyleSheet.create({
   examStatPill: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, alignItems: 'center', minWidth: 56 },
   examStatVal: { fontSize: 15, fontWeight: '900', color: '#ffffff' },
   examStatLbl: { fontSize: 8.5, fontWeight: '800', color: '#e2e8f0', letterSpacing: 0.5, marginTop: 2 },
+  pkgGridCard: {
+    width: '48.2%',
+    maxWidth: '48.2%',
+    flexBasis: '48.2%',
+    borderRadius: 20,
+    padding: 14,
+    borderWidth: 1,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  pkgTopPill: { alignSelf: 'flex-end', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 12 },
+  pkgTopPillText: { color: '#ffffff', fontSize: 9.5, fontWeight: '900' },
+  pkgIconTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pkgTitle: { flex: 1, fontSize: 15, fontWeight: '900', color: '#0f172a', lineHeight: 19 },
+  pkgSub: { fontSize: 11.5, color: '#475569', fontWeight: '500', lineHeight: 15, minHeight: 30 },
+  pkgExploreBtn: { borderRadius: 12, paddingVertical: 8, alignItems: 'center', marginTop: 2 },
+  pkgExploreText: { fontSize: 12, fontWeight: '800', color: '#0f172a' },
+  quickAccessCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  quickAccessHeading: { fontSize: 15.5, fontWeight: '900', color: '#0f172a' },
+  quickAccessRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 6 },
+  quickCircleItem: { flex: 1, alignItems: 'center', gap: 6 },
+  quickCircleIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  quickCircleLabel: { fontSize: 10.5, fontWeight: '700', color: '#334155', textAlign: 'center', lineHeight: 13 },
+  whiteProgressCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  progressCol: { flex: 1, alignItems: 'center', gap: 5 },
+  progressRing: { width: 52, height: 52, borderRadius: 26, borderWidth: 4.5, borderColor: '#10b981', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0fdf4' },
+  progressRingText: { fontSize: 14, fontWeight: '900', color: '#0f172a' },
+  progressColVal: { fontSize: 16, fontWeight: '900', color: '#0f172a' },
+  progressColLabel: { fontSize: 10.5, fontWeight: '700', color: '#64748b', textAlign: 'center' },
+  progressDivider: { width: 1, height: 46, backgroundColor: '#e2e8f0' },
+  takeTestBanner: {
+    borderRadius: 20,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+  },
+  takeTestTitle: { fontSize: 15, fontWeight: '900', color: '#0f172a' },
+  takeTestSub: { fontSize: 12, color: '#475569', fontWeight: '600' },
+  takeTestBtn: { backgroundColor: '#1e1b4b', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18 },
+  takeTestBtnText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
   moduleCard: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
