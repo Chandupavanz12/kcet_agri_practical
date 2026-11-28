@@ -34,10 +34,12 @@ export default function Root({ children }: { children: React.ReactNode }) {
         />
         <meta name="robots" content="index, follow" />
         <meta name="theme-color" content="#059669" />
+        <link rel="canonical" href="https://kcet-agri-practical1.vercel.app/" />
 
         {/* Open Graph */}
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="StudyHack" />
+        <meta property="og:url" content="https://kcet-agri-practical1.vercel.app/" />
         <meta
           property="og:title"
           content="StudyHack — KCET, Agri Practical, NEET & PUC Free Preparation Hub"
@@ -71,7 +73,19 @@ export default function Root({ children }: { children: React.ReactNode }) {
           }
         `}</style>
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <noscript>
+          <main style={{ fontFamily: 'sans-serif', maxWidth: 720, margin: '40px auto', padding: 20 }}>
+            <h1>StudyHack — KCET, Agri Practical, NEET &amp; PUC Free Preparation Hub</h1>
+            <p>
+              StudyHack provides free complete preparation guidance for KCET, KCET Agri Practical,
+              NEET, and PUC (Class 11 &amp; 12), including chapter-wise study materials, previous year
+              question papers (PYQs), timed mock tests, and practical video lectures.
+            </p>
+          </main>
+        </noscript>
+      </body>
     </html>
   );
 }

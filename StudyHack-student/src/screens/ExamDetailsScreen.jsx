@@ -107,6 +107,7 @@ export default function ExamDetailsScreen() {
   const [selectedSubject, setSelectedSubject] = useState('All');
   const [activities, setActivities] = useState([]);
   const [selectedActivity, setSelectedActivity] = useState(null);
+  const [examProgress, setExamProgress] = useState({ progressPercent: 0, testsAttended: 0, avgAccuracy: 0 });
 
   const cachedData = EXAM_CLIENT_CACHE.get(examId);
 
@@ -176,13 +177,24 @@ export default function ExamDetailsScreen() {
     if (showContentSpinner) setFetchingContent(true);
     try {
       setError('');
-      // Load top banner & activities for this exam
-      const [bannerRes, actRes] = await Promise.all([
+      // Load top banner, activities & exam progress for this exam
+      const [bannerRes, actRes, progRes] = await Promise.all([
         apiFetch(`/api/student/banners?exam=${examId}`, { token }).catch(() => null),
         apiFetch(`/api/student/activities?exam=${examId}`, { token }).catch(() => null),
+        apiFetch('/api/student/aggregated-progress', { token }).catch(() => null),
       ]);
       if (Array.isArray(actRes?.activities)) {
         setActivities(actRes.activities);
+      }
+      if (Array.isArray(progRes?.exams)) {
+        const foundProg = progRes.exams.find((e) => String(e.exam).toLowerCase() === examId);
+        if (foundProg) {
+          setExamProgress({
+            progressPercent: Number(foundProg.progressPercent || 0),
+            testsAttended: Number(foundProg.testsAttended || 0),
+            avgAccuracy: Number(foundProg.avgAccuracy || 0),
+          });
+        }
       }
       let currentBanners = banners;
       if (Array.isArray(bannerRes?.banners) && bannerRes.banners.length > 0) {
@@ -642,133 +654,141 @@ export default function ExamDetailsScreen() {
               <Text style={styles.sectionSubHeading}>Explore resources and tests designed for {config.fullName}</Text>
             </View>
 
-            {/* Modules Grid / Cards */}
-            <View style={styles.modulesGrid}>
-              {/* Module: Video Guidance (PRESENT AT TOP FOR AGRI PRACTICAL) */}
+            {/* 2-per-Row Modules Grid (matching Student Home Page) */}
+            <View style={styles.modulesTwoColGrid}>
               {config.hasVideos && (
                 <TouchableOpacity
-                  style={[styles.moduleCard, { borderColor: '#fbcfe8' }]}
+                  style={styles.moduleGridCard}
                   onPress={() => handleSelectModule('videos')}
-                  activeOpacity={0.8}
+                  activeOpacity={0.82}
                 >
-                  <View style={[styles.moduleIconBox, { backgroundColor: '#fce7f3' }]}>
-                    <Text style={styles.moduleIcon}>🎥</Text>
-                  </View>
-                  <View style={styles.moduleInfo}>
-                    <View style={styles.moduleTitleRow}>
-                      <Text style={styles.moduleTitle}>Video Guidance</Text>
-                      <View style={[styles.moduleTag, { backgroundColor: '#fdf2f8' }]}>
-                        <Text style={[styles.moduleTagText, { color: '#db2777' }]}>
-                          {examId === 'puc' ? 'PUC Lectures' : 'Specimens'}
-                        </Text>
-                      </View>
+                  <View style={styles.moduleGridTop}>
+                    <View style={[styles.moduleGridIconBox, { backgroundColor: '#fce7f3', borderColor: '#fbcfe8' }]}>
+                      <Text style={styles.moduleIcon}>🎥</Text>
                     </View>
-                    <Text style={styles.moduleDesc}>
-                      {examId === 'puc'
-                        ? 'Concept explanations, practicals & chapter video guides'
-                        : 'Practical plant identification & lab demonstration videos'}
-                    </Text>
+                    <Text style={styles.moduleGridArrow}>→</Text>
                   </View>
-                  <Text style={styles.moduleArrow}>→</Text>
+                  <Text style={styles.moduleGridTitle}>Video Guidance</Text>
+                  <Text style={styles.moduleGridDesc} numberOfLines={2}>
+                    {examId === 'puc' ? 'PUC Lectures & Guides' : 'Specimens & Lab Videos'}
+                  </Text>
                 </TouchableOpacity>
               )}
 
-              {/* Module: Study Materials */}
               <TouchableOpacity
-                style={[styles.moduleCard, { borderColor: '#e0e7ff' }]}
+                style={styles.moduleGridCard}
                 onPress={() => handleSelectModule('materials')}
-                activeOpacity={0.8}
+                activeOpacity={0.82}
               >
-                <View style={[styles.moduleIconBox, { backgroundColor: '#e0e7ff' }]}>
-                  <Text style={styles.moduleIcon}>📚</Text>
-                </View>
-                <View style={styles.moduleInfo}>
-                  <View style={styles.moduleTitleRow}>
-                    <Text style={styles.moduleTitle}>Study Materials</Text>
-                    <View style={[styles.moduleTag, { backgroundColor: '#eef2ff' }]}>
-                      <Text style={[styles.moduleTagText, { color: '#4f46e5' }]}>
-                        {examId === 'agri' ? 'Practical Notes' : `${config.subjects.length} Subjects`}
-                      </Text>
-                    </View>
+                <View style={styles.moduleGridTop}>
+                  <View style={[styles.moduleGridIconBox, { backgroundColor: '#e0e7ff', borderColor: '#c7d2fe' }]}>
+                    <Text style={styles.moduleIcon}>📚</Text>
                   </View>
-                  <Text style={styles.moduleDesc}>
-                    {examId === 'agri'
-                      ? 'Detailed specimens, guides and agri notes'
-                      : 'Subject-wise notes, textbooks and chapter PDFs'}
-                  </Text>
+                  <Text style={styles.moduleGridArrow}>→</Text>
                 </View>
-                <Text style={styles.moduleArrow}>→</Text>
+                <Text style={styles.moduleGridTitle}>Study Materials</Text>
+                <Text style={styles.moduleGridDesc} numberOfLines={2}>
+                  {examId === 'agri' ? 'Practical Notes & PDFs' : `${config.subjects.length} Subjects Notes & PDFs`}
+                </Text>
               </TouchableOpacity>
 
-              {/* Module: Mock Tests */}
               <TouchableOpacity
-                style={[styles.moduleCard, { borderColor: '#dcfce7' }]}
+                style={styles.moduleGridCard}
                 onPress={() => handleSelectModule('tests')}
-                activeOpacity={0.8}
+                activeOpacity={0.82}
               >
-                <View style={[styles.moduleIconBox, { backgroundColor: '#dcfce7' }]}>
-                  <Text style={styles.moduleIcon}>📝</Text>
-                </View>
-                <View style={styles.moduleInfo}>
-                  <View style={styles.moduleTitleRow}>
-                    <Text style={styles.moduleTitle}>Mock Tests</Text>
-                    <View style={[styles.moduleTag, { backgroundColor: '#f0fdf4' }]}>
-                      <Text style={[styles.moduleTagText, { color: '#16a34a' }]}>Timed Drills</Text>
-                    </View>
+                <View style={styles.moduleGridTop}>
+                  <View style={[styles.moduleGridIconBox, { backgroundColor: '#dcfce7', borderColor: '#bbf7d0' }]}>
+                    <Text style={styles.moduleIcon}>📝</Text>
                   </View>
-                  <Text style={styles.moduleDesc}>Full length timed tests with instant scoring & rank feedback</Text>
+                  <Text style={styles.moduleGridArrow}>→</Text>
                 </View>
-                <Text style={styles.moduleArrow}>→</Text>
+                <Text style={styles.moduleGridTitle}>Mock Tests</Text>
+                <Text style={styles.moduleGridDesc} numberOfLines={2}>
+                  Timed Drills & Instant Rank
+                </Text>
               </TouchableOpacity>
 
-              {/* Module: Previous Year Papers */}
               <TouchableOpacity
-                style={[styles.moduleCard, { borderColor: '#ffedd5' }]}
+                style={styles.moduleGridCard}
                 onPress={() => handleSelectModule('pyqs')}
-                activeOpacity={0.8}
+                activeOpacity={0.82}
               >
-                <View style={[styles.moduleIconBox, { backgroundColor: '#ffedd5' }]}>
-                  <Text style={styles.moduleIcon}>📑</Text>
-                </View>
-                <View style={styles.moduleInfo}>
-                  <View style={styles.moduleTitleRow}>
-                    <Text style={styles.moduleTitle}>Previous Year Papers</Text>
-                    <View style={[styles.moduleTag, { backgroundColor: '#fff7ed' }]}>
-                      <Text style={[styles.moduleTagText, { color: '#ea580c' }]}>Past Solved</Text>
-                    </View>
+                <View style={styles.moduleGridTop}>
+                  <View style={[styles.moduleGridIconBox, { backgroundColor: '#ffedd5', borderColor: '#fed7aa' }]}>
+                    <Text style={styles.moduleIcon}>📑</Text>
                   </View>
-                  <Text style={styles.moduleDesc}>
-                    {examId === 'agri'
-                      ? 'Centre-wise solved question papers'
-                      : 'Previous years official papers with answer keys'}
-                  </Text>
+                  <Text style={styles.moduleGridArrow}>→</Text>
                 </View>
-                <Text style={styles.moduleArrow}>→</Text>
+                <Text style={styles.moduleGridTitle}>Previous Papers</Text>
+                <Text style={styles.moduleGridDesc} numberOfLines={2}>
+                  {examId === 'agri' ? 'Centre-wise Solved PYQs' : 'Solved Papers & Keys'}
+                </Text>
               </TouchableOpacity>
 
-              {/* Module: Subscription Plans (LAST MODULE - hidden if disabled by admin) */}
               {!subscriptionDisabled && (
                 <TouchableOpacity
-                  style={[styles.moduleCard, { borderColor: '#fef08a' }]}
+                  style={styles.moduleGridCard}
                   onPress={() => handleSelectModule('plans')}
-                  activeOpacity={0.8}
+                  activeOpacity={0.82}
                 >
-                  <View style={[styles.moduleIconBox, { backgroundColor: '#fef9c3' }]}>
-                    <Text style={styles.moduleIcon}>⭐</Text>
-                  </View>
-                  <View style={styles.moduleInfo}>
-                    <View style={styles.moduleTitleRow}>
-                      <Text style={styles.moduleTitle}>Subscription Plans</Text>
-                      <View style={[styles.moduleTag, { backgroundColor: '#fefce8' }]}>
-                        <Text style={[styles.moduleTagText, { color: '#ca8a04' }]}>VIP Access</Text>
-                      </View>
+                  <View style={styles.moduleGridTop}>
+                    <View style={[styles.moduleGridIconBox, { backgroundColor: '#fef9c3', borderColor: '#fef08a' }]}>
+                      <Text style={styles.moduleIcon}>⭐</Text>
                     </View>
-                    <Text style={styles.moduleDesc}>Unlock all locked chapters, mocks & premium content</Text>
+                    <Text style={styles.moduleGridArrow}>→</Text>
                   </View>
-                  <Text style={styles.moduleArrow}>→</Text>
+                  <Text style={styles.moduleGridTitle}>Subscription Plans</Text>
+                  <Text style={styles.moduleGridDesc} numberOfLines={2}>
+                    VIP Access & Bundles
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
+
+            {/* Exam-Specific Progress & Activity Card (matching Student Home Page) */}
+            <TouchableOpacity
+              activeOpacity={0.88}
+              onPress={() => router.push('/student/progress')}
+            >
+              <LinearGradient
+                colors={['#0f172a', '#1e293b']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.examProgressCard}
+              >
+                <View style={styles.examProgressTop}>
+                  <Text style={styles.examProgressTitle}>📊 {config.name.toUpperCase()} ACTIVITY &amp; PROGRESS</Text>
+                  <View style={styles.examProgressPill}>
+                    <Text style={styles.examProgressPillText}>Analytics →</Text>
+                  </View>
+                </View>
+
+                <View style={styles.examProgressBody}>
+                  <View style={styles.examProgressCircle}>
+                    <Text style={styles.examProgressPct}>{examProgress.progressPercent}%</Text>
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ color: '#ffffff', fontSize: 13.5, fontWeight: '800' }}>
+                      {config.name} Preparation
+                    </Text>
+                    <Text style={{ color: '#cbd5e1', fontSize: 11.5 }}>
+                      {examProgress.testsAttended > 0 ? 'Keep practicing to boost rank!' : 'Start a mock test to track progress!'}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <LinearGradient colors={['#10b981', '#059669']} style={styles.examStatPill}>
+                      <Text style={styles.examStatVal}>{examProgress.testsAttended}</Text>
+                      <Text style={styles.examStatLbl}>TESTS</Text>
+                    </LinearGradient>
+                    <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.examStatPill}>
+                      <Text style={styles.examStatVal}>{examProgress.avgAccuracy}%</Text>
+                      <Text style={styles.examStatLbl}>ACCURACY</Text>
+                    </LinearGradient>
+                  </View>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -1406,6 +1426,38 @@ const styles = StyleSheet.create({
 
   // Level 1: Modules Grid
   modulesGrid: { gap: 12 },
+  modulesTwoColGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
+  moduleGridCard: {
+    width: '48.2%',
+    maxWidth: '48.2%',
+    flexBasis: '48.2%',
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  moduleGridTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  moduleGridIconBox: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  moduleGridArrow: { fontSize: 18, fontWeight: '900', color: '#cbd5e1' },
+  moduleGridTitle: { fontSize: 15.5, fontWeight: '900', color: '#0f172a' },
+  moduleGridDesc: { fontSize: 11.5, fontWeight: '600', color: '#64748b', lineHeight: 15 },
+  examProgressCard: { borderRadius: 24, padding: 18, gap: 14, shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 12, elevation: 5 },
+  examProgressTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  examProgressTitle: { fontSize: 13, fontWeight: '900', color: '#ffffff', letterSpacing: 0.4 },
+  examProgressPill: { backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  examProgressPillText: { color: '#38bdf8', fontSize: 11, fontWeight: '800' },
+  examProgressBody: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  examProgressCircle: { width: 54, height: 54, borderRadius: 27, borderWidth: 4, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.12)', alignItems: 'center', justifyContent: 'center' },
+  examProgressPct: { fontSize: 14, fontWeight: '900', color: '#ffffff' },
+  examStatPill: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, alignItems: 'center', minWidth: 56 },
+  examStatVal: { fontSize: 15, fontWeight: '900', color: '#ffffff' },
+  examStatLbl: { fontSize: 8.5, fontWeight: '800', color: '#e2e8f0', letterSpacing: 0.5, marginTop: 2 },
   moduleCard: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
