@@ -202,7 +202,7 @@ export default function StudentDashboardScreen() {
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={styles.iconCircle}
-              onPress={() => router.push('/student/notifications')}
+              onPress={() => router.push('/student/admin-notifications')}
               activeOpacity={0.75}
             >
               <Text style={styles.bellIcon}>🔔</Text>
@@ -333,9 +333,6 @@ export default function StudentDashboardScreen() {
         {/* 2. "Choose Your Exam" Section */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionHeading}>🎯 CHOOSE YOUR EXAM</Text>
-          <TouchableOpacity style={styles.viewAllPill} onPress={() => router.push('/student/exam/puc')}>
-            <Text style={styles.viewAllText}>View All →</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.examGrid}>
@@ -523,7 +520,7 @@ export default function StudentDashboardScreen() {
 
       {/* 6. Native Bottom Navigation Bar */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity style={[styles.bottomNavItem, styles.bottomNavItemActive]} onPress={() => {}}>
+        <TouchableOpacity style={[styles.bottomNavItem, styles.bottomNavItemActive]} onPress={() => { }}>
           <Text style={[styles.bottomNavIcon, { color: '#059669' }]}>🏠</Text>
           <Text style={[styles.bottomNavLabel, { color: '#059669', fontWeight: '800' }]}>Home</Text>
         </TouchableOpacity>

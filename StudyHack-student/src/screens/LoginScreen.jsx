@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -211,6 +212,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0f172a',
     height: '100%',
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
   },
   eyeBtn: {
     padding: 6,

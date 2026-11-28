@@ -33,56 +33,61 @@ export default function StudentAuthShell({
           showsVerticalScrollIndicator={false}
         >
           {/* Top Hero Section with Generated Sunlit Desk & Books Image */}
-          <ImageBackground
-            source={require('../../assets/images/student-auth-hero.jpg')}
-            style={styles.heroBg}
-            imageStyle={styles.heroBgImg}
-            resizeMode="cover"
-          >
-            <LinearGradient
-              colors={['rgba(255,255,255,0.88)', 'rgba(240,253,244,0.62)', 'rgba(6,78,59,0.18)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.heroOverlay}
+          <View style={styles.heroOuter}>
+            <ImageBackground
+              source={require('../../assets/images/student-auth-hero.jpg')}
+              style={styles.heroBg}
+              imageStyle={[
+                styles.heroBgImg,
+                Platform.OS === 'web' ? { objectPosition: 'right center' } : null,
+              ]}
+              resizeMode="cover"
             >
-              {/* Brand + Partner Row */}
-              <View style={styles.brandRow}>
-                <View style={styles.logoGroup}>
-                  <Image
-                    source={require('../../assets/images/studyhack-emblem.png')}
-                    style={styles.logoImg}
-                    resizeMode="contain"
-                  />
-                  <View>
-                    <Text style={styles.brandTitle}>
-                      Study<Text style={styles.brandTitleGreen}>Hack</Text>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.88)', 'rgba(240,253,244,0.45)', 'rgba(6,78,59,0.12)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.heroOverlay}
+              >
+                {/* Brand + Partner Row */}
+                <View style={styles.brandRow}>
+                  <View style={styles.logoGroup}>
+                    <Image
+                      source={require('../../assets/images/studyhack-emblem.png')}
+                      style={styles.logoImg}
+                      resizeMode="contain"
+                    />
+                    <View>
+                      <Text style={styles.brandTitle}>
+                        Study<Text style={styles.brandTitleGreen}>Hack</Text>
+                      </Text>
+                      <Text style={styles.brandTagline}>Learn Smart. Score Higher.</Text>
+                      <View style={styles.brandUnderline} />
+                    </View>
+                  </View>
+
+                  <View style={styles.partnerBox}>
+                    <Text style={styles.partnerText}>Your{'\n'}Exam Success{'\n'}Partner!</Text>
+                    <View style={styles.goldAccentBar} />
+                  </View>
+                </View>
+
+                {/* Slogan Row */}
+                <View style={styles.heroBodyRow}>
+                  <View style={styles.heroLeft}>
+                    <Text style={styles.heroSlogan}>
+                      Dream Big...{'\n'}Prepare Well...
                     </Text>
-                    <Text style={styles.brandTagline}>Learn Smart. Score Higher.</Text>
-                    <View style={styles.brandUnderline} />
+                    <View style={styles.achievePill}>
+                      <Text style={styles.achieveText}>Achieve More!</Text>
+                      <View style={styles.achieveGoldLine} />
+                    </View>
                   </View>
+                  <View style={{ flex: 0.9 }} />
                 </View>
-
-                <View style={styles.partnerBox}>
-                  <Text style={styles.partnerText}>Your{'\n'}Exam Success{'\n'}Partner!</Text>
-                  <View style={styles.goldAccentBar} />
-                </View>
-              </View>
-
-              {/* Slogan Row */}
-              <View style={styles.heroBodyRow}>
-                <View style={styles.heroLeft}>
-                  <Text style={styles.heroSlogan}>
-                    Dream Big...{'\n'}Prepare Well...
-                  </Text>
-                  <View style={styles.achievePill}>
-                    <Text style={styles.achieveText}>Achieve More!</Text>
-                    <View style={styles.achieveGoldLine} />
-                  </View>
-                </View>
-                <View style={{ flex: 0.7 }} />
-              </View>
-            </LinearGradient>
-          </ImageBackground>
+              </LinearGradient>
+            </ImageBackground>
+          </View>
 
           {/* Overlapping White Auth Card */}
           <View style={styles.cardOuter}>
@@ -135,16 +140,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#f0fdf4',
   },
+  heroOuter: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    overflow: 'hidden',
+  },
   heroBg: {
     width: '100%',
+    minHeight: 220,
   },
   heroBgImg: {
-    opacity: 0.96,
+    opacity: 0.98,
+    width: '100%',
+    height: '100%',
   },
   heroOverlay: {
     paddingHorizontal: 18,
     paddingTop: 14,
     paddingBottom: 38,
+    minHeight: 220,
+    justifyContent: 'space-between',
   },
   brandRow: {
     flexDirection: 'row',

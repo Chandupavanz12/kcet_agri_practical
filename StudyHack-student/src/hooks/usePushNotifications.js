@@ -1,6 +1,7 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
 import { isRunningInExpoGo } from 'expo';
+import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import { apiFetch } from '../api/client.js';
@@ -36,6 +37,8 @@ if (Notifications && typeof Notifications.setNotificationHandler === 'function')
     Notifications.setNotificationHandler({
         handleNotification: async () => ({
             shouldShowAlert: true,
+            shouldShowBanner: true,
+            shouldShowList: true,
             shouldPlaySound: true,
             shouldSetBadge: true,
         }),
@@ -45,6 +48,7 @@ if (Notifications && typeof Notifications.setNotificationHandler === 'function')
 export function usePushNotifications() {
     const [expoPushToken, setExpoPushToken] = useState('');
     const { token, user } = useAuth();
+    const router = useRouter();
     const responseListener = useRef();
 
     useEffect(() => {
@@ -52,6 +56,15 @@ export function usePushNotifications() {
 
         const notif = getNotificationsModule();
         if (!notif) return;
+
+        const handleNotificationTap = (response) => {
+            const data = response?.notification?.request?.content?.data || {};
+            if (data?.type === 'admin_notification') {
+                router.push('/student/admin-notifications');
+            } else {
+                router.push('/student/notifications');
+            }
+        };
 
         registerForPushNotificationsAsync(notif)
             .then((pushToken) => {
@@ -69,10 +82,17 @@ export function usePushNotifications() {
                 console.log('[push] Push notification registration error:', err);
             });
 
+        // Handle cold-start when app was completely closed and user tapped a notification
+        if (typeof notif.getLastNotificationResponseAsync === 'function') {
+            notif.getLastNotificationResponseAsync()
+                .then((lastResp) => {
+                    if (lastResp) handleNotificationTap(lastResp);
+                })
+                .catch(() => {});
+        }
+
         if (typeof notif.addNotificationResponseReceivedListener === 'function') {
-            responseListener.current = notif.addNotificationResponseReceivedListener(_response => {
-                // Handle tap on notification here (e.g. open specific notification directly)
-            });
+            responseListener.current = notif.addNotificationResponseReceivedListener(handleNotificationTap);
         }
 
         return () => {
@@ -82,7 +102,7 @@ export function usePushNotifications() {
                 } catch (_e) { }
             }
         };
-    }, [user, token]);
+    }, [user, token, router]);
 
     return { expoPushToken };
 }

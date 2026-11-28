@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -261,6 +262,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0f172a',
     height: '100%',
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
   },
   otpInput: {
     letterSpacing: 3,
