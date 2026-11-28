@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
   View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiFetch } from '../api/client.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
@@ -80,6 +80,7 @@ export default function StudentDashboardScreen() {
   const { token, user } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   const [banners, setBanners] = useState([
     {
@@ -106,6 +107,7 @@ export default function StudentDashboardScreen() {
   });
   const [notifications, setNotifications] = useState([]);
   const [subscriptionsDisabled, setSubscriptionsDisabled] = useState([]);
+  const [disabledExams, setDisabledExams] = useState([]);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -124,6 +126,9 @@ export default function StudentDashboardScreen() {
 
       if (Array.isArray(subSetRes?.subscriptionsDisabled)) {
         setSubscriptionsDisabled(subSetRes.subscriptionsDisabled);
+      }
+      if (Array.isArray(subSetRes?.disabledExams)) {
+        setDisabledExams(subSetRes.disabledExams.map((x) => String(x).toLowerCase().trim()));
       }
 
       if (Array.isArray(bannerRes?.banners) && bannerRes.banners.length > 0) {
@@ -189,7 +194,7 @@ export default function StudentDashboardScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
@@ -336,7 +341,7 @@ export default function StudentDashboardScreen() {
         </View>
 
         <View style={styles.examGrid}>
-          {EXAM_CARDS.map((exam) => (
+          {EXAM_CARDS.filter((exam) => !disabledExams.includes(exam.id)).map((exam) => (
             <TouchableOpacity
               key={exam.id}
               style={styles.examCard}
@@ -518,8 +523,16 @@ export default function StudentDashboardScreen() {
         </View>
       </ScrollView>
 
-      {/* 6. Native Bottom Navigation Bar */}
-      <View style={styles.bottomNav}>
+      {/* 6. Native Bottom Navigation Bar (adapts automatically to Android 3-button & gesture bars) */}
+      <View
+        style={[
+          styles.bottomNav,
+          {
+            paddingBottom: Math.max(insets.bottom, 8),
+            minHeight: 64 + insets.bottom,
+          },
+        ]}
+      >
         <TouchableOpacity style={[styles.bottomNavItem, styles.bottomNavItemActive]} onPress={() => { }}>
           <Text style={[styles.bottomNavIcon, { color: '#059669' }]}>🏠</Text>
           <Text style={[styles.bottomNavLabel, { color: '#059669', fontWeight: '800' }]}>Home</Text>
@@ -552,7 +565,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 92,
+    paddingBottom: 24,
     gap: 16,
   },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -768,11 +781,6 @@ const styles = StyleSheet.create({
 
   // Bottom Nav
   bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 68,
     backgroundColor: '#ffffff',
     flexDirection: 'row',
     borderTopWidth: 1,
@@ -780,6 +788,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 8,
+    paddingTop: 8,
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 10,

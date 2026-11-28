@@ -67,6 +67,7 @@ const SettingsSchema = new Schema(
     pyqs_enabled: { type: Boolean, default: true },
     notifications_enabled: { type: Boolean, default: true },
     subscriptions_disabled: { type: [String], default: [] },
+    disabled_exams: { type: [String], default: [] },
     created_at: { type: Date, default: () => new Date() },
     updated_at: { type: Date, default: () => new Date() },
   },

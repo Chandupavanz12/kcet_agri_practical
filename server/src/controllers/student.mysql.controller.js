@@ -409,7 +409,10 @@ export async function getSubscriptionSettingsStudent(req, res, next) {
     const disabled = Array.isArray(row?.subscriptions_disabled)
       ? row.subscriptions_disabled.map((x) => String(x || '').toLowerCase().trim()).filter(Boolean)
       : [];
-    return res.json({ subscriptionsDisabled: disabled });
+    const disabledExams = Array.isArray(row?.disabled_exams)
+      ? row.disabled_exams.map((x) => String(x || '').toLowerCase().trim()).filter(Boolean)
+      : [];
+    return res.json({ subscriptionsDisabled: disabled, disabledExams });
   } catch (err) {
     return next(err);
   }

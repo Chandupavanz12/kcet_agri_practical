@@ -1,6 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { apiFetch } from '../api/client.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 export const EXAM_OPTIONS = [
   {
@@ -57,6 +59,23 @@ export default function ExamSelectorView({
   onSelectExam,
   onBack,
 }) {
+  const { token } = useAuth();
+  const [disabledExams, setDisabledExams] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    apiFetch('/api/student/subscription-settings', { token })
+      .then((res) => {
+        if (active && Array.isArray(res?.disabledExams)) {
+          setDisabledExams(res.disabledExams.map((x) => String(x).toLowerCase().trim()));
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [token]);
+
+  const visibleExams = (exams || []).filter((ex) => !disabledExams.includes(String(ex.id).toLowerCase()));
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -80,7 +99,7 @@ export default function ExamSelectorView({
       </LinearGradient>
 
       <View style={styles.list}>
-        {exams.map((ex) => (
+        {visibleExams.map((ex) => (
           <TouchableOpacity
             key={ex.id}
             style={[styles.card, { borderColor: ex.border }]}

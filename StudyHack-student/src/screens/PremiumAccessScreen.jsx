@@ -62,7 +62,7 @@ export default function PremiumAccessScreen() {
               bustAndRefresh();
             }
           })
-          .catch(() => {});
+          .catch(() => { });
       }
     });
     return () => {

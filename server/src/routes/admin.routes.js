@@ -88,9 +88,11 @@ import {
   createAdminExamMaterial,
   getAdminExamMaterials,
   deleteAdminExamMaterial,
+  updateAdminExamMaterial,
   createAdminExamPyq,
   getAdminExamPyqs,
   deleteAdminExamPyq,
+  updateAdminExamPyq,
   createAdminExamTest,
   getAdminExamTests,
   deleteAdminExamTest,
@@ -119,10 +121,12 @@ adminRouter.delete('/banners/:id', deleteAdminBanner);
 // Exam Content Management (PUC, KCET, NEET)
 adminRouter.get('/exam/materials', getAdminExamMaterials);
 adminRouter.post('/exam/materials', createAdminExamMaterial);
+adminRouter.put('/exam/materials/:id', updateAdminExamMaterial);
 adminRouter.delete('/exam/materials/:id', deleteAdminExamMaterial);
 
 adminRouter.get('/exam/pyqs', getAdminExamPyqs);
 adminRouter.post('/exam/pyqs', createAdminExamPyq);
+adminRouter.put('/exam/pyqs/:id', updateAdminExamPyq);
 adminRouter.delete('/exam/pyqs/:id', deleteAdminExamPyq);
 
 adminRouter.get('/exam/tests', getAdminExamTests);

@@ -133,6 +133,9 @@ function mapSettingsRow(row) {
     subscriptionsDisabled: Array.isArray(row.subscriptions_disabled)
       ? row.subscriptions_disabled.map((x) => String(x).toLowerCase().trim())
       : [],
+    disabledExams: Array.isArray(row.disabled_exams)
+      ? row.disabled_exams.map((x) => String(x).toLowerCase().trim())
+      : [],
   };
 }
 
@@ -1108,6 +1111,7 @@ export async function listMaterials(req, res, next) {
       subject: m.subject,
       type: m.type,
       accessType: m.access_type,
+      status: m.status || 'active',
     }));
     return res.json({ materials });
   } catch (err) {
@@ -1129,6 +1133,7 @@ export async function updateMaterial(req, res, next) {
     if (Object.prototype.hasOwnProperty.call(body, 'type')) updates.type = body.type;
     if (Object.prototype.hasOwnProperty.call(body, 'accessType')) updates.access_type = body.accessType;
     if (Object.prototype.hasOwnProperty.call(body, 'access_type')) updates.access_type = body.access_type;
+    if (Object.prototype.hasOwnProperty.call(body, 'status')) updates.status = String(body.status).toLowerCase() === 'inactive' ? 'inactive' : 'active';
 
     if (Object.keys(updates).length > 0) {
       if (updates.pdf_url) {
@@ -1144,7 +1149,7 @@ export async function updateMaterial(req, res, next) {
     const m = await (await getMaterialModel()).findOne({ id: Number(id) }, { _id: 0, __v: 0 }).lean();
     if (!m) return res.status(404).json({ message: 'Material not found' });
     return res.json({
-      material: { id: m.id, title: m.title, pdfUrl: m.pdf_url, subject: m.subject, type: m.type, accessType: m.access_type },
+      material: { id: m.id, title: m.title, pdfUrl: m.pdf_url, subject: m.subject, type: m.type, accessType: m.access_type, status: m.status || 'active' },
     });
   } catch (err) {
     return next(err);
@@ -2068,6 +2073,13 @@ export async function updateSettings(req, res, next) {
     if (Object.prototype.hasOwnProperty.call(req.body || {}, 'subscriptionsDisabled')) {
       const raw = req.body.subscriptionsDisabled;
       updates.subscriptions_disabled = Array.isArray(raw)
+        ? [...new Set(raw.map((x) => String(x || '').toLowerCase().trim()).filter(Boolean))]
+        : [];
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'disabledExams')) {
+      const raw = req.body.disabledExams;
+      updates.disabled_exams = Array.isArray(raw)
         ? [...new Set(raw.map((x) => String(x || '').toLowerCase().trim()).filter(Boolean))]
         : [];
     }

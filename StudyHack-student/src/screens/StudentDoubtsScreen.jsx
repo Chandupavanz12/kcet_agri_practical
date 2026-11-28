@@ -188,11 +188,11 @@ export default function StudentDoubtsScreen() {
                     </>
                 ) : (
                     <>
-                        <TouchableOpacity onPress={() => router.back()}>
-                            <Ionicons name="arrow-back" size={24} color="#0f172a" />
+                        <TouchableOpacity onPress={() => router.back()} style={{ padding: 6, backgroundColor: '#1e293b', borderRadius: 10 }}>
+                            <Ionicons name="arrow-back" size={20} color="#ffffff" />
                         </TouchableOpacity>
                         <Text style={styles.headerTitle}>Doubt Clarification</Text>
-                        <View style={{ width: 24 }} />
+                        <View style={{ width: 32 }} />
                     </>
                 )}
             </View>
@@ -263,17 +263,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
-        elevation: 2,
+        paddingVertical: 14,
+        backgroundColor: '#0f172a',
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
+        elevation: 4,
         shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowRadius: 5
+        shadowOpacity: 0.12,
+        shadowRadius: 8
     },
-    headerTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
-    headerActionText: { fontSize: 16, fontWeight: '600', color: '#10b981' },
+    headerTitle: { fontSize: 18, fontWeight: '900', color: '#ffffff' },
+    headerActionText: { fontSize: 15, fontWeight: '700', color: '#34d399' },
     keyboardAvoid: { flex: 1 },
     listContent: { padding: 16, paddingBottom: 24, flexGrow: 1 },
     emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
         borderRadius: 20
     },
     bubbleMe: {
-        backgroundColor: '#10b981',
+        backgroundColor: '#059669',
         borderBottomRightRadius: 4
     },
     bubbleAdmin: {

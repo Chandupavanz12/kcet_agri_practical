@@ -1,8 +1,6 @@
-import crypto from 'crypto';
-import { getPoolForExam, getPucPool, getKcetNeetPool } from '../config/examPgs.js';
-export { getPoolForExam, getPucPool, getKcetNeetPool };
-import { Material, Pyq, User, UserAccess, Result } from '../models/index.js';
+import { getKcetNeetPool, getPoolForExam, getPucPool } from '../config/examPgs.js';
 import { getMockResultModel } from '../config/mockTestDb.js';
+export { getKcetNeetPool, getPoolForExam, getPucPool };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // IN-MEMORY TTL CACHE FOR ULTRA-FAST SUB-SECOND RESPONSES
@@ -66,7 +64,7 @@ export async function getStudentBanners(req, res, next) {
           `SELECT * FROM banners WHERE is_active = true ORDER BY display_order ASC LIMIT 10`
         );
         banners = result2.rows;
-      } catch (_) {}
+      } catch (_) { }
     }
 
     if (banners.length === 0) {
@@ -175,7 +173,7 @@ export async function createAdminBanner(req, res, next) {
           Boolean(is_active),
         ]
       );
-    } catch (_) {}
+    } catch (_) { }
 
     clearExamCache();
     return res.status(201).json({ success: true, banner: result.rows[0] });
@@ -252,7 +250,7 @@ export async function deleteAdminBanner(req, res, next) {
     try {
       const pool2 = getPucPool();
       await pool2.query('DELETE FROM banners WHERE id = $1', [id]);
-    } catch (_) {}
+    } catch (_) { }
     clearExamCache();
     return res.json({ success: true, message: 'Banner deleted' });
   } catch (err) {
@@ -349,7 +347,7 @@ export async function getUserBulkAllowedItems(userId) {
         mergeItems(doc.allowed_items);
       }
     }
-  } catch (_) {}
+  } catch (_) { }
 
   const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
   for (const p of pools) {
@@ -361,7 +359,7 @@ export async function getUserBulkAllowedItems(userId) {
       for (const row of r.rows) {
         mergeItems(row.allowed_items);
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   if (uid) {
@@ -482,7 +480,7 @@ export async function grantExamAccess(userId, exam, planCode, accessModules = ['
         await p.query(`ALTER TABLE user_access ADD COLUMN IF NOT EXISTS exam VARCHAR(50) DEFAULT 'puc'`);
         await p.query(`ALTER TABLE user_access ADD COLUMN IF NOT EXISTS access_modules JSONB DEFAULT '["all"]'::jsonb`);
         await p.query(`ALTER TABLE user_access ADD COLUMN IF NOT EXISTS allowed_items JSONB DEFAULT NULL`);
-      } catch (_) {}
+      } catch (_) { }
 
       await p.query(
         `DELETE FROM user_access WHERE user_id = $1 AND (exam = $2 OR exam = 'global') AND plan_code = $3`,
@@ -570,7 +568,7 @@ export async function getUserActiveExamAccess(userId) {
         });
       }
     }
-  } catch (_) {}
+  } catch (_) { }
 
   // Check Postgres Neon user_access
   const pools = [getPucPool(), getKcetNeetPool()].filter(Boolean);
@@ -596,7 +594,7 @@ export async function getUserActiveExamAccess(userId) {
           });
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   return activePlans;
@@ -927,7 +925,7 @@ export async function getExamPlans(req, res, next) {
           activePlanIds: [],
         });
       }
-    } catch (_) {}
+    } catch (_) { }
 
     const pool = getPoolForExam(exam) || getKcetNeetPool();
     if (!pool) return res.json({ plans: [] });
@@ -966,7 +964,7 @@ export async function getExamPlans(req, res, next) {
             if (!activeAccess) activeAccess = r;
             if (r.plan_code) activePlanCodes.push(String(r.plan_code).toLowerCase().trim());
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       // 2. Check MongoDB Payment records for active purchases
@@ -996,7 +994,7 @@ export async function getExamPlans(req, res, next) {
             }
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     activePlanCodes = [...new Set(activePlanCodes)];
@@ -1232,7 +1230,7 @@ export async function getAggregatedProgress(req, res, next) {
           }
           pucData.subjects = buildSubjectBreakdown(PUC_SUBJECTS, subjMap);
         }
-      } catch (_) {}
+      } catch (_) { }
       if (pucData.subjects.length === 0) {
         pucData.subjects = buildSubjectBreakdown(PUC_SUBJECTS, {});
       }
@@ -1315,7 +1313,7 @@ export async function getAggregatedProgress(req, res, next) {
           }
           kcetData.subjects = buildSubjectBreakdown(KCET_SUBJECTS, subjMap2);
         }
-      } catch (_) {}
+      } catch (_) { }
       if (kcetData.subjects.length === 0) {
         kcetData.subjects = buildSubjectBreakdown(KCET_SUBJECTS, {});
       }
@@ -1398,7 +1396,7 @@ export async function getAggregatedProgress(req, res, next) {
           }
           neetData.subjects = buildSubjectBreakdown(NEET_SUBJECTS, subjMap3);
         }
-      } catch (_) {}
+      } catch (_) { }
       if (neetData.subjects.length === 0) {
         neetData.subjects = buildSubjectBreakdown(NEET_SUBJECTS, {});
       }
@@ -1482,7 +1480,7 @@ export async function getAggregatedProgress(req, res, next) {
             agriData.subjects = buildSubjectBreakdown(AGRI_SUBJECTS, agriSubjMap);
           }
         }
-      } catch (_) {}
+      } catch (_) { }
 
       if (agriData.subjects.length === 0) {
         agriData.subjects = buildSubjectBreakdown(AGRI_SUBJECTS, {});
@@ -1849,6 +1847,21 @@ export async function deleteAdminExamMaterial(req, res, next) {
   }
 }
 
+export async function updateAdminExamMaterial(req, res, next) {
+  try {
+    const { id } = req.params;
+    const exam = String(req.query.exam || req.body?.exam || 'puc').toLowerCase().trim();
+    const pool = getPoolForExam(exam);
+    if (!pool) return res.status(400).json({ message: 'Invalid exam specified' });
+    const nextStatus = String(req.body?.status || '').toLowerCase() === 'inactive' ? 'inactive' : 'active';
+    const result = await pool.query('UPDATE materials SET status = $1 WHERE id = $2 RETURNING *', [nextStatus, id]);
+    if (!result.rows.length) return res.status(404).json({ message: 'Material not found' });
+    return res.json({ success: true, material: result.rows[0] });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 export async function getAdminExamPyqs(req, res, next) {
   try {
     const exam = String(req.query.exam || 'puc').toLowerCase().trim();
@@ -1869,6 +1882,21 @@ export async function deleteAdminExamPyq(req, res, next) {
     if (!pool) return res.status(400).json({ message: 'Invalid exam specified' });
     await pool.query('DELETE FROM pyqs WHERE id = $1', [id]);
     return res.json({ success: true, message: 'PYQ deleted' });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function updateAdminExamPyq(req, res, next) {
+  try {
+    const { id } = req.params;
+    const exam = String(req.query.exam || req.body?.exam || 'puc').toLowerCase().trim();
+    const pool = getPoolForExam(exam);
+    if (!pool) return res.status(400).json({ message: 'Invalid exam specified' });
+    const nextStatus = String(req.body?.status || '').toLowerCase() === 'inactive' ? 'inactive' : 'active';
+    const result = await pool.query('UPDATE pyqs SET status = $1 WHERE id = $2 RETURNING *', [nextStatus, id]);
+    if (!result.rows.length) return res.status(404).json({ message: 'PYQ not found' });
+    return res.json({ success: true, pyq: result.rows[0] });
   } catch (err) {
     return next(err);
   }
@@ -1935,7 +1963,7 @@ export async function deleteAdminExamPlan(req, res, next) {
     try {
       const { Plan } = await import('../models/index.js');
       await Plan.deleteOne({ id: Number(id) });
-    } catch (_) {}
+    } catch (_) { }
 
     clearExamCache();
     return res.json({ success: true, message: 'Plan deleted' });
@@ -2126,7 +2154,7 @@ export async function updateBulkPlan(req, res, next) {
           ]
         );
         if (result.rows.length > 0 && !updated) updated = result.rows[0];
-      } catch (_) {}
+      } catch (_) { }
     }
 
     clearExamCache();
@@ -2146,7 +2174,7 @@ export async function deleteBulkPlan(req, res, next) {
         const found = await pool.query('SELECT code FROM plans WHERE id = $1', [id]);
         if (found.rows[0]?.code) planCode = found.rows[0].code;
         await pool.query('DELETE FROM plans WHERE id = $1 OR ($2::text IS NOT NULL AND code = $2 AND allowed_items IS NOT NULL)', [id, planCode]);
-      } catch (_) {}
+      } catch (_) { }
     }
     clearExamCache();
     return res.json({ success: true, message: 'Bulk plan deleted' });

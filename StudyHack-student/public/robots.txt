@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Sitemap: https://kcet-agri-practical1.vercel.app/sitemap.xml
+
